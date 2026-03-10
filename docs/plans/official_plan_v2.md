@@ -178,7 +178,8 @@ interface RangeHighlight {
 
 interface VisualDirective {
   type: "card_grid" | "range_grid" | "equity_bar" | "equity_breakdown"
-      | "threat_map" | "outs_display" | "action_indicator" | "comparison";
+      | "hand_strength" | "threat_map" | "outs_display" | "action_indicator"
+      | "comparison";
   data: Record<string, unknown>;         // type-specific payload
   priority: number;                      // ordering importance
   lensId: string;                        // which lens generated this
@@ -196,75 +197,53 @@ interface AnalysisLens {
 }
 
 // Built-in lenses (each implemented as a separate module):
-// - RawEquityLens: hand strength against all/filtered holdings
+// - RawEquityLens: instant hand rank evaluation (no simulation)
+// - MonteCarloLens: opt-in equity simulation (10k trials)
 // - ThreatLens: what cards are dangerous on the next street
 // - OutsLens: what cards improve hero's hand
 // - DrawLens: flush/straight draw analysis
+// - OpponentReadLens: equity vs opponent's implied range
 // Future lenses (same interface, zero changes to existing code):
 // - GTOLens: game-theory-optimal action recommendations
 // - ICMLens: tournament equity adjustments
-// - OpponentReadLens: "what does their action tell us?"
 
 // ═══════════════════════════════════════════════════════
-// OPPONENT PROFILE — behavioral tree (same node structure)
+// OPPONENT PROFILE — situation-based behavioral model
 // ═══════════════════════════════════════════════════════
 
-// An opponent profile IS a decision tree using ExplanationNode.
-// Each node describes a decision point and the reasoning behind it.
-// When the opponent acts, the system traverses their tree to:
-//   1. Determine what action they take (for simulation)
-//   2. Explain WHY they took it (for the user's learning)
-//   3. Derive their implied range (for equity filtering)
+// An opponent profile maps standard poker situations to behavioral
+// parameters. Each situation has the same 5 configurable variables,
+// but values differ per profile archetype. Supports inheritance via
+// baseProfileId + overrides.
+
+type SituationKey =
+  | "preflop.open" | "preflop.facing_raise"
+  | "preflop.facing_3bet" | "preflop.facing_4bet"
+  | "postflop.aggressor.ip" | "postflop.aggressor.oop"
+  | "postflop.caller.ip" | "postflop.caller.oop"
+  | "postflop.facing_bet" | "postflop.facing_raise"
+  | "postflop.facing_allin";
+
+interface BehavioralParams {
+  continuePct: number;                   // % of hands that continue (call/raise)
+  raisePct: number;                      // % of continuing hands that raise vs call
+  positionAwareness: number;             // 0-1: how much position adjusts these numbers
+  bluffFrequency: number;               // 0-1: fraction of bets/raises that are bluffs
+  sizings: SizingPreference[];           // bet/raise sizing preferences
+  explanation: string;                   // teaching text for this situation
+}
 
 interface OpponentProfile {
   id: string;
   name: string;                          // "Nit", "LAG", "Calling Station"
   description: string;
-
-  // The behavioral tree
-  decisionTree: DecisionNode;
-
-  // Observable tendencies (derived from the tree, used for quick lookups)
-  tendencies: OpponentTendencies;
+  baseProfileId?: string;                // inheritance — "based on TAG"
+  situations: Partial<Record<SituationKey, BehavioralParams>>;
+  // Base profiles: all 11 populated. Derived profiles: only overrides.
 }
 
-interface DecisionNode {
-  // What is being decided at this node
-  condition: string;                     // "facing a raise preflop"
-  explanation: string;                   // "A Nit only continues with premium hands"
-
-  // Decision factors and their weights
-  factors: {
-    handStrength: number;                // how much hand strength matters (0-1)
-    position: number;                    // how much position matters
-    potOdds: number;                     // how much pot odds matter
-    opponentAction: number;              // how much opponent's action matters
-    stackDepth: number;                  // how much stack size matters
-  };
-
-  // Range thresholds for this decision point
-  continueRange: number;                 // % of hands that continue (call or raise)
-  raiseRange: number;                    // % of hands that raise (subset of continue)
-
-  // Sizing preferences at this node
-  sizingPreferences: SizingPreference[];
-
-  // Sub-decisions (deeper in the tree for specific situations)
-  children?: {
-    condition: string;                   // "on a dry flop" | "on a wet flop"
-    node: DecisionNode;
-  }[];
-}
-
-interface OpponentTendencies {
-  vpip: number;                          // voluntarily put $ in pot %
-  pfr: number;                           // preflop raise %
-  aggression: number;                    // aggression factor
-  threeBetPct: number;
-  cBetPct: number;
-  foldToCBetPct: number;
-  positionAwareness: number;             // 0 (none) to 1 (GTO-level)
-}
+// Display stats (vpip, pfr, etc.) are derived from the situation map
+// via deriveTendencies() — never stored separately.
 ```
 
 ### How the Architecture Grows Without Refactors
@@ -274,7 +253,7 @@ interface OpponentTendencies {
 | **Opponent modeling** | `AnalysisContext.opponents` gets populated | All existing lenses, UI, explanation structure |
 | **GTO lens** | New class implementing `AnalysisLens` | All existing lenses, context, UI rendering |
 | **ICM lens** | New class implementing `AnalysisLens`, uses `GameContext.tournamentContext` | Everything else |
-| **AI opponents at the table** | Opponent profiles drive `DecisionNode` traversal, produce `OpponentContext` | Analysis pipeline, UI, explanation structure |
+| **AI opponents at the table** | Opponent profiles drive situation-based decisions, produce `OpponentContext` | Analysis pipeline, UI, explanation structure |
 | **Game engine (dealing, automation)** | New orchestration layer that populates `AnalysisContext` from game state | All analysis, visualization, opponent modeling |
 | **New poker variant (Omaha)** | New hand evaluator behind same interface, different `GameContext` | Analysis pipeline, UI, opponent modeling |
 
@@ -292,7 +271,7 @@ HoldemVision/
 │   │   ├── types/                       # Core type contracts
 │   │   │   ├── analysis.ts              # AnalysisContext, AnalysisResult, ExplanationNode
 │   │   │   ├── cards.ts                 # Card, Rank, Suit, Hand types
-│   │   │   ├── opponents.ts             # OpponentProfile, DecisionNode, OpponentContext
+│   │   │   ├── opponents.ts             # OpponentProfile, SituationKey, BehavioralParams
 │   │   │   ├── visuals.ts              # VisualDirective, CardHighlight, RangeHighlight
 │   │   │   └── game.ts                 # GameContext, Street, Position, Action types
 │   │   ├── primitives/                  # Card engine
@@ -302,15 +281,18 @@ HoldemVision/
 │   │   │   └── constants.ts             # RANKS, SUITS, HAND_RANKINGS
 │   │   ├── analysis/                    # Analysis lenses (each implements AnalysisLens)
 │   │   │   ├── lens-registry.ts         # Registry of available lenses
-│   │   │   ├── raw-equity.ts            # Equity against all/filtered holdings
+│   │   │   ├── raw-equity.ts            # Instant hand strength (no simulation)
+│   │   │   ├── monteCarloLens.ts        # Opt-in equity simulation (10k trials)
 │   │   │   ├── threats.ts               # Threat card identification
 │   │   │   ├── outs.ts                  # Outs calculation
 │   │   │   ├── draws.ts                 # Draw analysis (flush, straight, etc.)
-│   │   │   └── monte-carlo.ts           # Monte Carlo engine (used by equity lens)
-│   │   ├── opponents/                   # Opponent modeling (added in later phase)
-│   │   │   ├── profile-presets.ts       # Nit, Fish, TAG, LAG, GTO decision trees
-│   │   │   ├── range-estimator.ts       # Action → implied range derivation
-│   │   │   └── decision-engine.ts       # Traverses DecisionNode tree for AI play
+│   │   │   ├── monte-carlo.ts           # Monte Carlo engine (shared infrastructure)
+│   │   │   └── opponentRead.ts          # Equity vs opponent's implied range
+│   │   ├── opponents/                   # Opponent modeling
+│   │   │   ├── presets.ts               # 5 preset profiles (Nit, Fish, TAG, LAG, GTO)
+│   │   │   ├── profileResolver.ts       # Profile inheritance resolution
+│   │   │   ├── rangeEstimator.ts        # Action → implied range derivation
+│   │   │   └── combos.ts               # Hand combos and range utilities
 │   │   ├── rules/                       # Game rules (added when game engine is built)
 │   │   │   ├── actions.ts               # Legal action validation
 │   │   │   ├── streets.ts               # Street progression
@@ -427,24 +409,18 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
-  // ─── Opponent Profiles (behavioral trees) ───
+  // ─── Opponent Profiles (situation-based behavioral model) ───
   opponentProfiles: defineTable({
     userId: v.optional(v.id("users")),     // null for system presets
     name: v.string(),                      // "Nit", "Loose Aggro Fish"
     isPreset: v.boolean(),
     description: v.string(),
 
-    // Decision tree (serialized DecisionNode)
-    decisionTree: v.string(),              // JSON-serialized DecisionNode
+    // Optional base profile for inheritance ("based on TAG but more aggressive")
+    baseProfileId: v.optional(v.id("opponentProfiles")),
 
-    // Quick-lookup tendencies (derived from tree)
-    vpip: v.number(),
-    pfr: v.number(),
-    aggression: v.number(),
-    threeBetPct: v.number(),
-    cBetPct: v.number(),
-    foldToCBetPct: v.number(),
-    positionAwareness: v.number(),
+    // JSON-serialized Partial<Record<SituationKey, BehavioralParams>>
+    situations: v.string(),
 
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -459,6 +435,23 @@ export default defineSchema({
     theme: v.optional(v.string()),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // ─── Scenario Library (classic spots + user-created) ───
+  scenarios: defineTable({
+    title: v.string(),                     // "Overpair on Wet Board"
+    category: v.string(),                  // "board_texture" | "cooler" | "drawing" | ...
+    difficulty: v.string(),                // "beginner" | "intermediate" | "advanced"
+    heroCards: v.array(v.number()),
+    communityCards: v.array(v.number()),
+    street: v.string(),
+    lesson: v.string(),                    // teaching explanation for this spot
+    tags: v.array(v.string()),             // ["wet_board", "overpair", "flush_draw"]
+    isBuiltIn: v.boolean(),                // system scenarios vs user-created
+    createdBy: v.optional(v.id("users")),
+    // Future: opponents field for Phase 5 opponent-aware scenarios
+  }).index("by_category", ["category"])
+    .index("by_difficulty", ["difficulty"])
+    .index("by_built_in", ["isBuiltIn"]),
 
   // ══════════════════════════════════════════════════
   // FUTURE TABLES (defined here for schema foresight,
@@ -478,7 +471,7 @@ export default defineSchema({
 
 ## Phase-by-Phase Build Plan
 
-### Phase 0: Environment Setup + Architecture Verification (4-6 hrs)
+### Phase 0: Environment Setup + Architecture Verification (4-6 hrs) — COMPLETE
 
 The goal is to set up the dev environment, verify all connections, and validate core architectural patterns before writing any feature code.
 
@@ -523,7 +516,7 @@ The goal is to set up the dev environment, verify all connections, and validate 
 
 ---
 
-### Phase 1: Core Types + Card Primitives (3-5 hrs)
+### Phase 1: Core Types + Card Primitives (3-5 hrs) — COMPLETE
 
 Build the type contracts that everything depends on, plus the card engine.
 
@@ -553,14 +546,18 @@ Build the type contracts that everything depends on, plus the card engine.
 
 ---
 
-### Phase 2: Analysis Lenses — Equity + Threats + Outs (6-8 hrs)
+### Phase 2: Analysis Lenses — Equity + Threats + Outs (6-8 hrs) — COMPLETE
 
 Build the first analysis lenses that power the core vision.
 
 **What we build:**
-- `RawEquityLens` — hand strength against all possible holdings (or filtered by opponent range)
-  - Monte Carlo engine for fast equity calculation
-  - Returns explanation tree: ahead of X%, behind Y%, drawing Z%
+- `RawEquityLens` — instant hand rank evaluation (no simulation, zero lag)
+  - Evaluates current hand rank (pair, flush, etc.) and preflop hand strength category
+  - Returns explanation tree with hand rank and relative strength context
+- `MonteCarloLens` — opt-in equity simulation (10,000 trials)
+  - Monte Carlo engine for win/tie/lose percentages against random holdings
+  - Separated from raw equity to avoid blocking the card selection hot path
+  - Not in default active lenses — user toggles it on when they want simulation
 - `ThreatLens` — which remaining cards are dangerous
   - Identifies cards that complete flushes, straights, give opponents trips/boats
   - Returns card highlights with urgency levels and reasons
@@ -590,7 +587,7 @@ Build the first analysis lenses that power the core vision.
 
 ---
 
-### Phase 3: Vision UI — The Core Product (10-14 hrs)
+### Phase 3: Vision UI — The Core Product (10-14 hrs) — COMPLETE
 
 Build the visual workspace where users see their poker situation.
 
@@ -642,21 +639,25 @@ Build the visual workspace where users see their poker situation.
 
 ---
 
-### Phase 4: Persistence + Server-Side Analysis (4-6 hrs)
+### Phase 4: Persistence + Server-Side Analysis (4-6 hrs) — COMPLETE (backend)
 
 Connect the vision workspace to Convex for saving sessions and running heavy computations server-side.
+**Note:** UI for save/load deferred until UX pass. All backend infrastructure is deployed.
 
-**What we build:**
-- Deploy Convex schema (users, analysisSessions, opponentProfiles, userPreferences)
-- Save/load analysis sessions (bookmark interesting spots to revisit)
-- Server-side Monte Carlo via Convex action (for heavy equity calculations)
-- User preferences (default lenses, card style)
+**What we built:**
+- Full Convex schema deployed (users, analysisSessions, opponentProfiles, userPreferences, scenarios)
+- Analysis session CRUD (`convex/analyses.ts`)
+- Server-side Monte Carlo via Convex action (`convex/compute.ts`)
+- User preferences upsert/get (`convex/preferences.ts`)
+- Scenario library with 14 built-in scenarios (`convex/scenarios.ts` + `convex/lib/scenarios/builtInScenarios.ts`)
 
 **Key files:**
 - `convex/schema.ts` (full schema deployed)
 - `convex/analyses.ts` (save/load session CRUD)
-- `convex/actions_compute.ts` (Monte Carlo action)
-- `convex/userPreferences.ts`
+- `convex/compute.ts` (Monte Carlo action)
+- `convex/preferences.ts`
+- `convex/scenarios.ts` (scenario CRUD + seed)
+- `convex/lib/scenarios/builtInScenarios.ts` (14 curated scenarios)
 
 **Accept:**
 - Can save a vision workspace state and reload it later
@@ -666,32 +667,31 @@ Connect the vision workspace to Convex for saving sessions and running heavy com
 
 ---
 
-### Phase 5: Opponent Modeling — Profiles + Range Estimation (8-12 hrs)
+### Phase 5: Opponent Modeling — Profiles + Range Estimation (8-12 hrs) — COMPLETE (backend)
 
 Add opponents to the vision. This is where the learning tool becomes powerful.
+**Note:** UI (opponent seats, profile editor) deferred until UX pass. All domain logic and Convex CRUD deployed.
 
 **What we build:**
-- **Opponent profile presets** — 5 decision trees: Nit, Fish/Calling Station, TAG, LAG, GTO Approximation
-  - Each is a `DecisionNode` tree that explains the archetype's behavior
-  - E.g., Nit tree: "Facing a raise → only continues with top 10% → explanation: Nits are risk-averse..."
-- **Range estimator** — given an opponent's profile + their actions this hand, derive their implied range
-  - "Opponent is a Nit, they 3-bet preflop → range is AA, KK, QQ, AKs" with explanation tree
-  - "Opponent is a Fish, they called preflop → range is top 40% of hands" with explanation tree
-- **OpponentReadLens** — new analysis lens that shows equity against opponent's implied range (not vacuum)
+- **Opponent profile presets** — 5 situation-based profiles: Nit, Fish/Calling Station, TAG, LAG, GTO Approximation
+  - Each maps 11 standard poker situations to behavioral parameters (continuePct, raisePct, positionAwareness, bluffFrequency, sizings, explanation)
+  - E.g., Nit `preflop.facing_raise`: continuePct=5, raisePct=60, explanation="Only continues with premium hands"
+- **Profile inheritance** — profiles can inherit from a base and override specific situations
+  - E.g., "Aggressive TAG" inherits from TAG but overrides `preflop.open.continuePct` to 28%
+  - `profileResolver.ts` walks the inheritance chain (max depth 5)
+- **Range estimator** — given an opponent's profile + their actions, classifies each action into a SituationKey and derives their implied range
+  - `classifyAction()` maps each action to the appropriate situation (e.g., preflop raise with no prior raise → `preflop.open`)
+  - Uses situation-specific `continuePct` and `bluffFrequency` instead of flat tendencies
+- **OpponentReadLens** — analysis lens showing equity against opponent's implied range (not vacuum)
   - Shows the delta: "82% in vacuum → 55% against this opponent's range"
-  - Explanation tree shows WHY the range is what it is, traced back to their actions
-- **Opponent seat UI** — add opponent slots to the vision workspace
-  - Assign a profile to each seat
-  - Record their actions ("Villain 1 raised to 3x preflop")
-  - See their implied range update in real-time
-  - See equity shift from vacuum to action-informed
-- **Profile editor** — create custom opponent profiles by adjusting the decision tree
-- **Profile CRUD** in Convex (save custom profiles)
+  - Explanation tree traces back through the opponent's actions to explain the range
+- **Fold equity analysis** — takes `BehavioralParams` for the relevant situation to compute fold probability
+- **Profile CRUD** in Convex (save custom profiles, clone presets)
 
 **Key files:**
-- `convex/lib/opponents/{profile-presets,range-estimator,decision-engine}.ts`
-- `convex/lib/analysis/opponent-read.ts` (new lens)
-- `src/components/opponents/{opponent-seat,range-display,profile-editor}.tsx`
+- `convex/lib/types/opponents.ts` (SituationKey, BehavioralParams, OpponentProfile)
+- `convex/lib/opponents/{presets,profileResolver,rangeEstimator,combos}.ts`
+- `convex/lib/analysis/{opponentRead,foldEquity}.ts`
 - `convex/profiles.ts`
 
 **The user experience:**
@@ -706,12 +706,12 @@ Add opponents to the vision. This is where the learning tool becomes powerful.
 5. User sees the learning moment: "My top pair looks great in vacuum but this opponent's actions tell a different story"
 
 **Accept:**
-- All 5 preset profiles have well-structured decision trees
-- Range estimator correctly narrows ranges based on actions
+- All 5 preset profiles have all 11 situations populated with valid params
+- Profile inheritance resolves correctly (child overrides parent, max depth 5)
+- Range estimator classifies actions into situations and narrows ranges accordingly
 - OpponentReadLens shows vacuum vs filtered equity with explanation
-- Adding/removing opponents updates all analysis in real-time
-- Profile editor allows meaningful customization
-- Decision trees are themselves explainable (user can inspect how a profile "thinks")
+- Derived stats (vpip, pfr, etc.) computed from situation map match expected values
+- Fold equity uses situation-specific params instead of flat tendencies
 
 ---
 
@@ -749,7 +749,8 @@ Build the rules engine and state machine. This doesn't change the analysis syste
 The opponents come alive. Their decision trees drive actual play, and every decision is explained.
 
 **What we build:**
-- AI decision engine — traverses opponent's `DecisionNode` tree given game state
+- AI decision engine — reads opponent's situation-based profile given game state
+  - Classifies the current situation (e.g., `postflop.facing_bet`) and uses behavioral params
   - Every AI decision produces an `ExplanationNode` (hidden during play, revealed after)
 - Game session management in Convex
 - Hand dealing (shuffle, deal, post blinds)
@@ -759,7 +760,7 @@ The opponents come alive. Their decision trees drive actual play, and every deci
 - Post-hand review: AI reasoning revealed, full hand replay with analysis at each street
 
 **Key files:**
-- `convex/lib/opponents/decision-engine.ts` (AI traversal of profile trees)
+- `convex/lib/opponents/decisionEngine.ts` (AI situation-based decision making)
 - `convex/games.ts`, `convex/hands.ts` (session + hand management)
 - `convex/actions_ai.ts` (server-side AI decisions)
 - `src/app/play/`, `src/components/table/`
@@ -812,23 +813,24 @@ Each of these is a new `AnalysisLens` implementation. Zero changes to existing c
 ## Growth Trajectory
 
 ```
-Phase 0: Environment verified
+Phase 0: Environment verified ✓
     │
-Phase 1: Types + Cards + Evaluator
+Phase 1: Types + Cards + Evaluator ✓
     │     (AnalysisContext defined, ExplanationNode pattern established)
     │
-Phase 2: Analysis Lenses
-    │     (AnalysisLens interface proven, lenses composable)
+Phase 2: Analysis Lenses ✓
+    │     (6 lenses: HandStrength + MonteCarloSim + Threats + Outs + Draws + OpponentRead)
+    │     (MonteCarloLens split from HandStrength for zero-lag card selection)
     │
-Phase 3: Vision UI ← FIRST USABLE PRODUCT
+Phase 3: Vision UI ✓ ← FIRST USABLE PRODUCT
     │     (User can select cards, see analysis, drill into explanations)
     │
-Phase 4: Persistence
-    │     (Save/load sessions, server-side compute)
+Phase 4: Persistence ✓
+    │     (Schema deployed, CRUD + compute + scenarios backend ready, UI deferred)
     │
-Phase 5: Opponent Modeling ← MAJOR LEARNING TOOL MILESTONE
-    │     (Opponents have profiles, actions narrow ranges, equity shifts)
-    │     (Same analysis pipeline, richer input)
+Phase 5: Opponent Modeling ✓ ← MAJOR LEARNING TOOL MILESTONE
+    │     (Situation-based profiles with inheritance, 309 tests pass)
+    │     (5 presets × 11 situations, profileResolver, classifyAction)
     │
 Phase 6: Rules + State Machine
     │     (Structured game flow, state machine produces AnalysisContext)

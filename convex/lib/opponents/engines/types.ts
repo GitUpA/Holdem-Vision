@@ -1,0 +1,91 @@
+/**
+ * Decision Engine type contracts.
+ *
+ * A DecisionEngine is a pluggable strategy for choosing actions.
+ * Each engine implements the same interface but uses different
+ * reasoning: basic (sample from behavioral %), range-aware
+ * (pot odds + board texture), or GTO (future).
+ *
+ * Engines MUST be stateless, deterministic (given same PRNG seed),
+ * and pure (no side effects, no Convex imports).
+ */
+import type { GameState, LegalActions, ActionType } from "../../state/game-state";
+import type {
+  OpponentProfile,
+  SituationKey,
+  BehavioralParams,
+} from "../../types/opponents";
+import type { ExplanationNode } from "../../types/analysis";
+import type { CardIndex } from "../../types/cards";
+
+// ═══════════════════════════════════════════════════════
+// DECISION CONTEXT — immutable snapshot for engine input
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Everything an engine needs to make a decision.
+ * Constructed by chooseActionFromProfile and passed to engine.decide().
+ */
+export interface DecisionContext {
+  /** Full game state snapshot. */
+  state: GameState;
+  /** The seat making the decision. */
+  seatIndex: number;
+  /** The profile driving this seat. */
+  profile: OpponentProfile;
+  /** Fully resolved situation map (all 11 keys populated). */
+  resolvedParams: Record<SituationKey, BehavioralParams>;
+  /** The classified situation for this decision point. */
+  situationKey: SituationKey;
+  /** The specific BehavioralParams for the current situation. */
+  params: BehavioralParams;
+  /** Legal actions available. */
+  legal: LegalActions;
+  /** Current pot size (total). */
+  potSize: number;
+  /** Hole cards for this seat (may be undefined if hidden). */
+  holeCards: CardIndex[] | undefined;
+  /** Lookup function for base profiles (inheritance resolution). */
+  getBase: (id: string) => OpponentProfile | undefined;
+  /** Deterministic PRNG — engines MUST use this, not Math.random. */
+  random: () => number;
+}
+
+// ═══════════════════════════════════════════════════════
+// ENGINE DECISION — rich output with teaching explanation
+// ═══════════════════════════════════════════════════════
+
+/**
+ * The result of an engine's decide() call.
+ * Richer than AutoPlayDecision — includes a full ExplanationNode tree.
+ */
+export interface EngineDecision {
+  actionType: ActionType;
+  amount?: number;
+  situationKey: SituationKey;
+  /** Multi-level explanation tree suitable for coaching UI. */
+  explanation: ExplanationNode;
+  /** Which engine produced this decision. */
+  engineId: string;
+  /** Optional structured reasoning data (engine-specific). */
+  reasoning?: Record<string, unknown>;
+}
+
+// ═══════════════════════════════════════════════════════
+// DECISION ENGINE — the pluggable interface
+// ═══════════════════════════════════════════════════════
+
+/**
+ * A decision engine chooses actions for a seat given game state + profile.
+ *
+ * Engines MUST be:
+ * - Stateless (no instance variables between calls)
+ * - Deterministic (given same PRNG seed)
+ * - Pure (no side effects, no Convex imports)
+ */
+export interface DecisionEngine {
+  id: string;
+  name: string;
+  description: string;
+  decide(ctx: DecisionContext): EngineDecision;
+}
