@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useHandManager } from "@/hooks/use-hand-manager";
@@ -16,9 +16,13 @@ import { LensSelector } from "./lens-selector";
 import { CardSelector, type SelectionMode } from "../cards/card-selector";
 import { VisualRenderer } from "../analysis/visual-renderer";
 import { ExplanationTree } from "../analysis/explanation-tree";
+import { CoachingPanel } from "../analysis/coaching-panel";
+import type { CoachingAdvice, CoachingValue } from "../../../convex/lib/analysis/coachingLens";
 import { PlayerList } from "../table/player-list";
 import { TableControls } from "../table/table-controls";
 import { OpponentDetail } from "../table/opponent-detail";
+import { HandReplayer } from "../replay/hand-replayer";
+import type { HandRecord } from "../../../convex/lib/audit/types";
 import type { OpponentReadValue } from "../../../convex/lib/analysis/opponentRead";
 import type { SelectionTarget } from "@/hooks/use-hand-manager";
 import { evaluateHand, compareHandRanks } from "../../../convex/lib/primitives/handEvaluator";
@@ -90,6 +94,15 @@ function mapTargetToMode(target: SelectionTarget): SelectionMode {
 export function VisionWorkspace() {
   const hand = useHandManager();
   const [guideOpen, setGuideOpen] = useState(false);
+  const [replayRecord, setReplayRecord] = useState<HandRecord | null>(null);
+
+  // Expose audit export to browser console for testing
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    w.__exportHandHistory = hand.exportHandHistory;
+    w.__handHistory = hand.handHistory;
+  }, [hand.exportHandHistory, hand.handHistory]);
 
   const {
     results,
@@ -109,6 +122,16 @@ export function VisionWorkspace() {
     hand.gameState,
     hand.heroSeatIndex,
   );
+
+  // Snapshot lens results to audit recorder once per street
+  const lastLensStreetRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hand.isHandActive || results.size === 0) return;
+    const key = `${hand.street}-${hand.handNumber}`;
+    if (lastLensStreetRef.current === key) return;
+    lastLensStreetRef.current = key;
+    hand.recordLensSnapshot(hand.street, results);
+  }, [hand.isHandActive, hand.street, hand.handNumber, results, hand.recordLensSnapshot]);
 
   const deckVisionCards = useDeckVision(hand.heroCards, hand.communityCards, hand.deadCards, results);
 
@@ -246,13 +269,20 @@ export function VisionWorkspace() {
       <div className="max-w-[1600px] mx-auto px-4 py-4">
         {/* Main content: 2-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_auto_1fr] gap-4">
-          {/* Left column: Board + Players + Actions + Card Grid */}
+          {/* Left column: Replay or Board + Players + Actions + Card Grid */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
             className="space-y-4"
           >
+            {replayRecord ? (
+              <HandReplayer
+                record={replayRecord}
+                onClose={() => setReplayRecord(null)}
+              />
+            ) : (
+            <>
             {/* Player list — always visible, top of left column */}
             <PlayerList
               seats={hand.seats}
@@ -260,6 +290,7 @@ export function VisionWorkspace() {
               onSeatClick={handleSeatClick}
               bigBlind={hand.blinds.big}
               activePlayerSeat={hand.activePlayerSeat}
+              decisions={hand.lastDecisions}
             />
 
             {/* Opponent detail panel (when a seat is selected) */}
@@ -273,6 +304,7 @@ export function VisionWorkspace() {
                   <OpponentDetail
                     seat={selectedSeat}
                     analysis={selectedSeatAnalysis}
+                    decision={hand.lastDecisions.get(selectedSeat.seatIndex)}
                     onAssignProfile={(profile) =>
                       hand.assignProfile(selectedSeat.seatIndex, profile)
                     }
@@ -437,6 +469,22 @@ export function VisionWorkspace() {
                   >
                     Reveal All
                   </button>
+                  {hand.handHistory.length > 0 && (
+                    <button
+                      onClick={() => setReplayRecord(hand.handHistory[hand.handHistory.length - 1])}
+                      className="text-[10px] px-3 py-1.5 rounded border border-blue-400/30 text-blue-400 hover:bg-blue-400/10 transition-colors"
+                    >
+                      Replay
+                    </button>
+                  )}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={hand.startNextHand}
+                    className="px-5 py-2 rounded-lg bg-[var(--felt)] text-[var(--gold)] font-semibold text-sm border border-[var(--gold-dim)]/40 hover:border-[var(--gold)]/60 transition-colors"
+                  >
+                    Deal Next Hand
+                  </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -444,9 +492,9 @@ export function VisionWorkspace() {
                       hand.newHand();
                       hand.startHand();
                     }}
-                    className="px-6 py-2 rounded-lg bg-[var(--felt)] text-[var(--gold)] font-semibold text-sm border border-[var(--gold-dim)]/40 hover:border-[var(--gold)]/60 transition-colors"
+                    className="px-5 py-2 rounded-lg bg-[var(--card)] text-[var(--muted-foreground)] text-sm border border-[var(--border)] hover:border-[var(--gold-dim)]/40 hover:text-[var(--gold-dim)] transition-colors"
                   >
-                    Deal Next Hand
+                    Deal Fresh
                   </motion.button>
                 </div>
               </div>
@@ -479,6 +527,7 @@ export function VisionWorkspace() {
                     onNumPlayersChange={hand.setNumPlayers}
                     onRotateDealer={() => hand.moveDealer(hand.dealerSeatIndex + 1)}
                     onReset={hand.newHand}
+                    isHandActive={hand.isHandActive}
                   />
                 </div>
                 <button
@@ -503,19 +552,47 @@ export function VisionWorkspace() {
                   communityCards={hand.communityCards}
                   onCardClick={() => {}}
                 />
-              </div>
-            </div>
 
-            {/* Action panel (hero's turn) */}
-            {hand.isHeroTurn && hand.legalActions && (
-              <ActionPanel
-                legalActions={hand.legalActions}
-                pot={hand.pot}
-                heroStack={heroStack}
-                blinds={hand.blinds}
-                onAct={hand.act}
-              />
-            )}
+                {/* Action panel — below the board inside the card */}
+                {hand.isHeroTurn && hand.legalActions && (
+                  <div className="mt-4">
+                    <ActionPanel
+                      legalActions={hand.legalActions}
+                      pot={hand.pot}
+                      heroStack={heroStack}
+                      blinds={hand.blinds}
+                      onAct={hand.act}
+                    />
+                  </div>
+                )}
+              </div>
+
+              </div>
+
+            {/* Coaching analysis — own card below the board */}
+            {(() => {
+              const coachingResult = results.get("coaching");
+              if (!coachingResult || coachingResult.visuals.length === 0) return null;
+              const coachingVisual = coachingResult.visuals.find((v) => v.type === "coaching");
+              if (!coachingVisual) return null;
+              const { advices, consensus } = coachingVisual.data as {
+                advices: CoachingAdvice[];
+                consensus?: CoachingValue["consensus"];
+              };
+              if (!advices || advices.length === 0) return null;
+              return (
+                <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+                  <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)]">
+                      Coaching
+                    </h3>
+                  </div>
+                  <div className="px-4 py-3">
+                    <CoachingPanel advices={advices} consensus={consensus} />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Card selector (52-card grid) */}
             <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3">
@@ -528,6 +605,8 @@ export function VisionWorkspace() {
                 readOnly={!hand.isHandActive && !hand.isHandOver}
               />
             </div>
+            </>
+            )}
           </motion.div>
 
           {/* Center divider on large screens */}
@@ -585,6 +664,9 @@ export function VisionWorkspace() {
               <>
                 {/* Analysis panels — rendered in activeLensIds order */}
                 {activeLensIds.map((lensId) => {
+                  // Coaching renders inside the board card, not here
+                  if (lensId === "coaching") return null;
+
                   const lensName = availableLenses.find((l) => l.id === lensId)?.name ?? lensId;
                   const result = results.get(lensId);
                   const isComputing = heavyComputing.has(lensId);

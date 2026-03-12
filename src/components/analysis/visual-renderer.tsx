@@ -33,8 +33,9 @@ export function VisualRenderer({ results, street }: VisualRendererProps) {
 
   const components: React.ReactNode[] = [];
 
-  for (const visual of allVisuals) {
-    const key = `${visual.lensId}-${visual.type}`;
+  for (let vi = 0; vi < allVisuals.length; vi++) {
+    const visual = allVisuals[vi];
+    const key = `${visual.lensId}-${visual.type}-${vi}`;
 
     switch (visual.type) {
       case "hand_strength": {

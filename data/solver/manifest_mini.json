@@ -1,0 +1,26 @@
+{
+  "ace_high_dry_rainbow": [
+    {
+      "name": "ace_high_dry_rainbow_000",
+      "board": ["Ac", "8h", "2d"],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_000.json"
+    }
+  ],
+  "two_tone_connected": [
+    {
+      "name": "two_tone_connected_000",
+      "board": ["5s", "4s", "3c"],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_000.json"
+    }
+  ],
+  "monotone": [
+    {
+      "name": "monotone_000",
+      "board": ["Kh", "4h", "3h"],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_000.json"
+    }
+  ]
+}

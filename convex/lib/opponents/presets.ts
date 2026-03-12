@@ -290,7 +290,7 @@ const tagSituations: Record<SituationKey, BehavioralParams> = {
       "TAGs play a solid, selective-aggressive style. They choose good starting hands (~22%) and raise most of them. Position significantly affects their range.",
   }),
   "preflop.facing_raise": bp({
-    continuePct: 14,
+    continuePct: 20,
     raisePct: 50,
     positionAwareness: 0.8,
     bluffFrequency: 0.05,
@@ -302,13 +302,13 @@ const tagSituations: Record<SituationKey, BehavioralParams> = {
       "TAGs respect raises but still 3-bet with a balanced range of value hands and occasional bluffs. They call with suited connectors and medium pairs.",
   }),
   "preflop.facing_3bet": bp({
-    continuePct: 10,
+    continuePct: 25,
     raisePct: 30,
     positionAwareness: 0.8,
     bluffFrequency: 0.03,
     sizings: [{ action: "raise", sizingPct: 250, weight: 1.0 }],
     explanation:
-      "TAGs respect 3-bets. They fold most of their open-raising range, call with suited connectors and medium pairs, and 4-bet with AA, KK, AKs.",
+      "TAGs defend ~25% vs 3-bets. They call with suited connectors, medium pairs, AQ, and 4-bet with AA, KK, AKs plus occasional bluffs.",
   }),
   "preflop.facing_4bet": bp({
     continuePct: 4,
@@ -427,7 +427,7 @@ const lagSituations: Record<SituationKey, BehavioralParams> = {
       "LAGs play many hands aggressively — top 35%. They put constant pressure with raises from all positions, especially late position.",
   }),
   "preflop.facing_raise": bp({
-    continuePct: 22,
+    continuePct: 28,
     raisePct: 55,
     positionAwareness: 0.9,
     bluffFrequency: 0.12,
@@ -439,13 +439,13 @@ const lagSituations: Record<SituationKey, BehavioralParams> = {
       "LAGs 3-bet light frequently. Their wide 3-bet range includes many bluffs (suited connectors, suited aces) alongside premium hands.",
   }),
   "preflop.facing_3bet": bp({
-    continuePct: 15,
+    continuePct: 35,
     raisePct: 40,
     positionAwareness: 0.9,
     bluffFrequency: 0.10,
     sizings: [{ action: "raise", sizingPct: 250, weight: 1.0 }],
     explanation:
-      "Good LAGs know when to back off but still 4-bet light sometimes. Their range is wider than TAGs here.",
+      "LAGs defend ~35% vs 3-bets. They call with a wide range including suited connectors and broadways, and 4-bet light with suited aces and blockers.",
   }),
   "preflop.facing_4bet": bp({
     continuePct: 8,
@@ -566,7 +566,7 @@ const gtoSituations: Record<SituationKey, BehavioralParams> = {
       "GTO players open ~27% of hands with full position adjustment. Their range is balanced with a correct ratio of value and speculative hands.",
   }),
   "preflop.facing_raise": bp({
-    continuePct: 16,
+    continuePct: 22,
     raisePct: 56,
     positionAwareness: 1.0,
     bluffFrequency: 0.08,
@@ -578,13 +578,13 @@ const gtoSituations: Record<SituationKey, BehavioralParams> = {
       "GTO 3-bet ranges are balanced with value and bluffs at theoretically correct frequencies. They 3-bet ~9% with a mix of premiums and suited blocker hands.",
   }),
   "preflop.facing_3bet": bp({
-    continuePct: 12,
+    continuePct: 30,
     raisePct: 35,
     positionAwareness: 1.0,
     bluffFrequency: 0.05,
     sizings: [{ action: "raise", sizingPct: 250, weight: 1.0 }],
     explanation:
-      "GTO responds to 3-bets with a precise mix of calls (suited connectors, pairs) and 4-bets (premiums + some bluffs). Frequencies depend on position.",
+      "GTO defends ~30% vs 3-bets. Calls with suited connectors, pairs 55+, AQ, and 4-bets with AA, KK, AKs plus balanced bluffs. Position-dependent.",
   }),
   "preflop.facing_4bet": bp({
     continuePct: 5,
@@ -679,7 +679,7 @@ const gtoSituations: Record<SituationKey, BehavioralParams> = {
 export const GTO_PROFILE: OpponentProfile = {
   id: "gto",
   name: "GTO (Balanced)",
-  engineId: "basic", // Future: "gto" engine
+  engineId: "lookup-gto",
   description:
     "Game-theory optimal player who balances value bets and bluffs at theoretically correct frequencies. Hard to exploit because their strategy is mathematically sound.",
   situations: gtoSituations,

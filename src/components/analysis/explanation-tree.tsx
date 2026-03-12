@@ -20,6 +20,16 @@ const SENTIMENT_DOT: Record<string, string> = {
   neutral: "bg-[var(--muted-foreground)]",
 };
 
+/** Visual badges for semantic tags — only high-signal tags get rendered. */
+const TAG_BADGES: Record<string, { label: string; color: string }> = {
+  "bluff":       { label: "BLUFF",   color: "bg-red-500/20 text-red-300 border-red-500/30" },
+  "draw-aware":  { label: "DRAW",    color: "bg-teal-500/20 text-teal-300 border-teal-500/30" },
+  "mdf":         { label: "MDF",     color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+  "fold-equity": { label: "FOLD EQ", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+  "position":    { label: "POS",     color: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
+  "sizing":      { label: "SIZING",  color: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30" },
+};
+
 interface ExplanationTreeProps {
   node: ExplanationNode;
   depth?: number;
@@ -76,6 +86,26 @@ export function ExplanationTree({
           >
             {node.summary}
           </span>
+          {/* Tag badges */}
+          {node.tags && node.tags.length > 0 && (
+            <span className="inline-flex gap-1 ml-1.5 align-middle">
+              {node.tags.map((tag) => {
+                const badge = TAG_BADGES[tag];
+                if (!badge) return null;
+                return (
+                  <span
+                    key={tag}
+                    className={cn(
+                      "text-[9px] font-bold tracking-wider px-1 py-px rounded border leading-none",
+                      badge.color,
+                    )}
+                  >
+                    {badge.label}
+                  </span>
+                );
+              })}
+            </span>
+          )}
           {node.detail && isOpen && (
             <motion.p
               initial={{ opacity: 0, height: 0 }}

@@ -225,6 +225,129 @@ describe("chooseBetSize", () => {
 });
 
 // ═══════════════════════════════════════════════════════
+// bluff frequency in sampleActionFromParams
+// ═══════════════════════════════════════════════════════
+
+describe("bluff frequency in sampleActionFromParams", () => {
+  it("bluffs when high bluffFrequency and hand would fold", () => {
+    // continuePct=0 forces fold. bluffFrequency=0.35 means 35% of those
+    // "fold" decisions get converted to bluff-raises.
+    const params = makeParams({ continuePct: 0, bluffFrequency: 0.35 });
+    const legal = makeLegal(); // canRaise=true
+    const random = seededRandom(1);
+
+    let bluffs = 0;
+    const trials = 200;
+    for (let i = 0; i < trials; i++) {
+      const result = sampleActionFromParams(params, legal, 100, random);
+      if (result.actionType === "raise" || result.actionType === "bet") {
+        bluffs++;
+      }
+    }
+
+    // With bluffFrequency=0.35, ~35% of decisions should be bluff-raises
+    expect(bluffs).toBeGreaterThan(trials * 0.2);
+    expect(bluffs).toBeLessThan(trials * 0.5);
+  });
+
+  it("never bluffs when bluffFrequency is 0", () => {
+    const params = makeParams({ continuePct: 0, bluffFrequency: 0 });
+    const legal = makeLegal();
+    const random = seededRandom(2);
+
+    let bluffs = 0;
+    for (let i = 0; i < 100; i++) {
+      const result = sampleActionFromParams(params, legal, 100, random);
+      if (result.actionType === "raise" || result.actionType === "bet") {
+        bluffs++;
+      }
+    }
+
+    expect(bluffs).toBe(0);
+  });
+
+  it("bluff pathway not triggered when hand continues", () => {
+    // With continuePct=100 the hand always continues — bluff pathway is skipped.
+    // The raise/call decision uses raisePct, not bluffFrequency.
+    const params = makeParams({ continuePct: 100, raisePct: 0, bluffFrequency: 1.0 });
+    const legal = makeLegal();
+    const random = seededRandom(3);
+
+    let raises = 0;
+    for (let i = 0; i < 100; i++) {
+      const result = sampleActionFromParams(params, legal, 100, random);
+      if (result.actionType === "raise" || result.actionType === "bet") {
+        raises++;
+      }
+    }
+
+    // raisePct=0 → no value raises. bluffFrequency only applies to fold/check path.
+    expect(raises).toBe(0);
+  });
+
+  it("bluff returns isBluff flag", () => {
+    // Force a bluff: continuePct=0 (always fold path), bluffFrequency=1.0 (always bluff)
+    const params = makeParams({ continuePct: 0, bluffFrequency: 1.0 });
+    const legal = makeLegal(); // canRaise=true
+    // Need 3 random calls: 1 for continuePct roll, 1 for bluff roll, 1+ for sizing
+    let callCount = 0;
+    const mockRandom = () => {
+      callCount++;
+      return callCount === 1
+        ? 0.99  // Exceeds continuePct (0) → fold path
+        : 0.0;  // bluff roll < bluffFrequency (1.0) → bluff!
+    };
+
+    const result = sampleActionFromParams(params, legal, 100, mockRandom);
+    expect(result.actionType).toBe("raise");
+    expect(result.isBluff).toBe(true);
+  });
+
+  it("cannot bluff without raise/bet legal actions", () => {
+    const params = makeParams({ continuePct: 0, bluffFrequency: 1.0 });
+    const legal = makeLegal({
+      canRaise: false,
+      canBet: false,
+      canFold: true,
+    });
+    const random = seededRandom(4);
+
+    let bluffs = 0;
+    for (let i = 0; i < 100; i++) {
+      const result = sampleActionFromParams(params, legal, 100, random);
+      if (result.isBluff) bluffs++;
+    }
+
+    expect(bluffs).toBe(0);
+  });
+
+  it("bluffs with bet when canRaise is false but canBet is true", () => {
+    const params = makeParams({ continuePct: 0, bluffFrequency: 1.0 });
+    const legal = makeLegal({
+      canRaise: false,
+      canBet: true,
+      betMin: 2,
+      betMax: 100,
+      canFold: false,
+      canCheck: true,
+      canCall: false,
+    });
+    let callCount = 0;
+    const mockRandom = () => {
+      callCount++;
+      return callCount === 1
+        ? 0.99  // Exceeds continuePct → fold/check path
+        : 0.0;  // bluff roll succeeds
+    };
+
+    const result = sampleActionFromParams(params, legal, 100, mockRandom);
+    expect(result.actionType).toBe("bet");
+    expect(result.isBluff).toBe(true);
+    expect(result.amount).toBeDefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════
 // chooseActionFromProfile (integration)
 // ═══════════════════════════════════════════════════════
 

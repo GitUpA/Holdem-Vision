@@ -11,6 +11,10 @@ export {
   getEngineOrDefault,
 } from "./engineRegistry";
 
+export { detectDraws, type DrawInfo, type DrawType } from "./drawDetector";
+
 // ─── Import engines to trigger self-registration ───
 export { basicEngine } from "./basicEngine";
 export { rangeAwareEngine } from "./rangeAwareEngine";
+export { gtoEngine } from "./gtoEngine";
+export { lookupGtoEngine } from "./lookupGtoEngine";

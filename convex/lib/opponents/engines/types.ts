@@ -49,6 +49,8 @@ export interface DecisionContext {
   getBase: (id: string) => OpponentProfile | undefined;
   /** Deterministic PRNG — engines MUST use this, not Math.random. */
   random: () => number;
+  /** Map of seatIndex → OpponentProfile for table opponents (for fold equity). */
+  opponentProfiles?: Map<number, OpponentProfile>;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -88,4 +90,24 @@ export interface DecisionEngine {
   name: string;
   description: string;
   decide(ctx: DecisionContext): EngineDecision;
+}
+
+/** Human-readable labels for SituationKey values (engine-layer, no React). */
+const SITUATION_LABELS: Record<string, string> = {
+  "preflop.open":            "Open Raise",
+  "preflop.facing_raise":    "vs Raise",
+  "preflop.facing_3bet":     "vs 3-Bet",
+  "preflop.facing_4bet":     "vs 4-Bet+",
+  "postflop.aggressor.ip":   "C-Bet IP",
+  "postflop.aggressor.oop":  "C-Bet OOP",
+  "postflop.caller.ip":      "Probe IP",
+  "postflop.caller.oop":     "Check / Donk OOP",
+  "postflop.facing_bet":     "vs Bet",
+  "postflop.facing_raise":   "vs Raise / X-R",
+  "postflop.facing_allin":   "vs All-In",
+};
+
+/** Format a SituationKey into a poker-friendly label for explanation text. */
+export function formatSituation(key: string): string {
+  return SITUATION_LABELS[key] ?? key;
 }

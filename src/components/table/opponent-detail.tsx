@@ -2,9 +2,12 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { formatSituationKey } from "@/lib/format";
 import type { UnifiedSeatConfig } from "@/hooks/use-hand-manager";
 import type { SelectionTarget } from "@/hooks/use-hand-manager";
+import { useState } from "react";
 import type { OpponentAnalysis } from "../../../convex/lib/analysis/opponentRead";
+import type { AutoPlayDecision } from "../../../convex/lib/opponents/autoPlay";
 import type { CardIndex } from "../../../convex/lib/types/cards";
 import { rankOf, suitOf } from "../../../convex/lib/primitives/card";
 import { ProfilePicker } from "./profile-picker";
@@ -13,6 +16,7 @@ import { ExplanationTree } from "../analysis/explanation-tree";
 interface OpponentDetailProps {
   seat: UnifiedSeatConfig;
   analysis?: OpponentAnalysis;
+  decision?: AutoPlayDecision;
   onAssignProfile: (profile: import("../../../convex/lib/types/opponents").OpponentProfile | undefined) => void;
   onClose: () => void;
   /** Card assignment */
@@ -55,6 +59,7 @@ function MiniCardSlot({ card, onClick, buffering }: { card?: CardIndex; onClick?
 export function OpponentDetail({
   seat,
   analysis,
+  decision,
   onAssignProfile,
   onClose,
   onReveal,
@@ -195,6 +200,9 @@ export function OpponentDetail({
           </div>
         )}
 
+        {/* Engine reasoning — shows when an auto-play decision exists */}
+        {decision && <EngineReasoningSection decision={decision} />}
+
         {/* Analysis results */}
         <AnimatePresence>
           {analysis && (
@@ -251,6 +259,201 @@ export function OpponentDetail({
     </motion.div>
   );
 }
+
+// ═══════════════════════════════════════════════════════
+// ENGINE REASONING SECTION
+// ═══════════════════════════════════════════════════════
+
+const ENGINE_ACTION_COLORS: Record<string, { text: string; bg: string; border: string }> = {
+  fold:   { text: "text-gray-400",  bg: "bg-gray-500/15",  border: "border-gray-500/30" },
+  check:  { text: "text-blue-300",  bg: "bg-blue-500/15",  border: "border-blue-500/30" },
+  call:   { text: "text-green-300", bg: "bg-green-500/15", border: "border-green-500/30" },
+  bet:    { text: "text-amber-300", bg: "bg-amber-500/15", border: "border-amber-500/30" },
+  raise:  { text: "text-red-300",   bg: "bg-red-500/15",   border: "border-red-500/30" },
+  all_in: { text: "text-red-400",   bg: "bg-red-500/20",   border: "border-red-500/40" },
+};
+
+function EngineReasoningSection({ decision }: { decision: AutoPlayDecision }) {
+  const [treeOpen, setTreeOpen] = useState(true);
+  const actionColor = ENGINE_ACTION_COLORS[decision.actionType] ?? ENGINE_ACTION_COLORS.check;
+  const isBluff = decision.explanationNode?.children?.some(
+    (c) => c.tags?.includes("bluff"),
+  ) ?? false;
+
+  return (
+    <div className="border-t border-[var(--border)] pt-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)] mb-2">
+        Engine Reasoning
+      </h4>
+
+      {/* Situation + Engine badges */}
+      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]">
+          {formatSituationKey(decision.situationKey)}
+        </span>
+        {decision.engineId && (
+          <span className={cn(
+            "text-[10px] px-1.5 py-0.5 rounded-md border",
+            decision.engineId === "basic"
+              ? "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]"
+              : "bg-[var(--gold-dim)]/15 text-[var(--gold-dim)] border-[var(--gold-dim)]/20",
+          )}>
+            {decision.engineId}
+          </span>
+        )}
+      </div>
+
+      {/* Action pill + amount + bluff indicator */}
+      <div className="flex items-center gap-2 mb-2">
+        <span
+          className={cn(
+            "text-xs font-bold uppercase px-2 py-0.5 rounded-full border",
+            actionColor.text,
+            actionColor.bg,
+            actionColor.border,
+            isBluff && "ring-1 ring-red-500/50 animate-pulse",
+          )}
+        >
+          {decision.actionType.replace("_", " ")}
+        </span>
+        {decision.amount !== undefined && (
+          <span className="text-xs font-bold tabular-nums text-[var(--foreground)]">
+            {decision.amount}
+          </span>
+        )}
+        {isBluff && (
+          <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
+            Bluff
+          </span>
+        )}
+      </div>
+
+      {/* Reasoning summary strip — at-a-glance key factors */}
+      {decision.explanationNode?.children && (
+        <ReasoningSummaryStrip children={decision.explanationNode.children} />
+      )}
+
+      {/* Explanation summary */}
+      <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed mb-2">
+        {decision.explanation}
+      </p>
+
+      {/* Expandable reasoning tree */}
+      {decision.explanationNode && (
+        <div>
+          <button
+            onClick={() => setTreeOpen(!treeOpen)}
+            className="flex items-center gap-1 text-[10px] text-[var(--gold-dim)] hover:text-[var(--gold)] transition-colors mb-1"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={cn(
+                "transition-transform duration-200",
+                treeOpen && "rotate-90",
+              )}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            <span>{treeOpen ? "Hide" : "Show"} decision tree</span>
+          </button>
+          <AnimatePresence>
+            {treeOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <ExplanationTree node={decision.explanationNode} defaultOpen={true} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// REASONING SUMMARY STRIP
+// ═══════════════════════════════════════════════════════
+
+/** Tag → summary extractor: pulls key numbers from node summaries for at-a-glance display. */
+const SUMMARY_EXTRACTORS: Record<string, { label: string; extract: (summary: string) => string | null; color: string }> = {
+  "hand-strength": {
+    label: "Hand",
+    extract: (s) => { const m = s.match(/\((\d+)%\)/); return m ? `${m[1]}%` : null; },
+    color: "text-[var(--foreground)]",
+  },
+  "board-texture": {
+    label: "Board",
+    extract: (s) => { const m = s.match(/wetness\s+(\d+)%/); return m ? `wet ${m[1]}%` : null; },
+    color: "text-[var(--muted-foreground)]",
+  },
+  "fold-equity": {
+    label: "Fold EQ",
+    extract: (s) => { const m = s.match(/~(\d+)%/); return m ? `${m[1]}%` : null; },
+    color: "text-amber-300",
+  },
+  "pot-odds": {
+    label: "Odds",
+    extract: (s) => { const m = s.match(/(\d+)%/); return m ? `${m[1]}%` : null; },
+    color: "text-[var(--muted-foreground)]",
+  },
+  "draw-aware": {
+    label: "Draw",
+    extract: (s) => { const m = s.match(/(\d+)\s*outs/); return m ? `${m[1]} outs` : null; },
+    color: "text-teal-300",
+  },
+  "mdf": {
+    label: "MDF",
+    extract: (s) => { const m = s.match(/defend\s+(\d+)%/); return m ? `${m[1]}%` : null; },
+    color: "text-blue-300",
+  },
+};
+
+function ReasoningSummaryStrip({ children }: { children: import("../../../convex/lib/types/analysis").ExplanationNode[] }) {
+  const items: { label: string; value: string; color: string }[] = [];
+
+  for (const child of children) {
+    if (!child.tags) continue;
+    for (const tag of child.tags) {
+      const extractor = SUMMARY_EXTRACTORS[tag];
+      if (extractor) {
+        const value = extractor.extract(child.summary);
+        if (value) {
+          items.push({ label: extractor.label, value, color: extractor.color });
+          break; // one item per child node
+        }
+      }
+    }
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 text-[10px]">
+      {items.map((item) => (
+        <span key={item.label} className="flex items-center gap-1">
+          <span className="text-[var(--muted-foreground)]">{item.label}:</span>
+          <span className={cn("font-bold tabular-nums", item.color)}>{item.value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// EQUITY BAR
+// ═══════════════════════════════════════════════════════
 
 function EquityBar({ equity }: { equity: number }) {
   const pct = equity * 100;

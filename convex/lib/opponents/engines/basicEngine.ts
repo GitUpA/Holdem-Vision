@@ -9,6 +9,7 @@
  * weak hands fold more, keeping the overall population frequency
  * close to the profile's continuePct.
  */
+import { formatSituation } from "./types";
 import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
 import type { ExplanationNode } from "../../types/analysis";
 import { sampleActionFromParams } from "../autoPlay";
@@ -22,7 +23,7 @@ export const basicEngine: DecisionEngine = {
     "Suitable for simple archetypes like Fish and Nit.",
 
   decide(ctx: DecisionContext): EngineDecision {
-    const { actionType, amount } = sampleActionFromParams(
+    const { actionType, amount, isBluff } = sampleActionFromParams(
       ctx.params,
       ctx.legal,
       ctx.potSize,
@@ -30,27 +31,38 @@ export const basicEngine: DecisionEngine = {
       ctx.holeCards,
     );
 
+    const children: ExplanationNode[] = [
+      {
+        summary: `Decision: ${actionType}${amount !== undefined ? ` ${amount}` : ""}${isBluff ? " (BLUFF)" : ""}`,
+        sentiment: actionType === "fold" ? "negative" : actionType === "raise" || actionType === "bet" ? "positive" : "neutral",
+        tags: ["decision"],
+      },
+      {
+        summary: `Continue ${ctx.params.continuePct}% / Raise ${ctx.params.raisePct}% of continuing`,
+        detail: `Bluff frequency: ${(ctx.params.bluffFrequency * 100).toFixed(0)}%, Position awareness: ${ctx.params.positionAwareness}`,
+        sentiment: "neutral",
+        tags: ["params"],
+      },
+      {
+        summary: ctx.params.explanation,
+        sentiment: "neutral",
+        tags: ["profile-reasoning"],
+      },
+    ];
+
+    if (isBluff) {
+      children.push({
+        summary: `Bluff! Weak hand but betting to pressure opponents`,
+        detail: `Bluff frequency: ${(ctx.params.bluffFrequency * 100).toFixed(0)}%`,
+        sentiment: "positive",
+        tags: ["bluff"],
+      });
+    }
+
     const explanation: ExplanationNode = {
-      summary: `${ctx.profile.name} in ${ctx.situationKey}: ${ctx.params.explanation}`,
+      summary: `${ctx.profile.name} — ${formatSituation(ctx.situationKey)}: ${ctx.params.explanation}`,
       sentiment: "neutral",
-      children: [
-        {
-          summary: `Decision: ${actionType}${amount !== undefined ? ` ${amount}` : ""}`,
-          sentiment: actionType === "fold" ? "negative" : actionType === "raise" || actionType === "bet" ? "positive" : "neutral",
-          tags: ["decision"],
-        },
-        {
-          summary: `Continue ${ctx.params.continuePct}% / Raise ${ctx.params.raisePct}% of continuing`,
-          detail: `Bluff frequency: ${(ctx.params.bluffFrequency * 100).toFixed(0)}%, Position awareness: ${ctx.params.positionAwareness}`,
-          sentiment: "neutral",
-          tags: ["params"],
-        },
-        {
-          summary: ctx.params.explanation,
-          sentiment: "neutral",
-          tags: ["profile-reasoning"],
-        },
-      ],
+      children,
       tags: ["basic-engine"],
     };
 

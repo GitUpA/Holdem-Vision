@@ -7,6 +7,8 @@ interface TableControlsProps {
   onNumPlayersChange: (n: number) => void;
   onRotateDealer: () => void;
   onReset: () => void;
+  /** When true, disables controls that would conflict with an in-progress hand */
+  isHandActive?: boolean;
 }
 
 export function TableControls({
@@ -14,6 +16,7 @@ export function TableControls({
   onNumPlayersChange,
   onRotateDealer,
   onReset,
+  isHandActive = false,
 }: TableControlsProps) {
   return (
     <div className="flex items-center gap-3 flex-wrap">
@@ -25,10 +28,10 @@ export function TableControls({
         <div className="flex items-center bg-[var(--muted)]/50 rounded-md border border-[var(--border)]">
           <button
             onClick={() => onNumPlayersChange(numPlayers - 1)}
-            disabled={numPlayers <= 2}
+            disabled={numPlayers <= 2 || isHandActive}
             className={cn(
               "px-2 py-1 text-xs font-medium transition-colors rounded-l-md",
-              numPlayers <= 2
+              numPlayers <= 2 || isHandActive
                 ? "text-[var(--muted-foreground)]/40 cursor-not-allowed"
                 : "text-[var(--foreground)] hover:bg-[var(--accent)]",
             )}
@@ -40,10 +43,10 @@ export function TableControls({
           </span>
           <button
             onClick={() => onNumPlayersChange(numPlayers + 1)}
-            disabled={numPlayers >= 10}
+            disabled={numPlayers >= 10 || isHandActive}
             className={cn(
               "px-2 py-1 text-xs font-medium transition-colors rounded-r-md",
-              numPlayers >= 10
+              numPlayers >= 10 || isHandActive
                 ? "text-[var(--muted-foreground)]/40 cursor-not-allowed"
                 : "text-[var(--foreground)] hover:bg-[var(--accent)]",
             )}
@@ -53,10 +56,16 @@ export function TableControls({
         </div>
       </div>
 
-      {/* Rotate dealer */}
+      {/* Rotate dealer — disabled mid-hand since positions are locked at deal time */}
       <button
         onClick={onRotateDealer}
-        className="text-xs px-2.5 py-1 rounded-md bg-[var(--muted)]/50 border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+        disabled={isHandActive}
+        className={cn(
+          "text-xs px-2.5 py-1 rounded-md bg-[var(--muted)]/50 border border-[var(--border)] transition-colors",
+          isHandActive
+            ? "text-[var(--muted-foreground)]/40 cursor-not-allowed"
+            : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)]",
+        )}
       >
         Rotate Dealer
       </button>

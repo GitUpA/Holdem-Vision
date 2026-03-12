@@ -16,14 +16,39 @@
  *
  * Pure TypeScript, zero Convex imports.
  */
+import { formatSituation } from "./types";
 import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
 import type { ExplanationNode } from "../../types/analysis";
-import type { BehavioralParams } from "../../types/opponents";
-import type { CardIndex } from "../../types/cards";
+import type { BehavioralParams, SituationKey } from "../../types/opponents";
+import type { CardIndex, Position } from "../../types/cards";
 import { sampleActionFromParams, preflopHandScore } from "../autoPlay";
+import { resolveProfile } from "../profileResolver";
 import { analyzeBoard, type BoardTexture } from "./boardTexture";
+import { detectDraws, type DrawInfo } from "./drawDetector";
 import { evaluateHand } from "../../primitives/handEvaluator";
 import { registerEngine } from "./engineRegistry";
+
+// ═══════════════════════════════════════════════════════
+// PREFLOP POSITION MULTIPLIERS
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Position multipliers for preflop opening ranges.
+ * < 1.0 = tighter than average, > 1.0 = wider than average.
+ * Scaled by positionAwareness: Fish (0.1) barely adjusts, TAG (0.8) adjusts a lot.
+ */
+const PREFLOP_POSITION_MULTIPLIERS: Partial<Record<Position, number>> = {
+  utg:  0.6,
+  utg1: 0.65,
+  utg2: 0.7,
+  mp:   0.75,
+  mp1:  0.8,
+  hj:   0.85,
+  co:   1.15,
+  btn:  1.5,
+  sb:   1.2,
+  bb:   1.0,
+};
 
 // ═══════════════════════════════════════════════════════
 // ENGINE IMPLEMENTATION
@@ -33,8 +58,8 @@ export const rangeAwareEngine: DecisionEngine = {
   id: "range-aware",
   name: "Range-Aware Engine",
   description:
-    "Modulates decisions based on board texture, pot odds, and hand " +
-    "strength. Used by TAG and LAG profiles for situationally aware play.",
+    "Modulates decisions based on hand strength, draw potential, board " +
+    "texture, pot odds, and SPR. Used by TAG and LAG profiles.",
 
   decide(ctx: DecisionContext): EngineDecision {
     const isPreflop = ctx.state.currentStreet === "preflop";
@@ -44,6 +69,12 @@ export const rangeAwareEngine: DecisionEngine = {
     let handStrength: number;
     let handDescription: string;
 
+    // ── 1.5. Draw awareness (postflop only) ──
+    let drawInfo: DrawInfo | undefined;
+    if (!isPreflop && ctx.holeCards && ctx.state.communityCards.length >= 3) {
+      drawInfo = detectDraws(ctx.holeCards, ctx.state.communityCards);
+    }
+
     if (isPreflop) {
       handStrength = ctx.holeCards ? preflopHandScore(ctx.holeCards) : 0.5;
       handDescription = describePreflop(handStrength);
@@ -51,6 +82,7 @@ export const rangeAwareEngine: DecisionEngine = {
       const postflopResult = assessPostflopStrength(
         ctx.holeCards,
         ctx.state.communityCards,
+        drawInfo,
       );
       handStrength = postflopResult.strength;
       handDescription = postflopResult.description;
@@ -61,6 +93,14 @@ export const rangeAwareEngine: DecisionEngine = {
       sentiment: handStrength >= 0.7 ? "positive" : handStrength <= 0.3 ? "negative" : "neutral",
       tags: ["hand-strength"],
     });
+
+    if (drawInfo && drawInfo.totalOuts > 0) {
+      reasoningChildren.push({
+        summary: `Draws: ${drawInfo.bestDrawType} (${drawInfo.totalOuts} outs)`,
+        sentiment: drawInfo.totalOuts >= 8 ? "positive" : "neutral",
+        tags: ["draw-aware"],
+      });
+    }
 
     // ── 2. Board texture (postflop only) ──
     let texture: BoardTexture | undefined;
@@ -106,32 +146,59 @@ export const rangeAwareEngine: DecisionEngine = {
       });
     }
 
+    // ── 5b. Preflop position context ──
+    const playerPosition = ctx.state.players[ctx.seatIndex]?.position;
+    if (isPreflop && playerPosition) {
+      const rawMultiplier = PREFLOP_POSITION_MULTIPLIERS[playerPosition] ?? 1.0;
+      const posAwareness = ctx.params.positionAwareness ?? 0;
+      const scaledMultiplier = 1 + (rawMultiplier - 1) * posAwareness;
+      const tighterOrWider = scaledMultiplier < 1 ? "tighter" : scaledMultiplier > 1 ? "wider" : "neutral";
+      reasoningChildren.push({
+        summary: `Position: ${playerPosition.toUpperCase()} — ${tighterOrWider} range (×${scaledMultiplier.toFixed(2)})`,
+        detail: `Base position multiplier: ${rawMultiplier.toFixed(2)}, scaled by positionAwareness ${posAwareness.toFixed(1)}`,
+        sentiment: scaledMultiplier >= 1.1 ? "positive" : scaledMultiplier <= 0.9 ? "negative" : "neutral",
+        tags: ["position", "preflop"],
+      });
+    }
+
     // ── 6. Compute adjusted behavioral params ──
     const adjusted = adjustParams(ctx.params, {
       handStrength,
       texture,
+      drawInfo,
       potOdds,
       foldLikelihood,
       spr,
       isPreflop,
       isAggressor: ctx.situationKey.includes("aggressor"),
       isInPosition: ctx.situationKey.endsWith(".ip"),
+      position: ctx.state.players[ctx.seatIndex]?.position,
     });
 
     reasoningChildren.push({
-      summary: `Adjusted: continue ${adjusted.continuePct.toFixed(0)}% (base ${ctx.params.continuePct}%), raise ${adjusted.raisePct.toFixed(0)}% (base ${ctx.params.raisePct}%)`,
+      summary: `Adjusted: continue ${adjusted.continuePct.toFixed(0)}% (base ${ctx.params.continuePct}%), raise ${adjusted.raisePct.toFixed(0)}% (base ${ctx.params.raisePct}%), bluff ${(adjusted.bluffFrequency * 100).toFixed(0)}% (base ${(ctx.params.bluffFrequency * 100).toFixed(0)}%)`,
       sentiment: "neutral",
       tags: ["adjusted-params"],
     });
 
     // ── 7. Sample action with adjusted params ──
-    const { actionType, amount } = sampleActionFromParams(
+    // Note: pass undefined for holeCards — adjustParams() already applied
+    // hand-strength scaling, so we don't double-apply via adjustedContinuePct().
+    const { actionType, amount, isBluff } = sampleActionFromParams(
       adjusted,
       ctx.legal,
       ctx.potSize,
       ctx.random,
-      ctx.holeCards,
+      undefined,
     );
+
+    if (isBluff) {
+      reasoningChildren.push({
+        summary: `Bluff! Adjusted bluff frequency: ${(adjusted.bluffFrequency * 100).toFixed(0)}% (base ${(ctx.params.bluffFrequency * 100).toFixed(0)}%)`,
+        sentiment: "positive",
+        tags: ["bluff"],
+      });
+    }
 
     // Build the final decision explanation
     const actionSentiment = actionType === "fold"
@@ -141,13 +208,13 @@ export const rangeAwareEngine: DecisionEngine = {
         : "neutral" as const;
 
     reasoningChildren.unshift({
-      summary: `Decision: ${actionType}${amount !== undefined ? ` ${amount}` : ""}`,
+      summary: `Decision: ${actionType}${amount !== undefined ? ` ${amount}` : ""}${isBluff ? " (BLUFF)" : ""}`,
       sentiment: actionSentiment,
       tags: ["decision"],
     });
 
     const explanation: ExplanationNode = {
-      summary: `${ctx.profile.name} in ${ctx.situationKey}: ${buildActionSummary(actionType, amount, handDescription, texture)}`,
+      summary: `${ctx.profile.name} — ${formatSituation(ctx.situationKey)}: ${buildActionSummary(actionType, amount, handDescription, texture)}`,
       sentiment: actionSentiment,
       children: reasoningChildren,
       tags: ["range-aware-engine"],
@@ -165,8 +232,20 @@ export const rangeAwareEngine: DecisionEngine = {
         potOdds,
         foldLikelihood,
         spr,
+        position: playerPosition,
         adjustedContinuePct: adjusted.continuePct,
         adjustedRaisePct: adjusted.raisePct,
+        adjustedBluffFrequency: adjusted.bluffFrequency,
+        isBluff: isBluff ?? false,
+        drawInfo: drawInfo
+          ? {
+              bestDrawType: drawInfo.bestDrawType,
+              totalOuts: drawInfo.totalOuts,
+              hasFlushDraw: drawInfo.hasFlushDraw,
+              hasStraightDraw: drawInfo.hasStraightDraw,
+              isCombo: drawInfo.isCombo,
+            }
+          : undefined,
       },
     };
   },
@@ -179,12 +258,14 @@ export const rangeAwareEngine: DecisionEngine = {
 interface AdjustmentFactors {
   handStrength: number;
   texture?: BoardTexture;
+  drawInfo?: DrawInfo;
   potOdds: number;
   foldLikelihood: number;
   spr: number;
   isPreflop: boolean;
   isAggressor: boolean;
   isInPosition: boolean;
+  position?: Position;
 }
 
 /**
@@ -197,6 +278,7 @@ function adjustParams(
 ): BehavioralParams {
   let continuePct = base.continuePct;
   let raisePct = base.raisePct;
+  let bluffFrequency = base.bluffFrequency;
 
   // ── Hand strength modulation ──
   // Strong hands continue and raise more; weak hands fold more.
@@ -207,9 +289,26 @@ function adjustParams(
     // Postflop: hand strength has a big effect
     continuePct *= 1 + strengthDelta * 0.4;
     raisePct *= 1 + strengthDelta * 0.3;
+  } else {
+    // Preflop: hand strength still matters significantly.
+    // Without this, AQo and 72o get the same flat continuePct.
+    // Premium hands (str > 0.7) get a big boost; trash (str < 0.3) gets penalized.
+    // Slightly less weight than postflop since we also apply position multipliers.
+    continuePct *= 1 + strengthDelta * 0.35;
+    raisePct *= 1 + strengthDelta * 0.25;
   }
-  // Preflop hand strength modulation is already handled by adjustedContinuePct
-  // in sampleActionFromParams, so we don't double-adjust here.
+  // ── Preflop position modulation ──
+  // Position is the biggest preflop differentiator: UTG opens ~12-15%,
+  // BTN opens ~40-50%. Scaled by positionAwareness so Fish barely adjusts
+  // while TAG/LAG adjust significantly.
+  if (factors.isPreflop && factors.position) {
+    const posMultiplier = PREFLOP_POSITION_MULTIPLIERS[factors.position] ?? 1.0;
+    // Scale the multiplier by positionAwareness:
+    // posAware=0.8 (TAG) → full effect, posAware=0.1 (Fish) → nearly no effect
+    const scaledMultiplier = 1 + (posMultiplier - 1) * base.positionAwareness;
+    continuePct *= scaledMultiplier;
+    raisePct *= scaledMultiplier;
+  }
 
   // ── Board texture modulation (postflop only) ──
   if (factors.texture && !factors.isPreflop) {
@@ -236,6 +335,23 @@ function adjustParams(
     if (factors.texture.isPaired) {
       continuePct *= 0.92;
     }
+  }
+
+  // ── Draw awareness modulation ──
+  // Draws increase willingness to continue (need to see more cards).
+  // Strong draws (combo, OESD) also boost aggression for semi-bluff value.
+  if (factors.drawInfo && !factors.isPreflop && factors.drawInfo.totalOuts > 0) {
+    const outsBoost = Math.min(factors.drawInfo.totalOuts / 15, 1) * 0.25;
+    continuePct *= 1 + outsBoost;
+
+    if (factors.drawInfo.isCombo) {
+      // Combo draws are great semi-bluff candidates
+      raisePct *= 1.3;
+    } else if (factors.drawInfo.totalOuts >= 8) {
+      // Flush draw / OESD — moderate semi-bluff
+      raisePct *= 1.15;
+    }
+    // Gutshots: continue more but don't raise more (speculative, not aggressive)
   }
 
   // ── Pot odds modulation ──
@@ -267,10 +383,32 @@ function adjustParams(
     }
   }
 
+  // ── Bluff frequency modulation ──
+  // Modulate how often the engine bluffs weak hands based on context.
+  if (!factors.isPreflop) {
+    // High fold equity → bluffs are more profitable
+    if (factors.foldLikelihood > 0.3) {
+      bluffFrequency *= 1 + (factors.foldLikelihood - 0.3) * 0.8;
+    }
+
+    // Strong draws → semi-bluff opportunities
+    if (factors.drawInfo && factors.drawInfo.totalOuts > 0) {
+      const drawBoost = Math.min(factors.drawInfo.totalOuts / 12, 1) * 0.5;
+      bluffFrequency *= 1 + drawBoost;
+    }
+
+    // Wet boards → aggressor has more bluffable textures
+    if (factors.texture && factors.isAggressor) {
+      bluffFrequency *= 1 + (factors.texture.wetness - 0.5) * 0.3;
+    }
+  }
+
   // ── Position bonus ──
   if (factors.isInPosition) {
     continuePct *= 1 + base.positionAwareness * 0.08;
     raisePct *= 1 + base.positionAwareness * 0.05;
+    // IP bluffs are more credible
+    bluffFrequency *= 1 + base.positionAwareness * 0.15;
   }
 
   // Clamp to legal bounds
@@ -278,16 +416,18 @@ function adjustParams(
     ...base,
     continuePct: clamp(continuePct, 0, 100),
     raisePct: clamp(raisePct, 0, 100),
+    bluffFrequency: clamp(bluffFrequency, 0, 1),
   };
 }
 
 /**
  * Estimate how likely opponents are to fold to aggression.
- * Based on their profiles' fold frequencies and current street.
+ *
+ * When opponent profiles are available (via ctx.opponentProfiles), uses
+ * their actual facing_bet / facing_raise continuePct. Otherwise falls
+ * back to a heuristic based on the current profile's own continuePct.
  */
 function estimateFoldLikelihood(ctx: DecisionContext): number {
-  // Use the inverse of the opponent's continuePct for the facing_bet situation.
-  // We approximate by looking at the average fold rate across active opponents.
   const activePlayers = ctx.state.players.filter(
     (p) => p.seatIndex !== ctx.seatIndex &&
            (p.status === "active" || p.status === "all_in"),
@@ -295,13 +435,41 @@ function estimateFoldLikelihood(ctx: DecisionContext): number {
 
   if (activePlayers.length === 0) return 0;
 
-  // Simple estimate: use the profile's own aggression tendency.
-  // TAG/LAG opponents tend to face opponents who fold (100 - facingBet.continuePct).
-  // Since we don't know the opponent profiles here, use the current profile's
-  // bluff frequency as a proxy for how profitable bluffing is.
-  const baseFoldEstimate = 1 - (ctx.params.continuePct / 100);
+  // ── Profile-based fold equity (when opponent profiles available) ──
+  if (ctx.opponentProfiles && ctx.opponentProfiles.size > 0) {
+    const foldRates: number[] = [];
 
-  // More opponents = less fold equity (need ALL to fold)
+    for (const p of activePlayers) {
+      const oppProfile = ctx.opponentProfiles.get(p.seatIndex);
+      if (oppProfile) {
+        const resolved = resolveProfile(oppProfile, ctx.getBase);
+        // Choose the facing situation based on street and action type
+        let facingKey: SituationKey;
+        if (ctx.state.currentStreet === "preflop") {
+          facingKey = "preflop.facing_raise";
+        } else if (ctx.legal.canRaise) {
+          // We're raising (opponent already bet) → they face a raise
+          facingKey = "postflop.facing_raise";
+        } else {
+          // We're betting first → opponent faces a bet
+          facingKey = "postflop.facing_bet";
+        }
+        const oppParams = resolved[facingKey];
+        foldRates.push(1 - oppParams.continuePct / 100);
+      } else {
+        // No profile for this opponent — moderate default
+        foldRates.push(0.4);
+      }
+    }
+
+    if (foldRates.length === 1) return foldRates[0];
+
+    // Multi-way: need ALL opponents to fold — multiply fold rates
+    return foldRates.reduce((acc, rate) => acc * rate, 1);
+  }
+
+  // ── Fallback: heuristic when no opponent profiles available ──
+  const baseFoldEstimate = 1 - (ctx.params.continuePct / 100);
   const multiWayPenalty = Math.pow(baseFoldEstimate, activePlayers.length - 1);
   return baseFoldEstimate * (activePlayers.length === 1 ? 1 : multiWayPenalty * 0.7);
 }
@@ -313,6 +481,7 @@ function estimateFoldLikelihood(ctx: DecisionContext): number {
 function assessPostflopStrength(
   holeCards: CardIndex[] | undefined,
   communityCards: CardIndex[],
+  drawInfo?: DrawInfo,
 ): { strength: number; description: string } {
   if (!holeCards || holeCards.length < 2 || communityCards.length < 3) {
     return { strength: 0.5, description: "unknown" };
@@ -324,15 +493,6 @@ function assessPostflopStrength(
     const tier = evaluated.rank.tier;
 
     // Map hand tier (0=high card, 1=pair, ..., 8=straight flush) to strength
-    // tier 0 = high card → 0.1
-    // tier 1 = pair → 0.35
-    // tier 2 = two pair → 0.55
-    // tier 3 = trips → 0.7
-    // tier 4 = straight → 0.78
-    // tier 5 = flush → 0.85
-    // tier 6 = full house → 0.92
-    // tier 7 = quads → 0.97
-    // tier 8 = straight flush → 0.99
     const tierStrengths = [0.1, 0.35, 0.55, 0.7, 0.78, 0.85, 0.92, 0.97, 0.99];
     const baseStrength = tierStrengths[Math.min(tier, tierStrengths.length - 1)];
 
@@ -341,13 +501,27 @@ function assessPostflopStrength(
       ? (evaluated.rank.tiebreakers[0] / 12) * 0.08
       : 0;
 
-    const strength = Math.min(1, baseStrength + kickerBonus);
+    let strength = Math.min(1, baseStrength + kickerBonus);
+
+    // Blend draw equity into strength — a hand with a strong draw is
+    // worth more than its made-hand tier alone. ~2% equity per out per
+    // street remaining (rule of 2 and 4).
+    if (drawInfo && drawInfo.totalOuts > 0) {
+      const streetsLeft =
+        communityCards.length === 3 ? 2 : communityCards.length === 4 ? 1 : 0;
+      const drawEquity = Math.min(drawInfo.totalOuts * 0.02 * streetsLeft, 0.45);
+      // Don't exceed flush-level strength from draws alone
+      strength = Math.min(0.85, strength + drawEquity);
+    }
 
     const tierNames = [
       "high card", "pair", "two pair", "trips",
       "straight", "flush", "full house", "quads", "straight flush",
     ];
-    const description = tierNames[Math.min(tier, tierNames.length - 1)] ?? "unknown";
+    let description = tierNames[Math.min(tier, tierNames.length - 1)] ?? "unknown";
+    if (drawInfo && drawInfo.totalOuts > 0) {
+      description += ` + ${drawInfo.bestDrawType.replace("_", " ")}`;
+    }
 
     return { strength, description };
   } catch {

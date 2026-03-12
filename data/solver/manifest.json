@@ -1,0 +1,1948 @@
+{
+  "ace_high_dry_rainbow": [
+    {
+      "name": "ace_high_dry_rainbow_000",
+      "board": [
+        "Ac",
+        "8h",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_000.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_001",
+      "board": [
+        "Ac",
+        "7h",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_001.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_001.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_002",
+      "board": [
+        "Ac",
+        "7s",
+        "5h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_002.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_002.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_003",
+      "board": [
+        "Ad",
+        "9h",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_003.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_003.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_004",
+      "board": [
+        "Ah",
+        "9c",
+        "5s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_004.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_004.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_005",
+      "board": [
+        "Ah",
+        "8d",
+        "5c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_005.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_005.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_006",
+      "board": [
+        "As",
+        "7c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_006.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_006.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_007",
+      "board": [
+        "Ah",
+        "9c",
+        "4d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_007.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_007.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_008",
+      "board": [
+        "Ad",
+        "9h",
+        "4c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_008.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_008.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_009",
+      "board": [
+        "Ad",
+        "7c",
+        "4s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_009.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_009.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_010",
+      "board": [
+        "Ah",
+        "7d",
+        "4c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_010.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_010.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_011",
+      "board": [
+        "Ac",
+        "8h",
+        "4s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_011.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_011.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_012",
+      "board": [
+        "Ad",
+        "7s",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_012.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_012.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_013",
+      "board": [
+        "Ah",
+        "9c",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_013.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_013.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_014",
+      "board": [
+        "Ah",
+        "9d",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_014.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_014.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_015",
+      "board": [
+        "As",
+        "7d",
+        "4h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_015.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_015.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_016",
+      "board": [
+        "Ah",
+        "7s",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_016.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_016.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_017",
+      "board": [
+        "Ad",
+        "8c",
+        "5s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_017.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_017.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_018",
+      "board": [
+        "Ad",
+        "7h",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_018.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_018.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_019",
+      "board": [
+        "Ac",
+        "9d",
+        "5h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_019.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_019.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_020",
+      "board": [
+        "Ah",
+        "9s",
+        "5c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_020.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_020.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_021",
+      "board": [
+        "Ah",
+        "8s",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_021.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_021.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_022",
+      "board": [
+        "Ad",
+        "8s",
+        "4c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_022.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_022.json"
+    },
+    {
+      "name": "ace_high_dry_rainbow_023",
+      "board": [
+        "Ad",
+        "8h",
+        "4c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\ace_high_dry_rainbow_023.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\ace_high_dry_rainbow_023.json"
+    }
+  ],
+  "kq_high_dry_rainbow": [
+    {
+      "name": "kq_high_dry_rainbow_000",
+      "board": [
+        "Kd",
+        "6h",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_000.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_001",
+      "board": [
+        "Kh",
+        "6d",
+        "4c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_001.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_001.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_002",
+      "board": [
+        "Qd",
+        "8h",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_002.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_002.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_003",
+      "board": [
+        "Qc",
+        "5d",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_003.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_003.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_004",
+      "board": [
+        "Kh",
+        "7c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_004.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_004.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_005",
+      "board": [
+        "Kd",
+        "8s",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_005.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_005.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_006",
+      "board": [
+        "Kh",
+        "8s",
+        "4c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_006.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_006.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_007",
+      "board": [
+        "Kc",
+        "5h",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_007.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_007.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_008",
+      "board": [
+        "Qh",
+        "7c",
+        "4d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_008.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_008.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_009",
+      "board": [
+        "Qc",
+        "5h",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_009.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_009.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_010",
+      "board": [
+        "Qd",
+        "8h",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_010.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_010.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_011",
+      "board": [
+        "Ks",
+        "8h",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_011.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_011.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_012",
+      "board": [
+        "Kc",
+        "7d",
+        "4s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_012.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_012.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_013",
+      "board": [
+        "Qh",
+        "4d",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_013.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_013.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_014",
+      "board": [
+        "Qc",
+        "4d",
+        "2h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_014.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_014.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_015",
+      "board": [
+        "Kd",
+        "4s",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_015.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_015.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_016",
+      "board": [
+        "Qs",
+        "4c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_016.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_016.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_017",
+      "board": [
+        "Kh",
+        "8c",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_017.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_017.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_018",
+      "board": [
+        "Ks",
+        "8d",
+        "2h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_018.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_018.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_019",
+      "board": [
+        "Ks",
+        "5h",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_019.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_019.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_020",
+      "board": [
+        "Kc",
+        "8s",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_020.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_020.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_021",
+      "board": [
+        "Qs",
+        "8h",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_021.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_021.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_022",
+      "board": [
+        "Qh",
+        "7c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_022.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_022.json"
+    },
+    {
+      "name": "kq_high_dry_rainbow_023",
+      "board": [
+        "Kd",
+        "7s",
+        "4h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\kq_high_dry_rainbow_023.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\kq_high_dry_rainbow_023.json"
+    }
+  ],
+  "mid_low_dry_rainbow": [
+    {
+      "name": "mid_low_dry_rainbow_000",
+      "board": [
+        "Ts",
+        "5c",
+        "2h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_000.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_001",
+      "board": [
+        "9c",
+        "4s",
+        "2h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_001.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_001.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_002",
+      "board": [
+        "8d",
+        "4c",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_002.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_002.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_003",
+      "board": [
+        "7h",
+        "4d",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_003.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_003.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_004",
+      "board": [
+        "7c",
+        "4h",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_004.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_004.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_005",
+      "board": [
+        "9s",
+        "6h",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_005.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_005.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_006",
+      "board": [
+        "7h",
+        "3s",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_006.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_006.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_007",
+      "board": [
+        "7h",
+        "5c",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_007.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_007.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_008",
+      "board": [
+        "7c",
+        "5d",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_008.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_008.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_009",
+      "board": [
+        "Ts",
+        "6c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_009.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_009.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_010",
+      "board": [
+        "Th",
+        "5d",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_010.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_010.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_011",
+      "board": [
+        "7d",
+        "5s",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_011.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_011.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_012",
+      "board": [
+        "9h",
+        "4c",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_012.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_012.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_013",
+      "board": [
+        "8h",
+        "5d",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_013.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_013.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_014",
+      "board": [
+        "7d",
+        "3h",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_014.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_014.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_015",
+      "board": [
+        "Ts",
+        "6h",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_015.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_015.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_016",
+      "board": [
+        "Th",
+        "4c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_016.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_016.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_017",
+      "board": [
+        "8s",
+        "5h",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_017.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_017.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_018",
+      "board": [
+        "Th",
+        "6s",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_018.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_018.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_019",
+      "board": [
+        "9d",
+        "5c",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_019.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_019.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_020",
+      "board": [
+        "9d",
+        "4c",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_020.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_020.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_021",
+      "board": [
+        "9c",
+        "6s",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_021.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_021.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_022",
+      "board": [
+        "8h",
+        "5c",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_022.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_022.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_023",
+      "board": [
+        "9h",
+        "4s",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_023.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_023.json"
+    },
+    {
+      "name": "mid_low_dry_rainbow_024",
+      "board": [
+        "Th",
+        "4d",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\mid_low_dry_rainbow_024.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\mid_low_dry_rainbow_024.json"
+    }
+  ],
+  "paired_boards": [
+    {
+      "name": "paired_boards_000",
+      "board": [
+        "4c",
+        "4h",
+        "Td"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_000.json"
+    },
+    {
+      "name": "paired_boards_001",
+      "board": [
+        "Th",
+        "Ts",
+        "As"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_001.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_001.json"
+    },
+    {
+      "name": "paired_boards_002",
+      "board": [
+        "7s",
+        "7d",
+        "9c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_002.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_002.json"
+    },
+    {
+      "name": "paired_boards_003",
+      "board": [
+        "Td",
+        "Ts",
+        "Jc"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_003.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_003.json"
+    },
+    {
+      "name": "paired_boards_004",
+      "board": [
+        "Qd",
+        "Qc",
+        "Th"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_004.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_004.json"
+    },
+    {
+      "name": "paired_boards_005",
+      "board": [
+        "9h",
+        "9c",
+        "7d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_005.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_005.json"
+    },
+    {
+      "name": "paired_boards_006",
+      "board": [
+        "As",
+        "Ac",
+        "6d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_006.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_006.json"
+    },
+    {
+      "name": "paired_boards_007",
+      "board": [
+        "Jh",
+        "Jd",
+        "9s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_007.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_007.json"
+    },
+    {
+      "name": "paired_boards_008",
+      "board": [
+        "Js",
+        "Jd",
+        "8c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_008.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_008.json"
+    },
+    {
+      "name": "paired_boards_009",
+      "board": [
+        "As",
+        "Ac",
+        "5d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_009.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_009.json"
+    },
+    {
+      "name": "paired_boards_010",
+      "board": [
+        "3s",
+        "3h",
+        "8d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_010.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_010.json"
+    },
+    {
+      "name": "paired_boards_011",
+      "board": [
+        "9d",
+        "9s",
+        "Kc"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_011.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_011.json"
+    },
+    {
+      "name": "paired_boards_012",
+      "board": [
+        "5h",
+        "5c",
+        "Jd"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_012.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_012.json"
+    },
+    {
+      "name": "paired_boards_013",
+      "board": [
+        "4s",
+        "4c",
+        "Jh"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_013.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_013.json"
+    },
+    {
+      "name": "paired_boards_014",
+      "board": [
+        "5d",
+        "5c",
+        "9h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_014.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_014.json"
+    },
+    {
+      "name": "paired_boards_015",
+      "board": [
+        "7s",
+        "7h",
+        "8c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_015.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_015.json"
+    },
+    {
+      "name": "paired_boards_016",
+      "board": [
+        "8s",
+        "8d",
+        "Kh"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_016.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_016.json"
+    },
+    {
+      "name": "paired_boards_017",
+      "board": [
+        "Ac",
+        "Ah",
+        "9d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_017.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_017.json"
+    },
+    {
+      "name": "paired_boards_018",
+      "board": [
+        "6h",
+        "6c",
+        "Ks"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_018.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_018.json"
+    },
+    {
+      "name": "paired_boards_019",
+      "board": [
+        "4c",
+        "4h",
+        "9s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_019.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_019.json"
+    },
+    {
+      "name": "paired_boards_020",
+      "board": [
+        "4d",
+        "4h",
+        "Th"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_020.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_020.json"
+    },
+    {
+      "name": "paired_boards_021",
+      "board": [
+        "3h",
+        "3c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_021.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_021.json"
+    },
+    {
+      "name": "paired_boards_022",
+      "board": [
+        "8s",
+        "8c",
+        "7c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_022.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_022.json"
+    },
+    {
+      "name": "paired_boards_023",
+      "board": [
+        "Jd",
+        "Jc",
+        "8c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_023.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_023.json"
+    },
+    {
+      "name": "paired_boards_024",
+      "board": [
+        "4s",
+        "4h",
+        "Qh"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\paired_boards_024.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\paired_boards_024.json"
+    }
+  ],
+  "two_tone_disconnected": [
+    {
+      "name": "two_tone_disconnected_000",
+      "board": [
+        "Jc",
+        "4c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_000.json"
+    },
+    {
+      "name": "two_tone_disconnected_001",
+      "board": [
+        "Qc",
+        "7c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_001.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_001.json"
+    },
+    {
+      "name": "two_tone_disconnected_002",
+      "board": [
+        "Ts",
+        "5s",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_002.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_002.json"
+    },
+    {
+      "name": "two_tone_disconnected_003",
+      "board": [
+        "Ts",
+        "7s",
+        "2h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_003.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_003.json"
+    },
+    {
+      "name": "two_tone_disconnected_004",
+      "board": [
+        "Ah",
+        "7h",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_004.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_004.json"
+    },
+    {
+      "name": "two_tone_disconnected_005",
+      "board": [
+        "Qs",
+        "5s",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_005.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_005.json"
+    },
+    {
+      "name": "two_tone_disconnected_006",
+      "board": [
+        "Qs",
+        "4s",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_006.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_006.json"
+    },
+    {
+      "name": "two_tone_disconnected_007",
+      "board": [
+        "Kd",
+        "4d",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_007.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_007.json"
+    },
+    {
+      "name": "two_tone_disconnected_008",
+      "board": [
+        "Th",
+        "4h",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_008.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_008.json"
+    },
+    {
+      "name": "two_tone_disconnected_009",
+      "board": [
+        "Kd",
+        "5d",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_009.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_009.json"
+    },
+    {
+      "name": "two_tone_disconnected_010",
+      "board": [
+        "Kd",
+        "5d",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_010.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_010.json"
+    },
+    {
+      "name": "two_tone_disconnected_011",
+      "board": [
+        "Ad",
+        "6d",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_011.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_011.json"
+    },
+    {
+      "name": "two_tone_disconnected_012",
+      "board": [
+        "Qc",
+        "5c",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_012.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_012.json"
+    },
+    {
+      "name": "two_tone_disconnected_013",
+      "board": [
+        "Ah",
+        "6h",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_013.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_013.json"
+    },
+    {
+      "name": "two_tone_disconnected_014",
+      "board": [
+        "Kd",
+        "6d",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_014.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_014.json"
+    },
+    {
+      "name": "two_tone_disconnected_015",
+      "board": [
+        "Js",
+        "4s",
+        "2d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_015.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_015.json"
+    },
+    {
+      "name": "two_tone_disconnected_016",
+      "board": [
+        "Qc",
+        "4c",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_016.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_016.json"
+    },
+    {
+      "name": "two_tone_disconnected_017",
+      "board": [
+        "Tc",
+        "6c",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_017.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_017.json"
+    },
+    {
+      "name": "two_tone_disconnected_018",
+      "board": [
+        "Jc",
+        "7c",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_018.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_018.json"
+    },
+    {
+      "name": "two_tone_disconnected_019",
+      "board": [
+        "Jh",
+        "4h",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_019.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_019.json"
+    },
+    {
+      "name": "two_tone_disconnected_020",
+      "board": [
+        "Kh",
+        "4h",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_020.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_020.json"
+    },
+    {
+      "name": "two_tone_disconnected_021",
+      "board": [
+        "Th",
+        "6h",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_021.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_021.json"
+    },
+    {
+      "name": "two_tone_disconnected_022",
+      "board": [
+        "Tc",
+        "7c",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_022.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_022.json"
+    },
+    {
+      "name": "two_tone_disconnected_023",
+      "board": [
+        "Ts",
+        "5s",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_023.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_023.json"
+    },
+    {
+      "name": "two_tone_disconnected_024",
+      "board": [
+        "Js",
+        "6s",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_disconnected_024.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_disconnected_024.json"
+    }
+  ],
+  "two_tone_connected": [
+    {
+      "name": "two_tone_connected_000",
+      "board": [
+        "5s",
+        "4s",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_000.json"
+    },
+    {
+      "name": "two_tone_connected_001",
+      "board": [
+        "9d",
+        "8d",
+        "7s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_001.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_001.json"
+    },
+    {
+      "name": "two_tone_connected_002",
+      "board": [
+        "Jh",
+        "Th",
+        "9c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_002.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_002.json"
+    },
+    {
+      "name": "two_tone_connected_003",
+      "board": [
+        "Tc",
+        "9c",
+        "8d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_003.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_003.json"
+    },
+    {
+      "name": "two_tone_connected_004",
+      "board": [
+        "Ts",
+        "9s",
+        "8h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_004.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_004.json"
+    },
+    {
+      "name": "two_tone_connected_005",
+      "board": [
+        "5s",
+        "4s",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_005.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_005.json"
+    },
+    {
+      "name": "two_tone_connected_006",
+      "board": [
+        "9d",
+        "8d",
+        "7h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_006.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_006.json"
+    },
+    {
+      "name": "two_tone_connected_007",
+      "board": [
+        "6c",
+        "5c",
+        "4s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_007.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_007.json"
+    },
+    {
+      "name": "two_tone_connected_008",
+      "board": [
+        "5d",
+        "4d",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_008.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_008.json"
+    },
+    {
+      "name": "two_tone_connected_009",
+      "board": [
+        "9d",
+        "8d",
+        "7c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_009.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_009.json"
+    },
+    {
+      "name": "two_tone_connected_010",
+      "board": [
+        "7d",
+        "6d",
+        "5s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_010.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_010.json"
+    },
+    {
+      "name": "two_tone_connected_011",
+      "board": [
+        "6c",
+        "5c",
+        "4d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_011.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_011.json"
+    },
+    {
+      "name": "two_tone_connected_012",
+      "board": [
+        "Js",
+        "Ts",
+        "9h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_012.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_012.json"
+    },
+    {
+      "name": "two_tone_connected_013",
+      "board": [
+        "Jh",
+        "Th",
+        "9s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_013.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_013.json"
+    },
+    {
+      "name": "two_tone_connected_014",
+      "board": [
+        "8h",
+        "7h",
+        "6s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_014.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_014.json"
+    },
+    {
+      "name": "two_tone_connected_015",
+      "board": [
+        "4h",
+        "3h",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_015.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_015.json"
+    },
+    {
+      "name": "two_tone_connected_016",
+      "board": [
+        "5h",
+        "4h",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_016.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_016.json"
+    },
+    {
+      "name": "two_tone_connected_017",
+      "board": [
+        "Jc",
+        "Tc",
+        "9d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_017.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_017.json"
+    },
+    {
+      "name": "two_tone_connected_018",
+      "board": [
+        "9h",
+        "8h",
+        "7c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_018.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_018.json"
+    },
+    {
+      "name": "two_tone_connected_019",
+      "board": [
+        "Qc",
+        "Jc",
+        "Th"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_019.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_019.json"
+    },
+    {
+      "name": "two_tone_connected_020",
+      "board": [
+        "7h",
+        "6h",
+        "5s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\two_tone_connected_020.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\two_tone_connected_020.json"
+    }
+  ],
+  "monotone": [
+    {
+      "name": "monotone_000",
+      "board": [
+        "Kh",
+        "4h",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_000.json"
+    },
+    {
+      "name": "monotone_001",
+      "board": [
+        "9h",
+        "7h",
+        "6h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_001.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_001.json"
+    },
+    {
+      "name": "monotone_002",
+      "board": [
+        "Kd",
+        "7d",
+        "6d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_002.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_002.json"
+    },
+    {
+      "name": "monotone_003",
+      "board": [
+        "Th",
+        "7h",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_003.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_003.json"
+    },
+    {
+      "name": "monotone_004",
+      "board": [
+        "Ks",
+        "Js",
+        "6s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_004.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_004.json"
+    },
+    {
+      "name": "monotone_005",
+      "board": [
+        "Ad",
+        "Qd",
+        "8d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_005.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_005.json"
+    },
+    {
+      "name": "monotone_006",
+      "board": [
+        "9h",
+        "8h",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_006.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_006.json"
+    },
+    {
+      "name": "monotone_007",
+      "board": [
+        "6c",
+        "5c",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_007.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_007.json"
+    },
+    {
+      "name": "monotone_008",
+      "board": [
+        "Ac",
+        "5c",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_008.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_008.json"
+    },
+    {
+      "name": "monotone_009",
+      "board": [
+        "8d",
+        "6d",
+        "5d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_009.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_009.json"
+    },
+    {
+      "name": "monotone_010",
+      "board": [
+        "Qs",
+        "5s",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_010.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_010.json"
+    },
+    {
+      "name": "monotone_011",
+      "board": [
+        "Jc",
+        "4c",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_011.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_011.json"
+    },
+    {
+      "name": "monotone_012",
+      "board": [
+        "Qs",
+        "9s",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_012.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_012.json"
+    },
+    {
+      "name": "monotone_013",
+      "board": [
+        "7c",
+        "5c",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_013.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_013.json"
+    },
+    {
+      "name": "monotone_014",
+      "board": [
+        "Jd",
+        "4d",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_014.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_014.json"
+    },
+    {
+      "name": "monotone_015",
+      "board": [
+        "8s",
+        "4s",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_015.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_015.json"
+    },
+    {
+      "name": "monotone_016",
+      "board": [
+        "8c",
+        "7c",
+        "5c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_016.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_016.json"
+    },
+    {
+      "name": "monotone_017",
+      "board": [
+        "7d",
+        "4d",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_017.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_017.json"
+    },
+    {
+      "name": "monotone_018",
+      "board": [
+        "8h",
+        "7h",
+        "2h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_018.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_018.json"
+    },
+    {
+      "name": "monotone_019",
+      "board": [
+        "9c",
+        "6c",
+        "2c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_019.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_019.json"
+    },
+    {
+      "name": "monotone_020",
+      "board": [
+        "9s",
+        "7s",
+        "6s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_020.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_020.json"
+    },
+    {
+      "name": "monotone_021",
+      "board": [
+        "7c",
+        "4c",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_021.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_021.json"
+    },
+    {
+      "name": "monotone_022",
+      "board": [
+        "Ad",
+        "Kd",
+        "5d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_022.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_022.json"
+    },
+    {
+      "name": "monotone_023",
+      "board": [
+        "Th",
+        "7h",
+        "2h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_023.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_023.json"
+    },
+    {
+      "name": "monotone_024",
+      "board": [
+        "9d",
+        "8d",
+        "5d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\monotone_024.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\monotone_024.json"
+    }
+  ],
+  "rainbow_connected": [
+    {
+      "name": "rainbow_connected_000",
+      "board": [
+        "Qd",
+        "Jc",
+        "Th"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_000.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_000.json"
+    },
+    {
+      "name": "rainbow_connected_001",
+      "board": [
+        "Jc",
+        "Ts",
+        "9h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_001.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_001.json"
+    },
+    {
+      "name": "rainbow_connected_002",
+      "board": [
+        "7h",
+        "6d",
+        "5s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_002.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_002.json"
+    },
+    {
+      "name": "rainbow_connected_003",
+      "board": [
+        "4d",
+        "3h",
+        "2s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_003.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_003.json"
+    },
+    {
+      "name": "rainbow_connected_004",
+      "board": [
+        "9h",
+        "8d",
+        "7c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_004.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_004.json"
+    },
+    {
+      "name": "rainbow_connected_005",
+      "board": [
+        "6h",
+        "5d",
+        "4s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_005.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_005.json"
+    },
+    {
+      "name": "rainbow_connected_006",
+      "board": [
+        "8d",
+        "7c",
+        "6h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_006.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_006.json"
+    },
+    {
+      "name": "rainbow_connected_007",
+      "board": [
+        "6s",
+        "5h",
+        "4d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_007.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_007.json"
+    },
+    {
+      "name": "rainbow_connected_008",
+      "board": [
+        "Qc",
+        "Jd",
+        "Th"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_008.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_008.json"
+    },
+    {
+      "name": "rainbow_connected_009",
+      "board": [
+        "Jd",
+        "Th",
+        "9s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_009.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_009.json"
+    },
+    {
+      "name": "rainbow_connected_010",
+      "board": [
+        "Jd",
+        "Tc",
+        "9h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_010.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_010.json"
+    },
+    {
+      "name": "rainbow_connected_011",
+      "board": [
+        "5s",
+        "4c",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_011.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_011.json"
+    },
+    {
+      "name": "rainbow_connected_012",
+      "board": [
+        "5h",
+        "4s",
+        "3d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_012.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_012.json"
+    },
+    {
+      "name": "rainbow_connected_013",
+      "board": [
+        "5h",
+        "4d",
+        "3c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_013.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_013.json"
+    },
+    {
+      "name": "rainbow_connected_014",
+      "board": [
+        "6h",
+        "5s",
+        "4c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_014.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_014.json"
+    },
+    {
+      "name": "rainbow_connected_015",
+      "board": [
+        "5d",
+        "4c",
+        "3h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_015.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_015.json"
+    },
+    {
+      "name": "rainbow_connected_016",
+      "board": [
+        "Jc",
+        "Td",
+        "9h"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_016.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_016.json"
+    },
+    {
+      "name": "rainbow_connected_017",
+      "board": [
+        "Jd",
+        "Th",
+        "9c"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_017.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_017.json"
+    },
+    {
+      "name": "rainbow_connected_018",
+      "board": [
+        "5h",
+        "4d",
+        "3s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_018.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_018.json"
+    },
+    {
+      "name": "rainbow_connected_019",
+      "board": [
+        "Qs",
+        "Jd",
+        "Tc"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_019.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_019.json"
+    },
+    {
+      "name": "rainbow_connected_020",
+      "board": [
+        "Js",
+        "Th",
+        "9d"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_020.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_020.json"
+    },
+    {
+      "name": "rainbow_connected_021",
+      "board": [
+        "6d",
+        "5c",
+        "4s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_021.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_021.json"
+    },
+    {
+      "name": "rainbow_connected_022",
+      "board": [
+        "Qc",
+        "Js",
+        "Th"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_022.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_022.json"
+    },
+    {
+      "name": "rainbow_connected_023",
+      "board": [
+        "8d",
+        "7c",
+        "6s"
+      ],
+      "input": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\inputs\\rainbow_connected_023.txt",
+      "output": "C:\\Users\\ALIVE-VIDEO-2\\Documents\\Development\\HoldemVision\\data\\solver\\outputs\\rainbow_connected_023.json"
+    }
+  ]
+}

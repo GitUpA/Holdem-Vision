@@ -23,6 +23,7 @@ import type {
 import type { AnalysisContext, GameContext, ExplanationNode } from "../types/analysis";
 import type { OpponentProfile, OpponentContext, PlayerAction } from "../types/opponents";
 import { estimateRange } from "../opponents/rangeEstimator";
+import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
 import { createShuffledDeck, deal, seededRandom } from "../primitives/deck";
 import { seatToPositionMap } from "../primitives/position";
 import { calculatePots } from "../rules/pot";
@@ -369,6 +370,13 @@ export function applyAction(
 
   // Check if hand is over (everyone folded)
   if (isHandOver(newState)) {
+    // Award pot to the last remaining player
+    const winner = newState.players.find(
+      (p) => p.status === "active" || p.status === "all_in",
+    );
+    if (winner) {
+      winner.currentStack += newState.pot.total;
+    }
     newState.phase = "complete";
     newState.activePlayerIndex = null;
     return {
@@ -390,6 +398,7 @@ export function applyAction(
       // After river betting, go to showdown
       newState.phase = "showdown";
       newState.activePlayerIndex = null;
+      resolveShowdown(newState);
       return { state: newState, explanation: "Showdown" };
     }
 
@@ -418,6 +427,7 @@ export function advanceStreet(state: GameState): StateTransitionResult {
   if (next === null) {
     state.phase = "showdown";
     state.activePlayerIndex = null;
+    resolveShowdown(state);
     return { state, explanation: "Showdown" };
   }
 
@@ -476,7 +486,38 @@ function runOutBoard(state: GameState): StateTransitionResult {
   }
 
   state.phase = "showdown";
+  resolveShowdown(state);
   return { state, explanation: "All-in run-out → showdown" };
+}
+
+/**
+ * Evaluate hands at showdown and distribute the pot to the winner.
+ * Mutates state in-place: updates winner's currentStack with pot.total.
+ * Simple single-pot logic (no side pots yet).
+ */
+function resolveShowdown(state: GameState): void {
+  const community = state.communityCards;
+  if (community.length < 5) return; // Can't evaluate without full board
+
+  const inHand = state.players.filter(
+    (p) => p.status === "active" || p.status === "all_in",
+  );
+  if (inHand.length === 0) return;
+
+  // Evaluate each player's hand
+  let bestPlayer = inHand[0];
+  let bestRank = evaluateHand([...bestPlayer.holeCards, ...community]).rank;
+
+  for (const p of inHand.slice(1)) {
+    const rank = evaluateHand([...p.holeCards, ...community]).rank;
+    if (compareHandRanks(rank, bestRank) > 0) {
+      bestPlayer = p;
+      bestRank = rank;
+    }
+  }
+
+  // Award pot to winner
+  bestPlayer.currentStack += state.pot.total;
 }
 
 // ═══════════════════════════════════════════════════════

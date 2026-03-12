@@ -17,8 +17,9 @@ import type {
   ExplanationNode,
 } from "../types/analysis";
 import type { VisualDirectiveType } from "../types/visuals";
-import type { ActionType } from "../state/game-state";
-import type { EngineDecision, DecisionContext } from "../opponents/engines/types";
+import type { ActionType, GameState, LegalActions } from "../state/game-state";
+import type { CardIndex } from "../types/cards";
+import type { DecisionContext } from "../opponents/engines/types";
 import { getEngineOrDefault } from "../opponents/engines/engineRegistry";
 import { classifyCurrentDecision } from "../opponents/autoPlay";
 import { resolveProfile } from "../opponents/profileResolver";
@@ -26,9 +27,21 @@ import { getAllPresets, PRESET_PROFILES } from "../opponents/presets";
 import { currentLegalActions } from "../state/state-machine";
 import { seededRandom } from "../primitives/deck";
 
+// GTO frequency table lookups for coaching the GTO profile with solver data
+import {
+  lookupFrequencies,
+  hasTable,
+} from "../gto/tables";
+import {
+  classifyArchetype,
+  contextFromGameState,
+} from "../gto/archetypeClassifier";
+import { categorizeHand } from "../gto/handCategorizer";
+
 // Ensure engines are registered
 import "../opponents/engines/basicEngine";
 import "../opponents/engines/rangeAwareEngine";
+import "../opponents/engines/lookupGtoEngine";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -82,8 +95,17 @@ export const coachingLens: AnalysisLens = {
     const presets = getAllPresets();
     const advices: CoachingAdvice[] = [];
 
+    // Pre-compute GTO solver data if available (shared across the GTO profile)
+    const gtoSolverAdvice = tryGtoSolverLookup(gameState, heroSeat, context.heroCards, legal);
+
     for (const profile of presets) {
       try {
+        // For the GTO profile, prefer solver frequency table data when available
+        if (profile.id === "gto" && gtoSolverAdvice) {
+          advices.push(gtoSolverAdvice);
+          continue;
+        }
+
         const resolved = resolveProfile(profile, (id) => PRESET_PROFILES[id]);
         const situationKey = classifyCurrentDecision(gameState, heroSeat);
         const params = resolved[situationKey];
@@ -192,6 +214,166 @@ function emptyResult(context: AnalysisContext): AnalysisResult<CoachingValue> {
     lensId: "coaching",
     dependencies: [],
   };
+}
+
+/**
+ * Try to produce GTO coaching advice using solver frequency tables.
+ * Returns a CoachingAdvice if solver data is available for this spot,
+ * or null if we should fall back to the heuristic engine.
+ */
+function tryGtoSolverLookup(
+  gameState: GameState,
+  heroSeat: number,
+  heroCards: CardIndex[],
+  legal: LegalActions,
+): CoachingAdvice | null {
+  if (heroCards.length < 2) return null;
+
+  // Classify archetype from the game state
+  const classCtx = contextFromGameState(gameState, heroSeat);
+  const archetype = classifyArchetype(classCtx);
+
+  // Need sufficient confidence and a registered table
+  if (archetype.confidence < 0.6 || !hasTable(archetype.archetypeId)) {
+    return null;
+  }
+
+  // Categorize the hero's hand
+  const handCat = categorizeHand(heroCards, gameState.communityCards);
+
+  // Look up GTO frequencies
+  const lookup = lookupFrequencies(
+    archetype.archetypeId,
+    handCat.category,
+    classCtx.isInPosition,
+  );
+  if (!lookup) return null;
+
+  // Find the optimal (highest frequency) action
+  let optimalGtoAction = "check";
+  let optimalFreq = 0;
+  for (const [action, freq] of Object.entries(lookup.frequencies)) {
+    if ((freq ?? 0) > optimalFreq) {
+      optimalFreq = freq ?? 0;
+      optimalGtoAction = action;
+    }
+  }
+
+  // Map GTO action to game ActionType
+  const actionType = mapGtoActionToActionType(optimalGtoAction, legal);
+  const amount = mapGtoActionToAmount(optimalGtoAction, legal, gameState.pot.total);
+
+  // Format frequencies for explanation
+  const freqChildren: ExplanationNode[] = Object.entries(lookup.frequencies)
+    .filter(([, v]) => v && v > 0.01)
+    .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
+    .map(([action, freq]) => ({
+      summary: `${action}: ${((freq ?? 0) * 100).toFixed(0)}%`,
+      sentiment: "neutral" as const,
+      tags: ["frequency"],
+    }));
+
+  const explanation: ExplanationNode = {
+    summary: `${archetype.description} — ${handCat.description}: ${actionType}${amount !== undefined ? ` ${amount}` : ""}`,
+    sentiment: actionType === "fold"
+      ? "negative"
+      : (actionType === "raise" || actionType === "bet")
+        ? "positive"
+        : "neutral",
+    children: [
+      {
+        summary: `Hand: ${handCat.description} (${handCat.category})`,
+        sentiment: handCat.relativeStrength > 0.6 ? "positive" : handCat.relativeStrength > 0.3 ? "neutral" : "negative",
+        tags: ["hand-category"],
+      },
+      {
+        summary: `Archetype: ${archetype.description} (${(archetype.confidence * 100).toFixed(0)}% confidence)`,
+        sentiment: "neutral",
+        tags: ["archetype"],
+      },
+      {
+        summary: `GTO frequencies (solver data):`,
+        children: freqChildren,
+        sentiment: "neutral",
+        tags: ["frequencies", "solver"],
+      },
+      ...(lookup.isExact ? [] : [{
+        summary: `Note: closest category match (original: ${handCat.category})`,
+        sentiment: "neutral" as const,
+        tags: ["fallback-category"],
+      }]),
+    ],
+    tags: ["lookup-gto", "solver"],
+  };
+
+  return {
+    profileName: "GTO",
+    profileId: "gto",
+    engineId: "lookup-gto",
+    actionType,
+    amount,
+    explanation,
+  };
+}
+
+/**
+ * Map a GTO action string to a game ActionType, respecting what's legal.
+ */
+function mapGtoActionToActionType(gtoAction: string, legal: LegalActions): ActionType {
+  switch (gtoAction) {
+    case "fold": return legal.canFold ? "fold" : "check";
+    case "check": return legal.canCheck ? "check" : "fold";
+    case "call": return legal.canCall ? "call" : "check";
+    case "bet_small":
+    case "bet_medium":
+    case "bet_large":
+      if (legal.canBet) return "bet";
+      if (legal.canRaise) return "raise";
+      return legal.canCall ? "call" : "check";
+    case "raise_small":
+    case "raise_large":
+      if (legal.canRaise) return "raise";
+      if (legal.canBet) return "bet";
+      return legal.canCall ? "call" : "check";
+    default:
+      return legal.canCheck ? "check" : "fold";
+  }
+}
+
+/**
+ * Map a GTO action to a chip amount for bets/raises.
+ */
+function mapGtoActionToAmount(
+  gtoAction: string,
+  legal: LegalActions,
+  potSize: number,
+): number | undefined {
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+  switch (gtoAction) {
+    case "bet_small":
+      if (legal.canBet) return clamp(Math.round(potSize * 0.33), legal.betMin, legal.betMax);
+      if (legal.canRaise) return clamp(legal.raiseMin + Math.round(potSize * 0.33), legal.raiseMin, legal.raiseMax);
+      return undefined;
+    case "bet_medium":
+      if (legal.canBet) return clamp(Math.round(potSize * 0.75), legal.betMin, legal.betMax);
+      if (legal.canRaise) return clamp(legal.raiseMin + Math.round(potSize * 0.75), legal.raiseMin, legal.raiseMax);
+      return undefined;
+    case "bet_large":
+      if (legal.canBet) return clamp(Math.round(potSize * 1.2), legal.betMin, legal.betMax);
+      if (legal.canRaise) return clamp(legal.raiseMin + Math.round(potSize * 1.2), legal.raiseMin, legal.raiseMax);
+      return undefined;
+    case "raise_small":
+      if (legal.canRaise) return legal.raiseMin;
+      return undefined;
+    case "raise_large":
+      if (legal.canRaise) return clamp(Math.round(legal.raiseMin * 1.5), legal.raiseMin, legal.raiseMax);
+      return undefined;
+    case "call":
+      return legal.canCall ? legal.callAmount : undefined;
+    default:
+      return undefined;
+  }
 }
 
 function detectConsensus(

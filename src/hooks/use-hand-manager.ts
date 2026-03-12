@@ -3,6 +3,7 @@
 /**
  * Unified hand manager — single hook replacing useGameEngine + useCardSelection + useTableSetup.
  *
+ * Thin React wrapper around HandSession (pure TS orchestration class).
  * The state machine always runs. Cards are always dealt to everyone.
  * All villain seats auto-play using their assigned profile.
  * Villain cards exist on a visibility spectrum: hidden / assigned / revealed.
@@ -22,8 +23,6 @@ import type {
 } from "../../convex/lib/state/game-state";
 import type { OpponentProfile, PlayerAction } from "../../convex/lib/types/opponents";
 import {
-  initializeHand,
-  applyAction,
   currentLegalActions,
   gameContextFromState,
   analysisContextFromState,
@@ -34,16 +33,15 @@ import {
   applyCommunityOverride,
   setCardVisibility,
 } from "../../convex/lib/state/card-overrides";
-import {
-  chooseActionFromProfile,
-  type AutoPlayDecision,
-} from "../../convex/lib/opponents/autoPlay";
+import type { AutoPlayDecision } from "../../convex/lib/opponents/autoPlay";
 import {
   positionForSeat,
   positionDisplayName,
   seatToPositionMap,
 } from "../../convex/lib/primitives/position";
-import { PRESET_PROFILES, PRESET_IDS } from "../../convex/lib/opponents/presets";
+import type { HandRecord } from "../../convex/lib/audit/types";
+import type { AnalysisResult } from "../../convex/lib/types/analysis";
+import { HandSession } from "../../convex/lib/session";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -81,35 +79,67 @@ const EMPTY_POT: PotState = {
 // ═══════════════════════════════════════════════════════
 
 export function useHandManager(initialPlayers = 6) {
-  // ─── Table config ───
+  // ─── Re-render counter — bumped by HandSession's onStateChange callback ───
+  const [, setRenderCounter] = useState(0);
+  const forceRender = useCallback(() => setRenderCounter((n) => n + 1), []);
+
+  // ─── Table config (UI state — used to construct/update session) ───
   const [numPlayers, setNumPlayersRaw] = useState(
     Math.min(Math.max(initialPlayers, 2), 10),
   );
   const [dealerSeatIndex, setDealerSeatIndex] = useState(0);
   const [heroSeatIndex, setHeroSeatIndex] = useState(0);
-  const [blinds, setBlinds] = useState<BlindStructure>({ small: 1, big: 2 });
-  const [startingStack, setStartingStack] = useState(200);
+  const [blinds, setBlinds] = useState<BlindStructure>({ small: 0.5, big: 1 });
+  const [startingStack, setStartingStack] = useState(100); // in BB (BB is always 1)
 
-  // ─── Seat config ───
-  const [seatProfiles, setSeatProfiles] = useState<Map<number, OpponentProfile>>(new Map());
+  // ─── Seat labels (UI-only) ───
   const [seatLabels, setSeatLabels] = useState<Map<number, string>>(new Map());
 
-  // ─── Game state ───
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [handNumber, setHandNumber] = useState(0);
-
-  // ─── Card selection ───
+  // ─── Card selection (UI-only) ───
   const [selectionTarget, setSelectionTarget] = useState<SelectionTarget>("hero");
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
 
-  // Counter ref for random seeding — initialized from timestamp so each
-  // session starts with different cards instead of always dealing the same hand.
-  const seedRef = useRef(Date.now());
+  // ─── Partial villain card assignment tracking (UI-only) ───
+  const [villainCardBuffer, setVillainCardBuffer] = useState<Map<number, CardIndex[]>>(new Map());
 
-  // Store last opponent decisions for display (engine reasoning)
-  const lastDecisionsRef = useRef<Map<number, AutoPlayDecision>>(new Map());
+  // ─── Audit file save (fire-and-forget POST to API route) ───
+  const saveAuditRecord = useCallback((record: HandRecord) => {
+    fetch("/api/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(record),
+    }).catch((err) => console.error("[audit] Failed to save:", err));
+  }, []);
 
-  // ─── Derived state ───
+  // ─── HandSession — owns all orchestration ───
+  const sessionRef = useRef<HandSession | null>(null);
+
+  // Lazy-init session on first access
+  const getSession = useCallback((): HandSession => {
+    if (!sessionRef.current) {
+      sessionRef.current = new HandSession(
+        {
+          numPlayers,
+          dealerSeatIndex,
+          heroSeatIndex,
+          blinds,
+          startingStack,
+          seatProfiles: new Map(),
+          seed: Date.now(),
+        },
+        {
+          onStateChange: forceRender,
+          onHandComplete: saveAuditRecord,
+        },
+      );
+    }
+    return sessionRef.current;
+  }, []); // stable ref — config synced via updateConfig
+
+  // ─── Derived state from session ───
+
+  const session = getSession();
+  const gameState = session.state;
 
   const positionMap = useMemo(
     () => seatToPositionMap(dealerSeatIndex, numPlayers),
@@ -156,6 +186,8 @@ export function useHandManager(initialPlayers = 6) {
     [gameState],
   );
 
+  const handNumber = session.currentHandNumber;
+
   const isHandActive = gameState !== null &&
     gameState.phase !== "complete" &&
     gameState.phase !== "showdown";
@@ -168,12 +200,9 @@ export function useHandManager(initialPlayers = 6) {
   const allUsedCards = useMemo(() => {
     if (!gameState) return new Set<CardIndex>();
     const used = new Set<CardIndex>();
-    // Hero cards are always "used"
     const hero = gameState.players.find((p) => p.seatIndex === heroSeatIndex);
     if (hero) for (const c of hero.holeCards) used.add(c);
-    // Community cards
     for (const c of gameState.communityCards) used.add(c);
-    // Visible villain cards
     for (const p of gameState.players) {
       if (p.seatIndex === heroSeatIndex) continue;
       if (p.cardVisibility !== "hidden") {
@@ -202,6 +231,9 @@ export function useHandManager(initialPlayers = 6) {
     return dead;
   }, [gameState, heroSeatIndex]);
 
+  // ─── Seat profiles (read from session) ───
+  const seatProfiles = session.profiles;
+
   // ─── Build unified seat configs ───
 
   const seats: UnifiedSeatConfig[] = useMemo(() => {
@@ -211,7 +243,6 @@ export function useHandManager(initialPlayers = 6) {
       const isHero = i === heroSeatIndex;
       const player = gameState?.players[i];
 
-      // Build action history for this seat
       const seatActions: PlayerAction[] = gameState
         ? gameState.actionHistory
             .filter((a) => a.seatIndex === i)
@@ -229,8 +260,8 @@ export function useHandManager(initialPlayers = 6) {
         isHero,
         profile: seatProfiles.get(i),
         status: player?.status ?? "active",
-        stack: player?.currentStack ?? startingStack,
-        startingStack: player?.startingStack ?? startingStack,
+        stack: player?.currentStack ?? startingStack * blinds.big,
+        startingStack: player?.startingStack ?? startingStack * blinds.big,
         holeCards: player?.holeCards ?? [],
         cardVisibility: player?.cardVisibility ?? (isHero ? "revealed" : "hidden"),
         streetCommitted: player?.streetCommitted ?? 0,
@@ -256,160 +287,46 @@ export function useHandManager(initialPlayers = 6) {
       }));
   }, [seats]);
 
-  // ─── Auto-advance opponents ───
-  // Accepts profiles map as parameter to avoid stale closure issues
-  // when startHand assigns default profiles in the same render cycle.
-
-  const advanceOpponents = useCallback(
-    (state: GameState, profiles: Map<number, OpponentProfile>): GameState => {
-      let s = state;
-      let safety = 0;
-
-      while (safety < 100) {
-        safety++;
-
-        if (s.phase === "complete" || s.phase === "showdown") break;
-        if (s.activePlayerIndex === null) break;
-
-        const activePlayer = s.players[s.activePlayerIndex];
-
-        // Hero's turn → stop
-        if (activePlayer.seatIndex === heroSeatIndex) break;
-
-        const legal = currentLegalActions(s);
-        if (!legal) break;
-
-        // Profile-driven auto-play
-        const profile = profiles.get(activePlayer.seatIndex);
-        let actionType: ActionType;
-        let amount: number | undefined;
-
-        if (profile) {
-          const decision = chooseActionFromProfile(
-            s,
-            activePlayer.seatIndex,
-            profile,
-            legal,
-            (id) => PRESET_PROFILES[id],
-          );
-          actionType = decision.actionType;
-          amount = decision.amount;
-          // Store decision for UI display
-          lastDecisionsRef.current.set(activePlayer.seatIndex, decision);
-        } else {
-          // Fallback: simple check/call (shouldn't happen — startHand assigns defaults)
-          if (legal.canCheck) {
-            actionType = "check";
-          } else if (legal.canCall) {
-            actionType = "call";
-          } else {
-            actionType = legal.canFold ? "fold" : "check";
-          }
-        }
-
-        try {
-          const result = applyAction(s, activePlayer.seatIndex, actionType, amount);
-          s = result.state;
-        } catch {
-          // Fallback: fold or check
-          try {
-            s = applyAction(s, activePlayer.seatIndex, legal.canFold ? "fold" : "check").state;
-          } catch {
-            break;
-          }
-        }
-      }
-
-      return s;
-    },
-    [heroSeatIndex],
-  );
-
   // ═══════════════════════════════════════════════════════
-  // ACTIONS
+  // ACTIONS — delegate to HandSession
   // ═══════════════════════════════════════════════════════
 
   // ─── Start hand ───
 
-  const startHand = useCallback(() => {
-    const seed = seedRef.current++;
-    const stacks = Array(numPlayers).fill(startingStack);
-    lastDecisionsRef.current = new Map();
-
-    // Build card overrides: hero always revealed
-    const overrides: CardOverride[] = [];
-    // Hero's visibility set via cardVisibility in player creation
-
-    const config = {
-      numPlayers,
-      dealerSeatIndex,
-      blinds,
-      startingStacks: stacks,
-      handNumber: handNumber + 1,
-      seed,
-      cardOverrides: overrides.length > 0 ? overrides : undefined,
-    };
-
-    const { state } = initializeHand(config);
-
-    // Mark hero as revealed
-    let s = state;
-    s = {
-      ...s,
-      players: s.players.map((p) =>
-        p.seatIndex === heroSeatIndex
-          ? { ...p, cardVisibility: "revealed" as CardVisibility }
-          : p,
-      ),
-    };
-
-    // Ensure every villain has a profile — assign random defaults for any missing
-    const profiles = new Map(seatProfiles);
-    let profilesChanged = false;
-    for (let i = 0; i < numPlayers; i++) {
-      if (i === heroSeatIndex) continue;
-      if (!profiles.has(i)) {
-        const randomId = PRESET_IDS[Math.floor(Math.random() * PRESET_IDS.length)];
-        profiles.set(i, PRESET_PROFILES[randomId]);
-        profilesChanged = true;
-      }
-    }
-    if (profilesChanged) {
-      setSeatProfiles(profiles);
-    }
-
-    // Auto-advance opponents (pass profiles directly to avoid stale closure)
-    const advanced = advanceOpponents(s, profiles);
-    setGameState(advanced);
-    setHandNumber((n) => n + 1);
+  const startHand = useCallback((customStacks?: number[]) => {
+    // Guard: React onClick passes MouseEvent as first arg — ignore non-arrays
+    const stacks = Array.isArray(customStacks) ? customStacks : undefined;
+    session.startHand(stacks);
     setSelectionTarget("hero");
-  }, [numPlayers, dealerSeatIndex, blinds, startingStack, handNumber, heroSeatIndex, seatProfiles, advanceOpponents]);
+  }, [session]);
+
+  /** Deal next hand: auto-rotates dealer, carries stacks forward. */
+  const startNextHand = useCallback(() => {
+    session.dealNext();
+    // Sync React state with session's rotated dealer
+    setDealerSeatIndex(session.dealerSeatIndex);
+    setSelectionTarget("hero");
+    setVillainCardBuffer(new Map());
+  }, [session]);
 
   // ─── Hero acts ───
 
   const act = useCallback(
     (actionType: ActionType, amount?: number) => {
-      if (!gameState || !isHeroTurn) return;
-      try {
-        const { state } = applyAction(gameState, heroSeatIndex, actionType, amount);
-        const advanced = advanceOpponents(state, seatProfiles);
-        setGameState(advanced);
-      } catch (e) {
-        console.error("Invalid action:", e);
-      }
+      session.act(actionType, amount);
     },
-    [gameState, isHeroTurn, heroSeatIndex, seatProfiles, advanceOpponents],
+    [session],
   );
 
   // ─── New hand ───
 
   const newHand = useCallback(() => {
-    setGameState(null);
+    session.resetHand();
     setSelectionTarget("hero");
     setVillainCardBuffer(new Map());
-  }, []);
+  }, [session]);
 
-  // ─── Card overrides ───
+  // ─── Card overrides (UI concern — modify game state directly) ───
 
   const overrideHeroCards = useCallback(
     (cards: CardIndex[]) => {
@@ -418,12 +335,12 @@ export function useHandManager(initialPlayers = 6) {
         const newState = applyCardOverrides(gameState, [
           { seatIndex: heroSeatIndex, cards, visibility: "revealed" },
         ]);
-        setGameState(newState);
+        session.setGameState(newState);
       } catch (e) {
         console.error("Card override error:", e);
       }
     },
-    [gameState, heroSeatIndex],
+    [gameState, heroSeatIndex, session],
   );
 
   const overrideVillainCards = useCallback(
@@ -433,12 +350,12 @@ export function useHandManager(initialPlayers = 6) {
         const newState = applyCardOverrides(gameState, [
           { seatIndex, cards, visibility },
         ]);
-        setGameState(newState);
+        session.setGameState(newState);
       } catch (e) {
         console.error("Card override error:", e);
       }
     },
-    [gameState],
+    [gameState, session],
   );
 
   const overrideCommunityCards = useCallback(
@@ -446,12 +363,12 @@ export function useHandManager(initialPlayers = 6) {
       if (!gameState || cards.length < 3 || cards.length > 5) return;
       try {
         const newState = applyCommunityOverride(gameState, cards);
-        setGameState(newState);
+        session.setGameState(newState);
       } catch (e) {
         console.error("Community override error:", e);
       }
     },
-    [gameState],
+    [gameState, session],
   );
 
   // ─── Reveal / hide villain cards ───
@@ -460,18 +377,18 @@ export function useHandManager(initialPlayers = 6) {
     (seatIndex: number) => {
       if (!gameState) return;
       const newState = setCardVisibility(gameState, seatIndex, "revealed");
-      setGameState(newState);
+      session.setGameState(newState);
     },
-    [gameState],
+    [gameState, session],
   );
 
   const hideVillainCards = useCallback(
     (seatIndex: number) => {
       if (!gameState) return;
       const newState = setCardVisibility(gameState, seatIndex, "hidden");
-      setGameState(newState);
+      session.setGameState(newState);
     },
-    [gameState],
+    [gameState, session],
   );
 
   const revealAllVillains = useCallback(() => {
@@ -483,59 +400,43 @@ export function useHandManager(initialPlayers = 6) {
         s = setCardVisibility(s, p.seatIndex, "revealed");
       }
     }
-    setGameState(s);
-  }, [gameState, heroSeatIndex]);
-
-  // ─── Partial villain card assignment tracking ───
-  // When user clicks cards in villain mode, we accumulate up to 2 cards
-  const [villainCardBuffer, setVillainCardBuffer] = useState<Map<number, CardIndex[]>>(new Map());
+    session.setGameState(s);
+  }, [gameState, heroSeatIndex, session]);
 
   // ─── Context-aware card toggle (click a card in the grid) ───
 
   const toggleCard = useCallback(
     (card: CardIndex) => {
       if (!gameState) return;
-
-      // Don't allow selecting cards already used elsewhere
       if (allUsedCards.has(card)) return;
 
       const hero = gameState.players.find((p) => p.seatIndex === heroSeatIndex);
 
       if (selectionTarget === "hero" && hero) {
-        // Hero mode: swap hero's cards
-        // Replace first card, then second, cycling
         const newCards: CardIndex[] = hero.holeCards.length >= 2
-          ? [hero.holeCards[1], card] // shift: drop oldest, append new
+          ? [hero.holeCards[1], card]
           : [...hero.holeCards, card];
-
         if (newCards.length === 2) {
           overrideHeroCards(newCards);
         }
       } else if (selectionTarget === "community") {
-        // Community mode: build up board cards
         const current = [...gameState.communityCards];
         if (current.length < 5) {
           const next = [...current, card];
-          // Need at least 3 cards for a valid override (flop)
           if (next.length >= 3) {
             overrideCommunityCards(next);
           }
         }
       } else if (selectionTarget.startsWith("villain-")) {
-        // Villain mode: accumulate cards for this villain
         const seatIdx = parseInt(selectionTarget.split("-")[1], 10);
         const currentBuffer = villainCardBuffer.get(seatIdx) ?? [];
-
         if (currentBuffer.length < 2) {
           const next = [...currentBuffer, card];
           const newBuffer = new Map(villainCardBuffer);
           newBuffer.set(seatIdx, next);
           setVillainCardBuffer(newBuffer);
-
           if (next.length === 2) {
-            // Both cards selected — apply the override
             overrideVillainCards(seatIdx, next, "assigned");
-            // Clear buffer
             const cleared = new Map(newBuffer);
             cleared.delete(seatIdx);
             setVillainCardBuffer(cleared);
@@ -546,34 +447,18 @@ export function useHandManager(initialPlayers = 6) {
     [gameState, heroSeatIndex, selectionTarget, allUsedCards, villainCardBuffer, overrideHeroCards, overrideCommunityCards, overrideVillainCards],
   );
 
-  // ─── Seat management ───
+  // ─── Seat management — delegate to session ───
 
   const assignProfile = useCallback(
     (seatIndex: number, profile: OpponentProfile | undefined) => {
-      setSeatProfiles((prev) => {
-        const next = new Map(prev);
-        if (profile) {
-          next.set(seatIndex, profile);
-        } else {
-          next.delete(seatIndex);
-        }
-        return next;
-      });
+      session.assignProfile(seatIndex, profile);
     },
-    [],
+    [session],
   );
 
   const randomizeProfiles = useCallback(() => {
-    setSeatProfiles((prev) => {
-      const next = new Map(prev);
-      for (let i = 0; i < numPlayers; i++) {
-        if (i === heroSeatIndex) continue;
-        const randomId = PRESET_IDS[Math.floor(Math.random() * PRESET_IDS.length)];
-        next.set(i, PRESET_PROFILES[randomId]);
-      }
-      return next;
-    });
-  }, [numPlayers, heroSeatIndex]);
+    session.randomizeProfiles();
+  }, [session]);
 
   const setNumPlayers = useCallback(
     (n: number) => {
@@ -581,30 +466,60 @@ export function useHandManager(initialPlayers = 6) {
       setNumPlayersRaw(clamped);
       setDealerSeatIndex((prev) => prev % clamped);
       setHeroSeatIndex((prev) => prev % clamped);
-      // Clean up stale seat data
-      setSeatProfiles((prev) => {
-        const next = new Map(prev);
-        for (const key of next.keys()) if (key >= clamped) next.delete(key);
-        return next;
-      });
-      // Reset game if players changed
-      setGameState(null);
+      session.updateConfig({ numPlayers: clamped });
     },
-    [],
+    [session],
   );
 
   const moveDealer = useCallback(
     (newSeat: number) => {
-      setDealerSeatIndex(((newSeat % numPlayers) + numPlayers) % numPlayers);
+      const clamped = ((newSeat % numPlayers) + numPlayers) % numPlayers;
+      setDealerSeatIndex(clamped);
+      session.updateConfig({ dealerSeatIndex: clamped });
     },
-    [numPlayers],
+    [numPlayers, session],
   );
 
   const moveHero = useCallback(
     (newSeat: number) => {
-      setHeroSeatIndex(((newSeat % numPlayers) + numPlayers) % numPlayers);
+      const clamped = ((newSeat % numPlayers) + numPlayers) % numPlayers;
+      setHeroSeatIndex(clamped);
+      session.updateConfig({ heroSeatIndex: clamped });
     },
-    [numPlayers],
+    [numPlayers, session],
+  );
+
+  const setBlindsWrapped = useCallback(
+    (newBlinds: BlindStructure) => {
+      setBlinds(newBlinds);
+      session.updateConfig({ blinds: newBlinds });
+    },
+    [session],
+  );
+
+  const setStartingStackWrapped = useCallback(
+    (newStack: number) => {
+      setStartingStack(newStack);
+      session.updateConfig({ startingStack: newStack });
+    },
+    [session],
+  );
+
+  // ─── Audit history — delegate to session ───
+
+  const exportHandHistory = useCallback((): string => {
+    return session.exportHandHistory();
+  }, [session]);
+
+  const clearHandHistory = useCallback(() => {
+    session.clearHandHistory();
+  }, [session]);
+
+  const recordLensSnapshot = useCallback(
+    (currentStreet: Street, results: Map<string, AnalysisResult>) => {
+      session.recordLensSnapshot(currentStreet, results);
+    },
+    [session],
   );
 
   // ═══════════════════════════════════════════════════════
@@ -614,6 +529,7 @@ export function useHandManager(initialPlayers = 6) {
   return {
     // Hand lifecycle
     startHand,
+    startNextHand,
     newHand,
 
     // Hero actions
@@ -657,9 +573,9 @@ export function useHandManager(initialPlayers = 6) {
     heroSeatIndex,
     moveHero,
     blinds,
-    setBlinds,
+    setBlinds: setBlindsWrapped,
     startingStack,
-    setStartingStack,
+    setStartingStack: setStartingStackWrapped,
 
     // Game state
     gameState,
@@ -671,7 +587,13 @@ export function useHandManager(initialPlayers = 6) {
     allUsedCards,
     isCardUsed,
 
-    // Engine decisions (for future UI display)
-    lastDecisions: lastDecisionsRef.current,
+    // Engine decisions (for UI display)
+    lastDecisions: session.decisions,
+
+    // Audit history
+    handHistory: session.history,
+    exportHandHistory,
+    clearHandHistory,
+    recordLensSnapshot,
   };
 }

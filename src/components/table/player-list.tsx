@@ -3,8 +3,10 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { UnifiedSeatConfig } from "@/hooks/use-hand-manager";
+import type { AutoPlayDecision } from "../../../convex/lib/opponents/autoPlay";
 import { rankOf, suitOf } from "../../../convex/lib/primitives/card";
 import type { CardIndex } from "../../../convex/lib/types/cards";
+import { formatBB } from "@/lib/format";
 
 interface PlayerListProps {
   seats: UnifiedSeatConfig[];
@@ -12,6 +14,7 @@ interface PlayerListProps {
   onSeatClick: (seatIndex: number) => void;
   bigBlind?: number;
   activePlayerSeat?: number | null;
+  decisions?: Map<number, AutoPlayDecision>;
 }
 
 const POSITION_COLORS: Record<string, string> = {
@@ -74,6 +77,7 @@ export function PlayerList({
   onSeatClick,
   bigBlind = 2,
   activePlayerSeat,
+  decisions,
 }: PlayerListProps) {
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
@@ -127,7 +131,7 @@ export function PlayerList({
 
               {/* Stack (in BB) */}
               <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums min-w-[40px]">
-                {(seat.stack / bigBlind).toFixed(0)} BB
+                {formatBB(seat.stack / bigBlind)} BB
               </span>
 
               {/* Hole cards (visible villains) */}
@@ -155,31 +159,47 @@ export function PlayerList({
               {/* Spacer */}
               <span className="flex-1" />
 
-              {/* Action badges */}
-              {seat.actions.length > 0 && (
-                <div className="flex items-center gap-0.5">
-                  {seat.actions.slice(0, 4).map((action, j) => {
-                    const badge = ACTION_BADGE[action.actionType] ?? { bg: "bg-gray-400", label: action.actionType, short: "?" };
-                    return (
-                      <span
-                        key={j}
-                        className={cn(
-                          "w-4 h-4 rounded-sm flex items-center justify-center text-[8px] font-bold text-white leading-none",
-                          badge.bg,
-                        )}
-                        title={`${action.street}: ${badge.label}`}
-                      >
-                        {badge.short}
+              {/* Action badges + reasoning indicator */}
+              {seat.actions.length > 0 && (() => {
+                const decision = decisions?.get(seat.seatIndex);
+                return (
+                  <div className="flex items-center gap-0.5">
+                    {seat.actions.slice(0, 4).map((action, j) => {
+                      const badge = ACTION_BADGE[action.actionType] ?? { bg: "bg-gray-400", label: action.actionType, short: "?" };
+                      return (
+                        <span
+                          key={j}
+                          className={cn(
+                            "w-4 h-4 rounded-sm flex items-center justify-center text-[8px] font-bold text-white leading-none",
+                            badge.bg,
+                          )}
+                          title={`${action.street}: ${badge.label}`}
+                        >
+                          {badge.short}
+                        </span>
+                      );
+                    })}
+                    {seat.actions.length > 4 && (
+                      <span className="text-[9px] text-[var(--muted-foreground)] ml-0.5">
+                        +{seat.actions.length - 4}
                       </span>
-                    );
-                  })}
-                  {seat.actions.length > 4 && (
-                    <span className="text-[9px] text-[var(--muted-foreground)] ml-0.5">
-                      +{seat.actions.length - 4}
-                    </span>
-                  )}
-                </div>
-              )}
+                    )}
+                    {/* Reasoning indicator — shows when engine decision is available */}
+                    {decision?.explanationNode && (
+                      <span
+                        className="ml-0.5 text-[var(--gold-dim)] opacity-70"
+                        title={decision.explanation}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                          <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Selection indicator */}
               {!seat.isHero && (

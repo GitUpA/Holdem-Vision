@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import type { BlindStructure } from "../../../convex/lib/types/game";
+import { formatBB } from "@/lib/format";
 
 interface GameSetupPanelProps {
   blinds: BlindStructure;
@@ -28,48 +29,36 @@ export function GameSetupPanel({
         Hand Setup
       </h3>
 
-      <div className="grid grid-cols-3 gap-3">
-        {/* Blinds */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* SB ratio — BB is always 1 */}
         <div className="space-y-1">
           <label className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
-            Small Blind
+            SB / BB Ratio
           </label>
           <input
             type="number"
-            min={1}
+            min={0.1}
+            max={1}
+            step={0.1}
             value={blinds.small}
             onChange={(e) =>
-              onBlindsChange({ ...blinds, small: Math.max(1, Number(e.target.value)) })
-            }
-            className="w-full text-xs bg-[var(--muted)]/40 border border-[var(--border)] rounded px-2 py-1.5 text-[var(--foreground)]"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
-            Big Blind
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={blinds.big}
-            onChange={(e) =>
-              onBlindsChange({ ...blinds, big: Math.max(1, Number(e.target.value)) })
+              onBlindsChange({ ...blinds, small: Math.min(1, Math.max(0.1, Number(e.target.value))) })
             }
             className="w-full text-xs bg-[var(--muted)]/40 border border-[var(--border)] rounded px-2 py-1.5 text-[var(--foreground)]"
           />
         </div>
 
-        {/* Starting stack */}
+        {/* Stack in BB */}
         <div className="space-y-1">
           <label className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
-            Stack ({Math.round(startingStack / blinds.big)} BB)
+            Stack (BB)
           </label>
           <input
             type="number"
-            min={blinds.big}
+            min={1}
             value={startingStack}
             onChange={(e) =>
-              onStackChange(Math.max(blinds.big, Number(e.target.value)))
+              onStackChange(Math.max(1, Number(e.target.value)))
             }
             className="w-full text-xs bg-[var(--muted)]/40 border border-[var(--border)] rounded px-2 py-1.5 text-[var(--foreground)]"
           />

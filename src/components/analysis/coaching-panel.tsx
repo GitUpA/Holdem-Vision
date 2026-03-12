@@ -48,20 +48,20 @@ export function CoachingPanel({ advices, consensus }: CoachingPanelProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Consensus Banner */}
       {consensus ? (
         <ConsensusBanner consensus={consensus} total={advices.length} />
       ) : (
-        <div className="text-xs text-[var(--muted-foreground)] italic px-1">
-          No consensus — profiles disagree on the best action
+        <div className="text-[10px] text-[var(--muted-foreground)] italic">
+          No consensus — profiles disagree
         </div>
       )}
 
-      {/* Profile Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+      {/* Profile Rows */}
+      <div className="space-y-0 divide-y divide-[var(--border)]/50">
         {advices.map((advice, i) => (
-          <ProfileCard
+          <ProfileRow
             key={advice.profileId}
             advice={advice}
             index={i}
@@ -97,20 +97,20 @@ function ConsensusBanner({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg border",
+        "flex items-center gap-3 px-3 py-1.5 rounded-lg border",
         colors.bg,
         colors.border,
       )}
     >
-      <span className={cn("text-sm font-bold uppercase", colors.text)}>
+      <span className={cn("text-xs font-bold uppercase", colors.text)}>
         {consensus.actionType.replace("_", " ")}
       </span>
-      <span className="text-xs">
+      <span className="text-[10px]">
         <span className="font-bold text-[var(--gold)]">
           {consensus.agreeing.length}
         </span>
         <span className="text-[var(--muted-foreground)]">
-          {" "}of {total} profiles agree
+          {" "}of {total} agree
         </span>
       </span>
     </motion.div>
@@ -118,10 +118,10 @@ function ConsensusBanner({
 }
 
 // ═══════════════════════════════════════════════════════
-// PROFILE CARD
+// PROFILE ROW
 // ═══════════════════════════════════════════════════════
 
-function ProfileCard({
+function ProfileRow({
   advice,
   index,
   isAgreeing,
@@ -139,57 +139,39 @@ function ProfileCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.03 }}
       className={cn(
-        "rounded-lg border p-3 space-y-2 transition-colors",
-        isAgreeing
-          ? "border-[var(--gold-dim)]/40 bg-[var(--felt)]/20"
-          : "border-[var(--border)] bg-[var(--muted)]/30",
+        "transition-colors",
+        isAgreeing && "bg-[var(--gold)]/[0.04]",
       )}
     >
-      {/* Header: profile name + engine badge + expand toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-bold text-[var(--foreground)]">
-            {meta?.short ?? advice.profileName}
-          </span>
-          {advice.engineId !== "basic" && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--gold-dim)]/15 text-[var(--gold-dim)] border border-[var(--gold-dim)]/20">
-              {advice.engineId}
-            </span>
-          )}
-        </div>
-        <button
-          onClick={onToggle}
-          className="p-1 hover:bg-[var(--muted)] rounded transition-colors"
-          aria-label={`${isExpanded ? "Collapse" : "Expand"} ${advice.profileName} reasoning`}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={cn(
-              "text-[var(--muted-foreground)] transition-transform duration-200",
-              isExpanded && "rotate-90",
-            )}
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-      </div>
+      {/* Row: clickable to expand */}
+      <button
+        onClick={onToggle}
+        className={cn(
+          "w-full flex items-center gap-2 px-2 py-1.5 text-left transition-colors",
+          "hover:bg-[var(--muted)]/30",
+          isAgreeing && "border-l-2 border-l-[var(--gold-dim)]/50",
+        )}
+      >
+        {/* Profile badge */}
+        <span className="text-[10px] font-bold text-[var(--foreground)] w-8 shrink-0">
+          {meta?.short ?? advice.profileName}
+        </span>
 
-      {/* Action pill + amount */}
-      <div className="flex items-center gap-2">
+        {/* Engine badge (if not basic) */}
+        {advice.engineId !== "basic" && (
+          <span className="text-[9px] px-1 py-0.5 rounded bg-[var(--gold-dim)]/10 text-[var(--gold-dim)] border border-[var(--gold-dim)]/20 shrink-0">
+            {advice.engineId}
+          </span>
+        )}
+
+        {/* Action pill */}
         <span
           className={cn(
-            "text-xs font-bold uppercase px-2 py-0.5 rounded-full border",
+            "text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full border shrink-0",
             actionColor.text,
             actionColor.bg,
             actionColor.border,
@@ -197,17 +179,37 @@ function ProfileCard({
         >
           {advice.actionType.replace("_", " ")}
         </span>
+
+        {/* Amount */}
         {advice.amount !== undefined && (
-          <span className="text-xs font-bold tabular-nums text-[var(--foreground)]">
+          <span className="text-[10px] font-bold tabular-nums text-[var(--foreground)] shrink-0">
             {advice.amount}
           </span>
         )}
-      </div>
 
-      {/* Profile description */}
-      <p className="text-[10px] text-[var(--muted-foreground)]">
-        {meta?.desc ?? advice.profileName}
-      </p>
+        {/* Description (truncated) */}
+        <span className="text-[10px] text-[var(--muted-foreground)] truncate flex-1 min-w-0">
+          {meta?.desc ?? advice.profileName}
+        </span>
+
+        {/* Expand chevron */}
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={cn(
+            "text-[var(--muted-foreground)]/50 transition-transform duration-200 shrink-0",
+            isExpanded && "rotate-90",
+          )}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
 
       {/* Expandable reasoning tree */}
       <AnimatePresence>
@@ -217,9 +219,11 @@ function ProfileCard({
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-[var(--border)] pt-2 mt-1"
+            className="overflow-hidden px-2 pb-2"
           >
-            <ExplanationTree node={advice.explanation} defaultOpen={true} />
+            <div className="border-t border-[var(--border)]/50 pt-2 ml-8">
+              <ExplanationTree node={advice.explanation} defaultOpen={true} />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

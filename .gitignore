@@ -42,3 +42,6 @@ next-env.d.ts
 
 # convex
 convex/_generated
+
+# audit data (local file storage)
+/data/audits

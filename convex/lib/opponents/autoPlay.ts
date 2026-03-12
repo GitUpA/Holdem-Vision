@@ -26,6 +26,7 @@ import { getEngineOrDefault } from "./engines/engineRegistry";
 // Ensure engines are registered (side-effect imports)
 import "./engines/basicEngine";
 import "./engines/rangeAwareEngine";
+import "./engines/gtoEngine";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -41,6 +42,8 @@ export interface AutoPlayDecision {
   explanationNode?: ExplanationNode;
   /** Which engine produced this decision. */
   engineId?: string;
+  /** Structured reasoning data from the engine (hand %, pot odds, fold equity, etc.). */
+  reasoning?: Record<string, unknown>;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -297,17 +300,32 @@ export function sampleActionFromParams(
   potSize: number,
   random: () => number = Math.random,
   holeCards?: CardIndex[],
-): { actionType: ActionType; amount?: number } {
+): { actionType: ActionType; amount?: number; isBluff?: boolean } {
   const effectiveContinue = adjustedContinuePct(params.continuePct, holeCards);
   const roll = random() * 100;
 
   // Step 1: Fold or continue?
   if (roll >= effectiveContinue) {
-    // Want to fold
+    // Hand wants to fold/check. Check for bluff opportunity.
+    // bluffFrequency gates how often weak hands raise/bet as a bluff.
+    const canBluff = legal.canRaise || legal.canBet;
+    if (canBluff && params.bluffFrequency > 0) {
+      const bluffRoll = random();
+      if (bluffRoll < params.bluffFrequency) {
+        // Bluff! Raise or bet with a weak hand.
+        if (legal.canRaise) {
+          const amount = chooseBetSize(params, potSize, legal.raiseMin, legal.raiseMax, random);
+          return { actionType: "raise", amount, isBluff: true };
+        }
+        if (legal.canBet) {
+          const amount = chooseBetSize(params, potSize, legal.betMin, legal.betMax, random);
+          return { actionType: "bet", amount, isBluff: true };
+        }
+      }
+    }
+    // Not bluffing → fold or check as before
     if (legal.canFold) return { actionType: "fold" };
-    // Can't fold (no bet to face) → check
     if (legal.canCheck) return { actionType: "check" };
-    // Shouldn't happen, but fallback
     return { actionType: "check" };
   }
 
@@ -396,6 +414,7 @@ function clamp(value: number, min: number, max: number): number {
  * @param legal - Legal actions for this seat
  * @param getBase - Lookup function for base profiles (for inheritance resolution)
  * @param random - Optional PRNG for deterministic tests
+ * @param opponentProfiles - Optional map of all table profiles (for fold equity calculation)
  */
 export function chooseActionFromProfile(
   state: GameState,
@@ -404,6 +423,7 @@ export function chooseActionFromProfile(
   legal: LegalActions,
   getBase: (id: string) => OpponentProfile | undefined = () => undefined,
   random: () => number = Math.random,
+  opponentProfiles?: Map<number, OpponentProfile>,
 ): AutoPlayDecision {
   const situationKey = classifyCurrentDecision(state, seatIndex);
   const resolved = resolveProfile(profile, getBase);
@@ -425,6 +445,7 @@ export function chooseActionFromProfile(
     holeCards,
     getBase,
     random,
+    opponentProfiles,
   };
 
   // Dispatch to the appropriate engine
@@ -439,5 +460,6 @@ export function chooseActionFromProfile(
     explanation: decision.explanation.summary,
     explanationNode: decision.explanation,
     engineId: decision.engineId,
+    reasoning: decision.reasoning,
   };
 }
