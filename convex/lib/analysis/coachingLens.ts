@@ -19,10 +19,8 @@ import type {
 import type { VisualDirectiveType } from "../types/visuals";
 import type { ActionType, GameState, LegalActions } from "../state/game-state";
 import type { CardIndex } from "../types/cards";
-import type { DecisionContext } from "../opponents/engines/types";
 import { getEngineOrDefault } from "../opponents/engines/engineRegistry";
-import { classifyCurrentDecision } from "../opponents/autoPlay";
-import { resolveProfile } from "../opponents/profileResolver";
+import { buildDecisionContext } from "../opponents/autoPlay";
 import { getAllPresets, PRESET_PROFILES } from "../opponents/presets";
 import { currentLegalActions } from "../state/state-machine";
 import { seededRandom } from "../primitives/deck";
@@ -106,27 +104,15 @@ export const coachingLens: AnalysisLens = {
           continue;
         }
 
-        const resolved = resolveProfile(profile, (id) => PRESET_PROFILES[id]);
-        const situationKey = classifyCurrentDecision(gameState, heroSeat);
-        const params = resolved[situationKey];
-
         // Each profile gets a deterministic seed based on its id
         const seed = hashString(profile.id);
         const random = seededRandom(seed);
 
-        const ctx: DecisionContext = {
-          state: gameState,
-          seatIndex: heroSeat,
-          profile,
-          resolvedParams: resolved,
-          situationKey,
-          params,
-          legal,
-          potSize: gameState.pot.total,
-          holeCards: context.heroCards,
+        const ctx = buildDecisionContext(gameState, heroSeat, profile, legal, {
           getBase: (id) => PRESET_PROFILES[id],
           random,
-        };
+          holeCards: context.heroCards,
+        });
 
         const engine = getEngineOrDefault(profile.engineId);
         const decision = engine.decide(ctx);

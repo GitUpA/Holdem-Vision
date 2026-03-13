@@ -21,7 +21,7 @@ interface OutsDisplayProps {
 }
 
 export function OutsDisplay({
-  outs,
+  outs: _outs,
   outsCount,
   probability,
   byImprovement,

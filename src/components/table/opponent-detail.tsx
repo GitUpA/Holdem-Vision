@@ -330,7 +330,7 @@ function EngineReasoningSection({ decision }: { decision: AutoPlayDecision }) {
 
       {/* Reasoning summary strip — at-a-glance key factors */}
       {decision.explanationNode?.children && (
-        <ReasoningSummaryStrip children={decision.explanationNode.children} />
+        <ReasoningSummaryStrip nodes={decision.explanationNode.children} />
       )}
 
       {/* Explanation summary */}
@@ -420,10 +420,10 @@ const SUMMARY_EXTRACTORS: Record<string, { label: string; extract: (summary: str
   },
 };
 
-function ReasoningSummaryStrip({ children }: { children: import("../../../convex/lib/types/analysis").ExplanationNode[] }) {
+function ReasoningSummaryStrip({ nodes }: { nodes: import("../../../convex/lib/types/analysis").ExplanationNode[] }) {
   const items: { label: string; value: string; color: string }[] = [];
 
-  for (const child of children) {
+  for (const child of nodes) {
     if (!child.tags) continue;
     for (const tag of child.tags) {
       const extractor = SUMMARY_EXTRACTORS[tag];

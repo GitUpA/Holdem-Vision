@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { threatLens } from "../../convex/lib/analysis/threats";
+import { threatLens, type ThreatValue } from "../../convex/lib/analysis/threats";
 import type { AnalysisContext } from "../../convex/lib/types/analysis";
-import { cardsFromStrings, cardFromString } from "../../convex/lib/primitives/card";
+import { cardsFromStrings } from "../../convex/lib/primitives/card";
 
 function makeContext(hero: string[], community: string[]): AnalysisContext {
   return {
@@ -23,7 +23,7 @@ describe("ThreatLens", () => {
       opponents: [],
     };
     const result = threatLens.analyze(ctx);
-    expect(result.value.threatCount).toBe(0);
+    expect((result.value as ThreatValue).threatCount).toBe(0);
     expect(result.explanation.summary).toContain("requires community cards");
   });
 
@@ -33,7 +33,7 @@ describe("ThreatLens", () => {
     const result = threatLens.analyze(ctx);
 
     // Any heart is a flush threat
-    const flushThreats = result.value.threats.filter((t) =>
+    const flushThreats = (result.value as ThreatValue).threats.filter((t) =>
       t.categories.includes("completes_flush"),
     );
     expect(flushThreats.length).toBeGreaterThan(0);
@@ -44,7 +44,7 @@ describe("ThreatLens", () => {
     const ctx = makeContext(["As", "Ad"], ["9c", "8d", "7h"]);
     const result = threatLens.analyze(ctx);
 
-    const straightThreats = result.value.threats.filter((t) =>
+    const straightThreats = (result.value as ThreatValue).threats.filter((t) =>
       t.categories.includes("completes_straight"),
     );
     expect(straightThreats.length).toBeGreaterThan(0);
@@ -55,7 +55,7 @@ describe("ThreatLens", () => {
     const ctx = makeContext(["Ac", "Kc"], ["Kd", "7h", "2s"]);
     const result = threatLens.analyze(ctx);
 
-    const pairThreats = result.value.threats.filter((t) =>
+    const pairThreats = (result.value as ThreatValue).threats.filter((t) =>
       t.categories.includes("pairs_board"),
     );
     // Should identify 7s and 2s as threats (they pair the board)
@@ -67,7 +67,7 @@ describe("ThreatLens", () => {
     const ctx = makeContext(["Tc", "9d"], ["Th", "5s", "3c"]);
     const result = threatLens.analyze(ctx);
 
-    const overcardThreats = result.value.threats.filter((t) =>
+    const overcardThreats = (result.value as ThreatValue).threats.filter((t) =>
       t.categories.includes("overcards"),
     );
     expect(overcardThreats.length).toBeGreaterThan(0);
@@ -79,7 +79,7 @@ describe("ThreatLens", () => {
 
     expect(result.lensId).toBe("threats");
     expect(result.explanation.tags).toContain("threats");
-    expect(result.value.threatCount + result.value.safeCount).toBe(
+    expect((result.value as ThreatValue).threatCount + (result.value as ThreatValue).safeCount).toBe(
       52 - 5, // 52 total - 2 hero - 3 community
     );
   });
@@ -101,6 +101,6 @@ describe("ThreatLens", () => {
     const dryResult = threatLens.analyze(dry);
     const wetResult = threatLens.analyze(wet);
 
-    expect(wetResult.value.threatCount).toBeGreaterThan(dryResult.value.threatCount);
+    expect((wetResult.value as ThreatValue).threatCount).toBeGreaterThan((dryResult.value as ThreatValue).threatCount);
   });
 });

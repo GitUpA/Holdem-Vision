@@ -7,7 +7,7 @@
 import type { AnalysisLens, AnalysisContext, AnalysisResult, ExplanationNode } from "../types/analysis";
 import type { VisualDirective, CardHighlight } from "../types/visuals";
 import type { CardIndex } from "../types/cards";
-import { rankValue, suitValue, cardToDisplay, createDeck, rankOf, SUITS } from "../primitives/card";
+import { rankValue, suitValue, createDeck } from "../primitives/card";
 
 export interface Draw {
   type: "flush_draw" | "straight_draw" | "oesd" | "gutshot" | "backdoor_flush" | "backdoor_straight";
@@ -38,7 +38,6 @@ export const drawLens: AnalysisLens = {
 
     const allKnown = new Set([...heroCards, ...communityCards, ...deadCards]);
     const remaining = createDeck().filter((c) => !allKnown.has(c));
-    const allCards = [...heroCards, ...communityCards];
 
     const draws: Draw[] = [];
 

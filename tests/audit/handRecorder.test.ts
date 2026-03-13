@@ -10,11 +10,10 @@ import {
 import {
   chooseActionFromProfile,
 } from "../../convex/lib/opponents/autoPlay";
-import { createTestConfig, createHeadsUpConfig } from "../state/helpers";
-import { FISH_PROFILE, TAG_PROFILE, NIT_PROFILE } from "../../convex/lib/opponents/presets";
-import { resolveProfile } from "../../convex/lib/opponents/profileResolver";
+import { createTestConfig } from "../state/helpers";
+import { FISH_PROFILE, TAG_PROFILE } from "../../convex/lib/opponents/presets";
 import type { GameState } from "../../convex/lib/state/game-state";
-import type { AnalysisResult, ExplanationNode } from "../../convex/lib/types/analysis";
+import type { AnalysisResult } from "../../convex/lib/types/analysis";
 
 // ─── Helpers ───
 
@@ -32,7 +31,7 @@ function makeSeatSetup(numPlayers = 3): SeatSetupEntry[] {
   const profiles = [undefined, FISH_PROFILE, TAG_PROFILE];
   return Array.from({ length: numPlayers }, (_, i) => ({
     seatIndex: i,
-    position: i === 0 ? "BTN" as const : i === 1 ? "SB" as const : "BB" as const,
+    position: i === 0 ? "btn" as const : i === 1 ? "sb" as const : "bb" as const,
     profileId: profiles[i]?.id,
     profileName: profiles[i]?.name,
     engineId: profiles[i]?.engineId,
@@ -221,7 +220,7 @@ describe("HandRecorder", () => {
     const eventCountBefore = recorder.snapshot().events.length;
     // Try to add another event
     recorder.recordEvent(
-      { seatIndex: 0, position: "BTN", street: "preflop", actionType: "fold", isAllIn: false, sequence: 999 },
+      { seatIndex: 0, position: "btn", street: "preflop", actionType: "fold", isAllIn: false, sequence: 999 },
       100,
       "manual",
     );

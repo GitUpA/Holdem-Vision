@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dealForArchetype, type DrillConstraints } from "../../convex/lib/gto/constrainedDealer";
+import { dealForArchetype } from "../../convex/lib/gto/constrainedDealer";
 import { seededRandom } from "../../convex/lib/primitives/deck";
 import { analyzeBoard } from "../../convex/lib/opponents/engines/boardTexture";
 import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";

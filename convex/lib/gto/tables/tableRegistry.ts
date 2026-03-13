@@ -17,7 +17,6 @@ import type {
   PositionFrequencyBands,
   ActionFrequencyBands,
   ArchetypeAccuracy,
-  FrequencyBand,
 } from "./types";
 
 // ═══════════════════════════════════════════════════════

@@ -15,7 +15,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ArchetypeId, ArchetypeCategory } from "../../../convex/lib/gto/archetypeClassifier";
 import { hasTable } from "../../../convex/lib/gto/tables/tableRegistry";
-import { useDrillSession, type DrillPhase } from "@/hooks/use-drill-session";
+import { useDrillSession } from "@/hooks/use-drill-session";
 import { HandStateViewer } from "../replay/hand-state-viewer";
 import { DrillActionPanel } from "./drill-action-panel";
 import { ScoreDisplay } from "./score-display";

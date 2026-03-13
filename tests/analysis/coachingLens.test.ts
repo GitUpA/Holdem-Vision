@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { coachingLens } from "../../convex/lib/analysis/coachingLens";
 import type { CoachingValue } from "../../convex/lib/analysis/coachingLens";
-import { initializeHand, applyAction, analysisContextFromState } from "../../convex/lib/state/state-machine";
+import { initializeHand, analysisContextFromState } from "../../convex/lib/state/state-machine";
 import { createHeadsUpConfig, createTestConfig } from "../state/helpers";
 import { PRESET_PROFILES } from "../../convex/lib/opponents/presets";
 import type { AnalysisContext } from "../../convex/lib/types/analysis";

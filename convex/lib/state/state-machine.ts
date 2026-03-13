@@ -9,16 +9,14 @@
  * - gameContextFromState: bridge to existing analysis pipeline
  * - analysisContextFromState: full bridge producing AnalysisContext
  */
-import type { CardIndex, Street, Position } from "../types/cards";
+import type { CardIndex } from "../types/cards";
 import type {
   GameState,
   PlayerState,
-  GameAction,
   HandConfig,
   StateTransitionResult,
   LegalActions,
   ActionType,
-  PotState,
 } from "./game-state";
 import type { AnalysisContext, GameContext, ExplanationNode } from "../types/analysis";
 import type { OpponentProfile, OpponentContext, PlayerAction } from "../types/opponents";
@@ -97,7 +95,7 @@ export function initializeHand(config: HandConfig): StateTransitionResult {
   }
 
   // Initial state
-  let state: GameState = {
+  const state: GameState = {
     numPlayers,
     dealerSeatIndex,
     blinds,

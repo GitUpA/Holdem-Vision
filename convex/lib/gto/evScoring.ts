@@ -8,9 +8,8 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { ExplanationNode } from "../types/analysis";
-import type { ArchetypeId } from "./archetypeClassifier";
 import type { ArchetypeClassification } from "./archetypeClassifier";
-import type { HandCategory, HandCategorization } from "./handCategorizer";
+import type { HandCategorization } from "./handCategorizer";
 import {
   lookupFrequencies,
   getTable,
@@ -188,7 +187,6 @@ function buildScoringExplanation(
   keyPrinciple: string,
   commonMistakes: string[],
 ): ExplanationNode {
-  const verdictEmoji = verdict === "optimal" ? "" : verdict === "acceptable" ? "" : verdict === "mistake" ? "" : "";
   const verdictSentiment = verdict === "optimal" || verdict === "acceptable"
     ? "positive"
     : verdict === "mistake"

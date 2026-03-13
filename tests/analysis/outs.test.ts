@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { outsLens } from "../../convex/lib/analysis/outs";
+import { outsLens, type OutsValue } from "../../convex/lib/analysis/outs";
 import type { AnalysisContext } from "../../convex/lib/types/analysis";
 import { cardsFromStrings } from "../../convex/lib/primitives/card";
 
@@ -23,7 +23,7 @@ describe("OutsLens", () => {
       opponents: [],
     };
     const result = outsLens.analyze(ctx);
-    expect(result.value.outsCount).toBe(0);
+    expect((result.value as OutsValue).outsCount).toBe(0);
   });
 
   it("returns empty for river (all cards dealt)", () => {
@@ -32,7 +32,7 @@ describe("OutsLens", () => {
       ["Qc", "Jh", "2s", "7d", "3c"],
     );
     const result = outsLens.analyze(ctx);
-    expect(result.value.outsCount).toBe(0);
+    expect((result.value as OutsValue).outsCount).toBe(0);
   });
 
   it("finds outs for pair to improve", () => {
@@ -40,9 +40,9 @@ describe("OutsLens", () => {
     const ctx = makeContext(["Ac", "Kd"], ["Ks", "7h", "2c"]);
     const result = outsLens.analyze(ctx);
 
-    expect(result.value.outsCount).toBeGreaterThan(0);
+    expect((result.value as OutsValue).outsCount).toBeGreaterThan(0);
     // Should have "One Pair → Two Pair" outs (remaining Aces)
-    expect(result.value.byImprovement).toHaveProperty("One Pair → Two Pair");
+    expect((result.value as OutsValue).byImprovement).toHaveProperty("One Pair → Two Pair");
   });
 
   it("finds outs for flush draw", () => {
@@ -51,7 +51,7 @@ describe("OutsLens", () => {
     const result = outsLens.analyze(ctx);
 
     // Should find hearts that complete the flush
-    const flushOuts = Object.entries(result.value.byImprovement).find(
+    const flushOuts = Object.entries((result.value as OutsValue).byImprovement).find(
       ([key]) => key.includes("Flush"),
     );
     expect(flushOuts).toBeDefined();
@@ -63,8 +63,8 @@ describe("OutsLens", () => {
 
     // probability = outsCount / remaining cards
     const remaining = 52 - 5; // 2 hero + 3 community
-    expect(result.value.probability).toBeCloseTo(
-      result.value.outsCount / remaining,
+    expect((result.value as OutsValue).probability).toBeCloseTo(
+      (result.value as OutsValue).outsCount / remaining,
       5,
     );
   });
@@ -86,7 +86,7 @@ describe("OutsLens", () => {
     const oddsChild = result.explanation.children?.find((c) =>
       c.tags?.includes("outs-odds"),
     );
-    if (result.value.outsCount > 0) {
+    if ((result.value as OutsValue).outsCount > 0) {
       expect(oddsChild).toBeDefined();
     }
   });
@@ -95,7 +95,7 @@ describe("OutsLens", () => {
     const ctx = makeContext(["Ah", "Kh"], ["9h", "5h", "2c"]);
     const result = outsLens.analyze(ctx);
 
-    if (result.value.outsCount > 0) {
+    if ((result.value as OutsValue).outsCount > 0) {
       const outsDisplay = result.visuals.find((v) => v.type === "outs_display");
       expect(outsDisplay).toBeDefined();
       expect(outsDisplay!.lensId).toBe("outs");

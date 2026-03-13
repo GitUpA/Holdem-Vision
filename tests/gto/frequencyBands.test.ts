@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   computeBand,
   computeArchetypeAccuracy,
@@ -10,13 +10,9 @@ import {
   analyzeSampleSize,
   boardsNeededForPrecision,
   solverOutputToTableWithBands,
-  type FrequencyBand,
   type PositionFrequencyBands,
   type ArchetypeAccuracy,
-  type AccuracyImpact,
   type SolverOutputWithBands,
-  clearTables,
-  registerBands,
   getAccuracy,
   lookupFrequencies,
 } from "../../convex/lib/gto/tables";

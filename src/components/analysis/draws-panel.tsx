@@ -37,8 +37,8 @@ const DRAW_COLORS: Record<string, string> = {
 
 export function DrawsPanel({
   draws,
-  hasFlushDraw,
-  hasStraightDraw,
+  hasFlushDraw: _hasFlushDraw,
+  hasStraightDraw: _hasStraightDraw,
   isCombo,
   totalDrawOuts,
 }: DrawsPanelProps) {

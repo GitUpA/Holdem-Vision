@@ -139,7 +139,7 @@ export function classifyAction(
   actionIndex: number,
   position?: Position,
 ): SituationKey {
-  const { street, actionType } = action;
+  const { street, actionType: _actionType } = action;
 
   if (street === "preflop") {
     return classifyPreflopAction(action, allActions, actionIndex);
@@ -295,7 +295,7 @@ function applyActionWithParams(
   knownCards: CardIndex[],
   position?: Position,
 ): ActionResult {
-  const { street, actionType } = action;
+  const { street, actionType: _actionType } = action;
 
   if (street === "preflop") {
     return applyPreflopAction(

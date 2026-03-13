@@ -12,7 +12,7 @@
 import { formatSituation } from "./types";
 import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
 import type { ExplanationNode } from "../../types/analysis";
-import { sampleActionFromParams } from "../autoPlay";
+import { sampleActionFromParams, paramsToFrequencies, preflopHandScore } from "../autoPlay";
 import { registerEngine } from "./engineRegistry";
 
 export const basicEngine: DecisionEngine = {
@@ -66,12 +66,23 @@ export const basicEngine: DecisionEngine = {
       tags: ["basic-engine"],
     };
 
+    // Compute frequencies for unified output format
+    const handStrength = ctx.holeCards?.length === 2
+      ? preflopHandScore(ctx.holeCards) : undefined;
+    const frequencies = paramsToFrequencies(ctx.params, ctx.legal, handStrength);
+
     return {
       actionType,
       amount,
       situationKey: ctx.situationKey,
       engineId: "basic",
       explanation,
+      reasoning: {
+        frequencies,
+        continuePct: ctx.params.continuePct,
+        raisePct: ctx.params.raisePct,
+        bluffFrequency: ctx.params.bluffFrequency,
+      },
     };
   },
 };

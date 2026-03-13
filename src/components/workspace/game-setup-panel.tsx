@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import type { BlindStructure } from "../../../convex/lib/types/game";
-import { formatBB } from "@/lib/format";
 
 interface GameSetupPanelProps {
   blinds: BlindStructure;

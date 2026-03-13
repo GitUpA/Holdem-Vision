@@ -113,7 +113,7 @@ function buildExplanation(
   value: OutsValue,
   currentHandName: string,
 ): ExplanationNode {
-  const { outs, outsCount, probability, byImprovement } = value;
+  const { outsCount, probability, byImprovement } = value;
   const pct = (probability * 100).toFixed(1);
 
   const sentiment = outsCount >= 12 ? "positive"
@@ -135,9 +135,7 @@ function buildExplanation(
 
   // Odds helper
   if (outsCount > 0) {
-    const street = context.communityCards.length === 3 ? "turn" : "river";
     const remainingStreets = context.communityCards.length === 3 ? 2 : 1;
-    const approxOddsOneCard = outsCount;
     // Rule of 2/4: multiply outs by 2 (one card) or 4 (two cards) for rough %
     const roughPct = outsCount * (remainingStreets === 2 ? 4 : 2);
 

@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   nextStreet,
   firstToAct,
-  nextToAct,
   isBettingRoundComplete,
   isHandOver,
   allPlayersAllIn,

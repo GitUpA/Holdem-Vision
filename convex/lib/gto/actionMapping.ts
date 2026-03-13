@@ -4,7 +4,7 @@
  *
  * Pure TypeScript, zero Convex imports.
  */
-import type { ActionType, LegalActions, PotState } from "../state/game-state";
+import type { ActionType, LegalActions } from "../state/game-state";
 import type { GtoAction } from "./tables/types";
 
 export interface GameActionResult {

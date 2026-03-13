@@ -168,7 +168,7 @@ export class HandSession {
     }
 
     // Mark hero as revealed
-    let s: GameState = {
+    const s: GameState = {
       ...state,
       players: state.players.map((p) =>
         p.seatIndex === this._heroSeatIndex
@@ -178,14 +178,12 @@ export class HandSession {
     };
 
     // Ensure every villain has a profile — assign random defaults for missing
-    let profilesChanged = false;
     for (let i = 0; i < this._numPlayers; i++) {
       if (i === this._heroSeatIndex) continue;
       if (!this._seatProfiles.has(i)) {
         const rng = this._random ?? Math.random;
         const randomId = PRESET_IDS[Math.floor(rng() * PRESET_IDS.length)];
         this._seatProfiles.set(i, PRESET_PROFILES[randomId]);
-        profilesChanged = true;
       }
     }
 

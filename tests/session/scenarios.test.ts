@@ -145,7 +145,7 @@ describe("Scenarios", () => {
     table.deal();
 
     // Raise preflop if hero's turn
-    let raised = false;
+    let _raised = false;
     if (
       table.state &&
       table.state.phase !== "complete" &&
@@ -154,7 +154,7 @@ describe("Scenarios", () => {
       const idx = table.state.activePlayerIndex;
       if (idx !== null && table.state.players[idx].seatIndex === table.heroSeatIndex) {
         table.raise(6); // 3x BB
-        raised = true;
+        _raised = true;
       }
     }
 

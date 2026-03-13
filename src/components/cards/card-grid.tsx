@@ -18,7 +18,7 @@ interface CardGridProps {
   usedCards: Set<CardIndex>;
 }
 
-export function CardGrid({ cards, onCardClick, usedCards }: CardGridProps) {
+export function CardGrid({ cards, onCardClick, usedCards: _usedCards }: CardGridProps) {
   // Group cards by suit (suit = cardIndex % 4)
   const bySuit = SUIT_LABELS.map(({ suit, label, name }) => ({
     suit,

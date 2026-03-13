@@ -14,10 +14,6 @@ import type { Position } from "../types/cards";
 /**
  * Full 10-seat position order, clockwise from dealer.
  */
-const FULL_POSITION_ORDER: Position[] = [
-  "btn", "sb", "bb", "utg", "utg1", "utg2", "mp", "mp1", "hj", "co",
-];
-
 /**
  * Position subsets for each table size.
  * Seats are removed from the middle (early positions compressed first).

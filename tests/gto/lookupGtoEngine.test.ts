@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { lookupGtoEngine } from "../../convex/lib/opponents/engines/lookupGtoEngine";
 import { getEngine } from "../../convex/lib/opponents/engines/engineRegistry";
 // Side-effect: registers all engines including lookup-gto, gto, basic
@@ -180,8 +180,8 @@ describe("lookupGtoEngine postflop", () => {
   it("handles flop decision with community cards", () => {
     // Deal preflop actions to get to flop
     let { state } = initializeHand(createHeadsUpConfig({ seed: 42 }));
-    const seat0 = state.players[0].seatIndex;
-    const seat1 = state.players[1].seatIndex;
+    const _seat0 = state.players[0].seatIndex;
+    const _seat1 = state.players[1].seatIndex;
 
     // Preflop: SB calls, BB checks
     const activeIdx = state.activePlayerIndex!;

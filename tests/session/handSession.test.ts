@@ -62,7 +62,11 @@ function mockAnalysisResult(lensId: string, summary: string): AnalysisResult {
       tags: [lensId],
       children: [],
     } as ExplanationNode,
-    visualDirectives: [],
+    visuals: [],
+    lensId: lensId,
+    value: null,
+    context: {} as AnalysisResult["context"],
+    dependencies: [],
   };
 }
 
@@ -210,7 +214,7 @@ describe("HandSession", () => {
       const activePlayer = session.state.players[activeIdx];
       if (activePlayer.seatIndex === session.heroSeatIndex) {
         // Call or check to stay in
-        const legal = session.state;
+        const _legal = session.state;
         const player = session.state.players.find(p => p.seatIndex === session.heroSeatIndex);
         if (player && session.state.currentBet > (player.streetCommitted ?? 0)) {
           session.act("call");

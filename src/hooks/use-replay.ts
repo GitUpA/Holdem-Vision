@@ -27,11 +27,13 @@ export function useReplay(record: HandRecord | null) {
     }
   }, [record]);
 
-  // Reset cursor when timeline changes
-  useEffect(() => {
-    setCurrentIndex(0);
-    setIsPlaying(false);
-  }, [timeline]);
+  // Reset cursor when timeline changes (ref-based to avoid setState-in-effect)
+  const prevTimelineRef = useRef(timeline);
+  if (timeline !== prevTimelineRef.current) {
+    prevTimelineRef.current = timeline;
+    if (currentIndex !== 0) setCurrentIndex(0);
+    if (isPlaying) setIsPlaying(false);
+  }
 
   const totalSteps = timeline?.snapshots.length ?? 0;
   const snapshot: ReplaySnapshot | null = timeline?.snapshots[currentIndex] ?? null;

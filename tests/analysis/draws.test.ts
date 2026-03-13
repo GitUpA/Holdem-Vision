@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { drawLens } from "../../convex/lib/analysis/draws";
+import { drawLens, type DrawValue } from "../../convex/lib/analysis/draws";
 import type { AnalysisContext } from "../../convex/lib/types/analysis";
 import { cardsFromStrings } from "../../convex/lib/primitives/card";
 
@@ -23,7 +23,7 @@ describe("DrawLens", () => {
       opponents: [],
     };
     const result = drawLens.analyze(ctx);
-    expect(result.value.draws).toHaveLength(0);
+    expect((result.value as DrawValue).draws).toHaveLength(0);
   });
 
   it("detects flush draw", () => {
@@ -31,8 +31,8 @@ describe("DrawLens", () => {
     const ctx = makeContext(["Ah", "Kh"], ["9h", "5h", "2c"]);
     const result = drawLens.analyze(ctx);
 
-    expect(result.value.hasFlushDraw).toBe(true);
-    const flushDraw = result.value.draws.find((d) => d.type === "flush_draw");
+    expect((result.value as DrawValue).hasFlushDraw).toBe(true);
+    const flushDraw = (result.value as DrawValue).draws.find((d) => d.type === "flush_draw");
     expect(flushDraw).toBeDefined();
     expect(flushDraw!.outsCount).toBe(9); // 13 hearts - 4 known = 9
   });
@@ -42,8 +42,8 @@ describe("DrawLens", () => {
     const ctx = makeContext(["Jc", "Tc"], ["9d", "8h", "2s"]);
     const result = drawLens.analyze(ctx);
 
-    expect(result.value.hasStraightDraw).toBe(true);
-    const oesd = result.value.draws.find((d) => d.type === "oesd");
+    expect((result.value as DrawValue).hasStraightDraw).toBe(true);
+    const oesd = (result.value as DrawValue).draws.find((d) => d.type === "oesd");
     expect(oesd).toBeDefined();
   });
 
@@ -56,8 +56,8 @@ describe("DrawLens", () => {
     const ctx = makeContext(["Ac", "Kd"], ["Qc", "Jh", "2s"]);
     const result = drawLens.analyze(ctx);
 
-    expect(result.value.hasStraightDraw).toBe(true);
-    const gutshot = result.value.draws.find(
+    expect((result.value as DrawValue).hasStraightDraw).toBe(true);
+    const gutshot = (result.value as DrawValue).draws.find(
       (d) => d.type === "gutshot" || d.type === "oesd",
     );
     expect(gutshot).toBeDefined();
@@ -68,10 +68,10 @@ describe("DrawLens", () => {
     const ctx = makeContext(["Jh", "Th"], ["9h", "8h", "2c"]);
     const result = drawLens.analyze(ctx);
 
-    expect(result.value.hasFlushDraw).toBe(true);
-    expect(result.value.hasStraightDraw).toBe(true);
-    expect(result.value.isCombo).toBe(true);
-    expect(result.value.totalDrawOuts).toBeGreaterThan(9); // More than just flush outs
+    expect((result.value as DrawValue).hasFlushDraw).toBe(true);
+    expect((result.value as DrawValue).hasStraightDraw).toBe(true);
+    expect((result.value as DrawValue).isCombo).toBe(true);
+    expect((result.value as DrawValue).totalDrawOuts).toBeGreaterThan(9); // More than just flush outs
   });
 
   it("detects backdoor flush draw on flop", () => {
@@ -79,7 +79,7 @@ describe("DrawLens", () => {
     const ctx = makeContext(["Ah", "5h"], ["Kh", "9c", "2d"]);
     const result = drawLens.analyze(ctx);
 
-    const backdoor = result.value.draws.find((d) => d.type === "backdoor_flush");
+    const backdoor = (result.value as DrawValue).draws.find((d) => d.type === "backdoor_flush");
     expect(backdoor).toBeDefined();
   });
 
@@ -90,7 +90,7 @@ describe("DrawLens", () => {
     const ctx = makeContext(["Ac", "Kd"], ["7h", "3s", "2c"]);
     const result = drawLens.analyze(ctx);
 
-    expect(result.value.hasFlushDraw).toBe(false);
+    expect((result.value as DrawValue).hasFlushDraw).toBe(false);
     // May or may not have straight draw depending on board connectivity
   });
 
@@ -114,7 +114,7 @@ describe("DrawLens", () => {
     const ctx = makeContext(["Jh", "Th"], ["9h", "8h", "2c"]);
     const result = drawLens.analyze(ctx);
 
-    if (result.value.draws.length > 0) {
+    if ((result.value as DrawValue).draws.length > 0) {
       const outsDisplay = result.visuals.find((v) => v.type === "outs_display");
       expect(outsDisplay).toBeDefined();
       expect(outsDisplay!.lensId).toBe("draws");

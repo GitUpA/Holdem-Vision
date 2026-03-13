@@ -7,10 +7,8 @@ import {
   GTO_PROFILE,
   getAllPresets,
   getPreset,
-  PRESET_IDS,
 } from "../../convex/lib/opponents/presets";
 import { ALL_SITUATION_KEYS, deriveTendencies } from "../../convex/lib/types/opponents";
-import type { SituationKey, BehavioralParams } from "../../convex/lib/types/opponents";
 import { resolveProfile } from "../../convex/lib/opponents/profileResolver";
 
 describe("preset profiles", () => {

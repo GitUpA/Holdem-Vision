@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { rangeAwareEngine } from "../../../convex/lib/opponents/engines/rangeAwareEngine";
-import { basicEngine } from "../../../convex/lib/opponents/engines/basicEngine";
 import { initializeHand, applyAction, currentLegalActions } from "../../../convex/lib/state/state-machine";
 import { createHeadsUpConfig, createTestConfig } from "../../state/helpers";
 import { TAG_PROFILE, LAG_PROFILE, NIT_PROFILE, FISH_PROFILE } from "../../../convex/lib/opponents/presets";
@@ -178,8 +177,8 @@ describe("rangeAwareEngine", () => {
     const allTags = decision.explanation.children!.flatMap((c) => c.tags ?? []);
     expect(allTags).toContain("draw-aware");
     expect(decision.reasoning?.drawInfo).toBeDefined();
-    expect(decision.reasoning!.drawInfo!.hasFlushDraw).toBe(true);
-    expect(decision.reasoning!.drawInfo!.totalOuts).toBeGreaterThanOrEqual(9);
+    expect((decision.reasoning!.drawInfo as { hasFlushDraw: boolean }).hasFlushDraw).toBe(true);
+    expect((decision.reasoning!.drawInfo as { totalOuts: number }).totalOuts).toBeGreaterThanOrEqual(9);
   });
 
   it("flush draw increases hand strength above base high-card level", () => {
@@ -226,8 +225,8 @@ describe("rangeAwareEngine", () => {
     const decisionNoDraw = rangeAwareEngine.decide(ctxNoDraw);
 
     // Flush draw hand should have higher assessed strength
-    expect(decisionDraw.reasoning!.handStrength).toBeGreaterThan(
-      decisionNoDraw.reasoning!.handStrength,
+    expect(decisionDraw.reasoning!.handStrength as number).toBeGreaterThan(
+      decisionNoDraw.reasoning!.handStrength as number,
     );
   });
 
@@ -307,7 +306,6 @@ describe("rangeAwareEngine", () => {
     const seatIndex = state.players[state.activePlayerIndex!].seatIndex;
 
     let lagBluffs = 0;
-    let nitBluffs = 0;
     const trials = 200;
 
     for (let i = 0; i < trials; i++) {
@@ -483,7 +481,7 @@ describe("rangeAwareEngine", () => {
     // Fish-like profile using range-aware engine
     const fishLikeProfile: OpponentProfile = {
       ...FISH_PROFILE,
-      decisionEngine: "range-aware",
+      engineId: "range-aware",
     };
 
     // Use same medium-strength hand for all to isolate position effect

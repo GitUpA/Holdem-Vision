@@ -7,11 +7,10 @@ import {
   deriveIsInPosition,
   type ClassificationContext,
   type ActionSummary,
-  type PotType,
 } from "../../convex/lib/gto/archetypeClassifier";
 import { initializeHand, applyAction } from "../../convex/lib/state/state-machine";
-import { createTestConfig, createHeadsUpConfig } from "../state/helpers";
-import { cardFromString, cardsFromStrings } from "../../convex/lib/primitives/card";
+import { createTestConfig } from "../state/helpers";
+import { cardsFromStrings } from "../../convex/lib/primitives/card";
 import type { Position, Street } from "../../convex/lib/types/cards";
 
 // ─── Helpers ───

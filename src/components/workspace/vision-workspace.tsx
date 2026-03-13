@@ -131,6 +131,7 @@ export function VisionWorkspace() {
     if (lastLensStreetRef.current === key) return;
     lastLensStreetRef.current = key;
     hand.recordLensSnapshot(hand.street, results);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes `hand` object; only triggers on street/handNumber changes
   }, [hand.isHandActive, hand.street, hand.handNumber, results, hand.recordLensSnapshot]);
 
   const deckVisionCards = useDeckVision(hand.heroCards, hand.communityCards, hand.deadCards, results);

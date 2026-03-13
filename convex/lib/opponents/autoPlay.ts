@@ -19,6 +19,7 @@ import type {
 } from "../types/opponents";
 import type { ExplanationNode } from "../types/analysis";
 import type { CardIndex } from "../types/cards";
+import type { ActionFrequencies, GtoAction } from "../gto/tables/types";
 import { rankValue, sameSuit } from "../primitives/card";
 import { resolveProfile } from "./profileResolver";
 import type { DecisionContext } from "./engines/types";
@@ -67,7 +68,7 @@ export function classifyCurrentDecision(
 
 function classifyPreflop(
   state: GameState,
-  seatIndex: number,
+  _seatIndex: number,
 ): SituationKey {
   // Count the number of raises in the preflop action history
   const preflopActions = state.actionHistory.filter((a) => a.street === "preflop");
@@ -90,7 +91,6 @@ function classifyPostflop(
   state: GameState,
   seatIndex: number,
 ): SituationKey {
-  const player = state.players[seatIndex];
   const currentStreetActions = state.actionHistory.filter(
     (a) => a.street === state.currentStreet,
   );
@@ -233,54 +233,6 @@ export function preflopHandScore(cards: CardIndex[]): number {
   return Math.min(1, Math.max(0, score));
 }
 
-/**
- * Adjust continuePct based on hand strength.
- *
- * The profile's continuePct represents the *overall* frequency for that situation,
- * but we need to modulate it so strong hands continue more and weak hands fold more.
- *
- * Approach: map the raw continuePct into an effective range using hand strength.
- * - A hand at the top of the continue range (strength ≥ threshold) always continues.
- * - A hand at the bottom gets an even lower chance than the raw continuePct.
- * - The overall population frequency stays roughly the same as continuePct.
- *
- * Example: Fish facing raise, continuePct=40, AQo (score≈0.78)
- *   → effective ~95% continue (almost never folds AQ)
- * Example: Fish facing raise, continuePct=40, 72o (score≈0.22)
- *   → effective ~10% continue (folds most of the time)
- */
-function adjustedContinuePct(
-  basePct: number,
-  holeCards: CardIndex[] | undefined,
-): number {
-  if (!holeCards || holeCards.length < 2) return basePct;
-
-  const strength = preflopHandScore(holeCards);
-
-  // continuePct of 100 means always continue, don't modify
-  if (basePct >= 100) return 100;
-  // continuePct of 0 means always fold, don't modify
-  if (basePct <= 0) return 0;
-
-  // The "threshold" is the hand strength at which this profile's range begins.
-  // If continuePct=40, the top 40% of hands should continue, meaning
-  // hands above the 60th percentile (strength > 0.6) should usually continue.
-  const foldPct = 100 - basePct;
-  const threshold = foldPct / 100; // e.g. 0.60 for continuePct=40
-
-  if (strength >= threshold) {
-    // Hand is within the "continue" range — high continue rate
-    // Scale from basePct at the threshold to 99 at strength=1.0
-    const depth = threshold < 1 ? (strength - threshold) / (1 - threshold) : 1;
-    return basePct + depth * (99 - basePct);
-  } else {
-    // Hand is below the threshold — low continue rate
-    // Scale from 0 at strength=0 to basePct at threshold
-    const depth = threshold > 0 ? strength / threshold : 0;
-    return depth * basePct * 0.5; // below-threshold hands fold most of the time
-  }
-}
-
 // ═══════════════════════════════════════════════════════
 // SAMPLE ACTION FROM PROFILE PARAMS
 // ═══════════════════════════════════════════════════════
@@ -398,6 +350,151 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 // ═══════════════════════════════════════════════════════
+// PARAMS → ACTION FREQUENCIES (unified output format)
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Convert BehavioralParams into ActionFrequencies — the shared output format
+ * used by all engines for UI display and comparison.
+ *
+ * Maps the profile's 2-level decision tree (continue/fold → raise/call)
+ * plus the bluff pathway into flat action frequencies that sum to ~1.
+ *
+ * Sizings are mapped to GtoAction bet sizes:
+ *   ≤50% pot → bet_small, 51-90% → bet_medium, >90% → bet_large
+ *
+ * @param params - The BehavioralParams (raw or adjusted)
+ * @param legal - Legal actions (determines which actions are available)
+ * @param handStrength - Optional 0-1 hand strength for per-hand modulation.
+ *   If provided, adjustedContinuePct is used instead of raw continuePct.
+ */
+export function paramsToFrequencies(
+  params: BehavioralParams,
+  legal: LegalActions,
+  handStrength?: number,
+): ActionFrequencies {
+  // Effective continue rate — optionally modulated by hand strength
+  const effectiveContinue = handStrength !== undefined
+    ? adjustedContinuePct(params.continuePct, handStrength)
+    : params.continuePct;
+
+  const continueProb = Math.min(100, Math.max(0, effectiveContinue)) / 100;
+  const foldProb = 1 - continueProb;
+
+  // Within continuing hands: raise vs passive
+  const raiseProb = continueProb * (params.raisePct / 100);
+  const passiveProb = continueProb * (1 - params.raisePct / 100);
+
+  // Bluffs come from the fold portion
+  const bluffProb = foldProb * params.bluffFrequency;
+  const pureFoldProb = foldProb * (1 - params.bluffFrequency);
+
+  const freqs: ActionFrequencies = {};
+
+  // ── Fold ──
+  if (legal.canFold) {
+    freqs.fold = pureFoldProb;
+  } else if (!legal.canCheck) {
+    // Can't fold or check — redistribute fold probability to call
+    // (This shouldn't normally happen)
+  }
+
+  // ── Passive: call or check ──
+  if (legal.canCall) {
+    freqs.call = passiveProb;
+  } else if (legal.canCheck) {
+    freqs.check = passiveProb;
+  }
+
+  // If can check and fold isn't available, redirect fold prob to check
+  if (legal.canCheck && !legal.canFold) {
+    freqs.check = (freqs.check ?? 0) + pureFoldProb;
+  }
+
+  // ── Aggressive: raise/bet (value + bluffs) ──
+  const totalAggressive = raiseProb + bluffProb;
+  if (totalAggressive > 0) {
+    const sizingDistribution = sizingsToGtoActions(params);
+    const canAggress = legal.canRaise || legal.canBet;
+
+    if (canAggress) {
+      for (const [action, weight] of Object.entries(sizingDistribution)) {
+        freqs[action as GtoAction] = (freqs[action as GtoAction] ?? 0) + totalAggressive * weight;
+      }
+    } else {
+      // Can't raise/bet — bluffs become folds, value raises become calls
+      if (legal.canCall) {
+        freqs.call = (freqs.call ?? 0) + raiseProb;
+      }
+      if (legal.canFold) {
+        freqs.fold = (freqs.fold ?? 0) + bluffProb;
+      } else if (legal.canCheck) {
+        freqs.check = (freqs.check ?? 0) + bluffProb;
+      }
+    }
+  }
+
+  return freqs;
+}
+
+/**
+ * Map a profile's SizingPreference[] to GtoAction weights.
+ * Aggregates weighted sizings into bet_small / bet_medium / bet_large buckets.
+ */
+function sizingsToGtoActions(params: BehavioralParams): Partial<Record<GtoAction, number>> {
+  const sizings = params.sizings.filter((s) => s.weight > 0);
+
+  if (sizings.length === 0) {
+    // Default: 66% pot → bet_medium
+    return { bet_medium: 1 };
+  }
+
+  const buckets: Partial<Record<GtoAction, number>> = {};
+  const totalWeight = sizings.reduce((sum, s) => sum + s.weight, 0);
+
+  for (const sizing of sizings) {
+    const action: GtoAction =
+      sizing.sizingPct <= 50 ? "bet_small"
+        : sizing.sizingPct <= 90 ? "bet_medium"
+          : "bet_large";
+    buckets[action] = (buckets[action] ?? 0) + sizing.weight / totalWeight;
+  }
+
+  return buckets;
+}
+
+/**
+ * adjustedContinuePct variant that takes a numeric hand strength (0-1)
+ * instead of hole cards. Used by paramsToFrequencies when the engine
+ * has already computed hand strength.
+ */
+function adjustedContinuePct(basePct: number, strengthOrCards: number | CardIndex[] | undefined): number {
+  if (strengthOrCards === undefined) return basePct;
+
+  let strength: number;
+  if (typeof strengthOrCards === "number") {
+    strength = strengthOrCards;
+  } else {
+    if (strengthOrCards.length < 2) return basePct;
+    strength = preflopHandScore(strengthOrCards);
+  }
+
+  if (basePct >= 100) return 100;
+  if (basePct <= 0) return 0;
+
+  const foldPct = 100 - basePct;
+  const threshold = foldPct / 100;
+
+  if (strength >= threshold) {
+    const depth = threshold < 1 ? (strength - threshold) / (1 - threshold) : 1;
+    return basePct + depth * (99 - basePct);
+  } else {
+    const depth = threshold > 0 ? strength / threshold : 0;
+    return depth * basePct * 0.5;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
 // MAIN ENTRY POINT
 // ═══════════════════════════════════════════════════════
 
@@ -416,6 +513,46 @@ function clamp(value: number, min: number, max: number): number {
  * @param random - Optional PRNG for deterministic tests
  * @param opponentProfiles - Optional map of all table profiles (for fold equity calculation)
  */
+/**
+ * Build a DecisionContext for a seat — shared setup for both auto-play and coaching.
+ *
+ * Handles: classification → profile resolution → context assembly.
+ * Callers provide optional overrides for holeCards, random, and opponentProfiles.
+ */
+export function buildDecisionContext(
+  state: GameState,
+  seatIndex: number,
+  profile: OpponentProfile,
+  legal: LegalActions,
+  opts: {
+    getBase?: (id: string) => OpponentProfile | undefined;
+    random?: () => number;
+    holeCards?: CardIndex[];
+    opponentProfiles?: Map<number, OpponentProfile>;
+  } = {},
+): DecisionContext {
+  const getBase = opts.getBase ?? (() => undefined);
+  const situationKey = classifyCurrentDecision(state, seatIndex);
+  const resolved = resolveProfile(profile, getBase);
+  const params = resolved[situationKey];
+  const holeCards = opts.holeCards ?? state.players[seatIndex]?.holeCards;
+
+  return {
+    state,
+    seatIndex,
+    profile,
+    resolvedParams: resolved,
+    situationKey,
+    params,
+    legal,
+    potSize: state.pot.total,
+    holeCards,
+    getBase,
+    random: opts.random ?? Math.random,
+    opponentProfiles: opts.opponentProfiles,
+  };
+}
+
 export function chooseActionFromProfile(
   state: GameState,
   seatIndex: number,
@@ -425,28 +562,11 @@ export function chooseActionFromProfile(
   random: () => number = Math.random,
   opponentProfiles?: Map<number, OpponentProfile>,
 ): AutoPlayDecision {
-  const situationKey = classifyCurrentDecision(state, seatIndex);
-  const resolved = resolveProfile(profile, getBase);
-  const params = resolved[situationKey];
-  const potSize = state.pot.total;
-  const player = state.players[seatIndex];
-  const holeCards = player?.holeCards;
-
-  // Build context for the engine
-  const ctx: DecisionContext = {
-    state,
-    seatIndex,
-    profile,
-    resolvedParams: resolved,
-    situationKey,
-    params,
-    legal,
-    potSize,
-    holeCards,
+  const ctx = buildDecisionContext(state, seatIndex, profile, legal, {
     getBase,
     random,
     opponentProfiles,
-  };
+  });
 
   // Dispatch to the appropriate engine
   const engine = getEngineOrDefault(profile.engineId);

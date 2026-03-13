@@ -217,7 +217,6 @@ function categorizePostflop(
   const heroRanks = holeCards.map(rankValue);
   const boardRanks = communityCards.map(rankValue).sort((a, b) => b - a);
   const highHero = Math.max(...heroRanks);
-  const lowHero = Math.min(...heroRanks);
   const isPocketPair = heroRanks[0] === heroRanks[1];
 
   // Get made hand and draw info
@@ -296,8 +295,6 @@ function classifyOnePair(
   isPocketPair: boolean,
   draws: DrawInfo,
 ): HandCategorization {
-  const highHero = Math.max(...heroRanks);
-  const lowHero = Math.min(...heroRanks);
   const topBoardRank = boardRanks[0];
 
   if (isPocketPair) {

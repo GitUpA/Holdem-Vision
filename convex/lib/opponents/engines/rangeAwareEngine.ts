@@ -21,7 +21,7 @@ import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
 import type { ExplanationNode } from "../../types/analysis";
 import type { BehavioralParams, SituationKey } from "../../types/opponents";
 import type { CardIndex, Position } from "../../types/cards";
-import { sampleActionFromParams, preflopHandScore } from "../autoPlay";
+import { sampleActionFromParams, preflopHandScore, paramsToFrequencies } from "../autoPlay";
 import { resolveProfile } from "../profileResolver";
 import { analyzeBoard, type BoardTexture } from "./boardTexture";
 import { detectDraws, type DrawInfo } from "./drawDetector";
@@ -220,6 +220,10 @@ export const rangeAwareEngine: DecisionEngine = {
       tags: ["range-aware-engine"],
     };
 
+    // Compute frequencies from adjusted params (no hand-strength re-modulation —
+    // adjustParams already applied it, so pass undefined for handStrength)
+    const frequencies = paramsToFrequencies(adjusted, ctx.legal);
+
     return {
       actionType,
       amount,
@@ -227,6 +231,7 @@ export const rangeAwareEngine: DecisionEngine = {
       engineId: "range-aware",
       explanation,
       reasoning: {
+        frequencies,
         handStrength,
         boardWetness: texture?.wetness,
         potOdds,

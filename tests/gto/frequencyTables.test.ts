@@ -1,20 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
-  registerTable,
-  getTable,
   hasTable,
   registeredArchetypes,
   tableCount,
-  clearTables,
   lookupFrequencies,
   getPositionFrequencies,
   solverOutputToTable,
-  type FrequencyTable,
   type SolverOutput,
 } from "../../convex/lib/gto/tables";
 import { ALL_PREFLOP_TABLES, FLOP_ARCHETYPE_METADATA } from "../../convex/lib/gto/tables/preflopTables";
 import { loadSolverTables, validateSolverOutput, FLOP_ARCHETYPE_IDS } from "../../convex/lib/gto/tables/loadSolverTables";
-import type { HandCategory } from "../../convex/lib/gto/handCategorizer";
 
 // ─── Sample solver output (from the 3-board test run) ───
 
@@ -85,7 +80,7 @@ describe("Preflop table structure", () => {
       });
 
       it("IP frequencies sum to ~1.0 per category", () => {
-        for (const [cat, freqs] of Object.entries(table.ipFrequencies)) {
+        for (const [_cat, freqs] of Object.entries(table.ipFrequencies)) {
           const sum = Object.values(freqs!).reduce((a, b) => a + (b ?? 0), 0);
           expect(sum).toBeGreaterThan(0.95);
           expect(sum).toBeLessThan(1.05);
@@ -93,7 +88,7 @@ describe("Preflop table structure", () => {
       });
 
       it("OOP frequencies sum to ~1.0 per category", () => {
-        for (const [cat, freqs] of Object.entries(table.oopFrequencies)) {
+        for (const [_cat, freqs] of Object.entries(table.oopFrequencies)) {
           const sum = Object.values(freqs!).reduce((a, b) => a + (b ?? 0), 0);
           expect(sum).toBeGreaterThan(0.95);
           expect(sum).toBeLessThan(1.05);
@@ -236,8 +231,6 @@ describe("solverOutputToTable — underpair merging", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("loadSolverTables", () => {
-  const originalCount = tableCount();
-
   it("registers solver output as frequency tables", () => {
     const registered = loadSolverTables([SAMPLE_SOLVER_OUTPUT]);
     expect(registered).toContain("ace_high_dry_rainbow");

@@ -11,29 +11,24 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import type { CardIndex, Street, Position } from "../../convex/lib/types/cards";
 import type { BlindStructure } from "../../convex/lib/types/game";
-import type { GameContext, AnalysisContext } from "../../convex/lib/types/analysis";
+import type { GameContext } from "../../convex/lib/types/analysis";
 import type {
-  GameState,
   LegalActions,
   PotState,
   ActionType,
   PlayerState,
   CardVisibility,
-  CardOverride,
 } from "../../convex/lib/state/game-state";
 import type { OpponentProfile, PlayerAction } from "../../convex/lib/types/opponents";
 import {
   currentLegalActions,
   gameContextFromState,
-  analysisContextFromState,
 } from "../../convex/lib/state/state-machine";
-import type { AnalysisBridgeConfig } from "../../convex/lib/state/state-machine";
 import {
   applyCardOverrides,
   applyCommunityOverride,
   setCardVisibility,
 } from "../../convex/lib/state/card-overrides";
-import type { AutoPlayDecision } from "../../convex/lib/opponents/autoPlay";
 import {
   positionForSeat,
   positionDisplayName,
@@ -93,7 +88,7 @@ export function useHandManager(initialPlayers = 6) {
   const [startingStack, setStartingStack] = useState(100); // in BB (BB is always 1)
 
   // ─── Seat labels (UI-only) ───
-  const [seatLabels, setSeatLabels] = useState<Map<number, string>>(new Map());
+  const [seatLabels, _setSeatLabels] = useState<Map<number, string>>(new Map());
 
   // ─── Card selection (UI-only) ───
   const [selectionTarget, setSelectionTarget] = useState<SelectionTarget>("hero");
@@ -134,7 +129,8 @@ export function useHandManager(initialPlayers = 6) {
       );
     }
     return sessionRef.current;
-  }, []); // stable ref — config synced via updateConfig
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- lazy initializer; config synced via updateConfig(), not re-creation
+  }, []);
 
   // ─── Derived state from session ───
 
@@ -271,6 +267,7 @@ export function useHandManager(initialPlayers = 6) {
       });
     }
     return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- blinds.big is stable after setup; used only as fallback multiplier
   }, [numPlayers, positionMap, heroSeatIndex, gameState, seatProfiles, seatLabels, startingStack]);
 
   // ─── Build opponents for analysis ───

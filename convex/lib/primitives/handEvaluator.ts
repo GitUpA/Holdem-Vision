@@ -7,8 +7,7 @@
 import type { CardIndex } from "../types/cards";
 import type { HandRank, HandRankName } from "../types/cards";
 import type { ExplanationNode } from "../types/analysis";
-import { HAND_RANK_NAMES } from "../types/cards";
-import { rankValue, suitValue, cardToDisplay, rankOf } from "./card";
+import { rankValue, suitValue, cardToDisplay } from "./card";
 
 export interface EvaluatedHand {
   rank: HandRank;

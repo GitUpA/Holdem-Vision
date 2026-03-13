@@ -7,7 +7,7 @@
  * - User overrides community cards (what-if exploration)
  * - Reconstructing a known hand (all cards specified)
  */
-import type { CardIndex, Street } from "../types/cards";
+import type { CardIndex } from "../types/cards";
 import type { GameState, CardOverride, CardVisibility } from "./game-state";
 
 // ═══════════════════════════════════════════════════════

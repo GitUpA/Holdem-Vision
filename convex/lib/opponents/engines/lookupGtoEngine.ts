@@ -336,10 +336,9 @@ function buildExplanation(
   actionType: ActionType,
   amount: number | undefined,
   keyPrinciple: string,
-  commonMistakes: string[],
+  _commonMistakes: string[],
 ): ExplanationNode {
   const amountStr = amount !== undefined ? ` ${amount}` : "";
-  const posLabel = lookup.archetypeId ? "IP" : "OOP";
 
   // Format frequencies for display
   const freqChildren: ExplanationNode[] = Object.entries(lookup.frequencies)

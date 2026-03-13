@@ -25,7 +25,7 @@ const SIZING_PRESETS = [
 export function ActionPanel({
   legalActions,
   pot,
-  heroStack,
+  heroStack: _heroStack,
   blinds,
   onAct,
 }: ActionPanelProps) {

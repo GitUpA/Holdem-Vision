@@ -411,7 +411,6 @@ export function estimateBoardAccuracy(
   const accuracy = archetypeAccuracy.accuracy * (0.5 + 0.5 * boardTypicality);
   const clamped = Math.max(0, Math.min(1, accuracy));
   const pct = Math.round(clamped * 100);
-  const gap = 1 - clamped; // e.g. 0.04 for 96% accuracy
 
   // ── EV impact calculation ──
   // The accuracy gap (stdDev) tells us how much the frequency could shift.
@@ -559,8 +558,6 @@ export function analyzeSampleSize(
 
   // Average population stdDev (this is inherent to the archetype, not reducible)
   const avgPopStdDev = stdDevs.reduce((a, b) => a + b, 0) / stdDevs.length;
-  // Max population stdDev (worst-case action)
-  const maxPopStdDev = Math.max(...stdDevs);
 
   // Current standard error of the mean
   const currentStdError = avgPopStdDev / Math.sqrt(currentBoards);

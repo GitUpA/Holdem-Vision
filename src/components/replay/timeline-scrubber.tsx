@@ -13,14 +13,6 @@ const STREET_LABELS: Record<Street, string> = {
   river: "River",
 };
 
-const ACTION_LABELS: Record<string, string> = {
-  fold: "Fold",
-  check: "Check",
-  call: "Call",
-  bet: "Bet",
-  raise: "Raise",
-  all_in: "All-In",
-};
 
 export interface TimelineScrubberProps {
   currentIndex: number;

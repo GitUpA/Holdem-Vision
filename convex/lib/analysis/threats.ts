@@ -13,7 +13,7 @@
 import type { AnalysisLens, AnalysisContext, AnalysisResult, ExplanationNode } from "../types/analysis";
 import type { VisualDirective, CardHighlight } from "../types/visuals";
 import type { CardIndex } from "../types/cards";
-import { rankOf, suitOf, rankValue, suitValue, cardToDisplay, createDeck } from "../primitives/card";
+import { rankOf, rankValue, suitValue, cardToDisplay, createDeck } from "../primitives/card";
 
 export interface ThreatCard {
   cardIndex: CardIndex;
@@ -52,7 +52,6 @@ export const threatLens: AnalysisLens = {
     const allKnown = new Set([...heroCards, ...communityCards, ...deadCards]);
     const remaining = createDeck().filter((c) => !allKnown.has(c));
 
-    const allCards = [...heroCards, ...communityCards];
     const heroRanks = heroCards.map(rankValue);
     const communityRanks = communityCards.map(rankValue);
     const communitySuits = communityCards.map(suitValue);

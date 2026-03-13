@@ -17,7 +17,7 @@ import {
   type ArchetypeCategory,
 } from "./archetypeClassifier";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
-import { hasTable, getTable, lookupFrequencies } from "./tables/tableRegistry";
+import { hasTable } from "./tables/tableRegistry";
 import { positionsForTableSize } from "../primitives/position";
 
 // ═══════════════════════════════════════════════════════

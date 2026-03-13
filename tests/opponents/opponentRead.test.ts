@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { opponentReadLens } from "../../convex/lib/analysis/opponentRead";
 import type { OpponentReadValue } from "../../convex/lib/analysis/opponentRead";
-import { NIT_PROFILE, FISH_PROFILE, LAG_PROFILE } from "../../convex/lib/opponents/presets";
+import { NIT_PROFILE, FISH_PROFILE } from "../../convex/lib/opponents/presets";
 import { cardsFromStrings } from "../../convex/lib/primitives/card";
 import type { AnalysisContext } from "../../convex/lib/types/analysis";
 import type { OpponentContext } from "../../convex/lib/types/opponents";

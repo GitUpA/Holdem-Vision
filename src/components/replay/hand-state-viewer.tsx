@@ -9,7 +9,6 @@
 import { useMemo } from "react";
 import type { GameState } from "../../../convex/lib/state/game-state";
 import type { SeatSetupEntry } from "../../../convex/lib/audit/types";
-import type { DecisionSnapshot } from "../../../convex/lib/audit/types";
 import type { UnifiedSeatConfig } from "@/hooks/use-hand-manager";
 import type { AutoPlayDecision } from "../../../convex/lib/opponents/autoPlay";
 import {

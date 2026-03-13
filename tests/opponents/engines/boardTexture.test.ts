@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { analyzeBoard } from "../../../convex/lib/opponents/engines/boardTexture";
-import { cardFromString, cardsFromStrings } from "../../../convex/lib/primitives/card";
+import { cardsFromStrings } from "../../../convex/lib/primitives/card";
 
 describe("analyzeBoard", () => {
   it("returns neutral texture for empty board (preflop)", () => {

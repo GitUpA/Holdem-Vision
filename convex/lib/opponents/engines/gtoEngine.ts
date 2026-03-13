@@ -19,7 +19,7 @@ import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
 import type { ExplanationNode } from "../../types/analysis";
 import type { BehavioralParams, SituationKey } from "../../types/opponents";
 import type { CardIndex, Position } from "../../types/cards";
-import { sampleActionFromParams, preflopHandScore } from "../autoPlay";
+import { sampleActionFromParams, preflopHandScore, paramsToFrequencies } from "../autoPlay";
 import { resolveProfile } from "../profileResolver";
 import { analyzeBoard, type BoardTexture } from "./boardTexture";
 import { detectDraws, type DrawInfo } from "./drawDetector";
@@ -250,6 +250,8 @@ export const gtoEngine: DecisionEngine = {
       tags: ["gto-engine"],
     };
 
+    const frequencies = paramsToFrequencies(adjusted, ctx.legal);
+
     return {
       actionType,
       amount,
@@ -257,6 +259,7 @@ export const gtoEngine: DecisionEngine = {
       engineId: "gto",
       explanation,
       reasoning: {
+        frequencies,
         handStrength,
         boardWetness: texture?.wetness,
         potOdds,

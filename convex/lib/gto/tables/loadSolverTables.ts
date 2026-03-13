@@ -8,7 +8,7 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { ArchetypeId } from "../archetypeClassifier";
-import type { SolverOutput, SolverOutputWithBands, FrequencyTable } from "./types";
+import type { SolverOutput, SolverOutputWithBands } from "./types";
 import { solverOutputToTable, solverOutputToTableWithBands } from "./types";
 import { registerTable, registerBands } from "./tableRegistry";
 import { FLOP_ARCHETYPE_METADATA } from "./preflopTables";

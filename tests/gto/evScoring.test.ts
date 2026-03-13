@@ -2,10 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   scoreAction,
   normalizeToGtoAction,
-  type ActionScore,
-  type Verdict,
 } from "../../convex/lib/gto/evScoring";
-import type { ArchetypeClassification } from "../../convex/lib/gto/archetypeClassifier";
+import type { ArchetypeClassification, ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
 import type { HandCategorization } from "../../convex/lib/gto/handCategorizer";
 // Ensure preflop tables are registered
 import "../../convex/lib/gto/tables";
@@ -14,7 +12,7 @@ import "../../convex/lib/gto/tables";
 
 const RFI_ARCHETYPE: ArchetypeClassification = {
   archetypeId: "rfi_opening",
-  archetypeCategory: "preflop",
+  category: "preflop",
   confidence: 0.95,
   description: "Raise First In — opening the pot",
 };
@@ -44,8 +42,8 @@ const TPTK_HAND: HandCategorization = {
 describe("scoreAction", () => {
   it("returns null when no frequency table exists", () => {
     const bogusArchetype: ArchetypeClassification = {
-      archetypeId: "nonexistent" as any,
-      archetypeCategory: "preflop",
+      archetypeId: "nonexistent" as ArchetypeId,
+      category: "preflop",
       confidence: 0.9,
       description: "Does not exist",
     };

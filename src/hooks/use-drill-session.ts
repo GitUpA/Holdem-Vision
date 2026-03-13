@@ -49,7 +49,6 @@ import {
   getTable,
   lookupFrequencies,
   getAccuracy,
-  type FrequencyLookup,
 } from "../../convex/lib/gto/tables/tableRegistry";
 import { explainArchetype } from "../../convex/lib/gto/archetypeExplainer";
 import { analyzeBoard } from "../../convex/lib/opponents/engines/boardTexture";

@@ -14,7 +14,7 @@ interface PlayerListProps {
   onSeatClick: (seatIndex: number) => void;
   bigBlind?: number;
   activePlayerSeat?: number | null;
-  decisions?: Map<number, AutoPlayDecision>;
+  decisions?: ReadonlyMap<number, AutoPlayDecision>;
 }
 
 const POSITION_COLORS: Record<string, string> = {
@@ -159,6 +159,13 @@ export function PlayerList({
               {/* Spacer */}
               <span className="flex-1" />
 
+              {/* Current street bet amount */}
+              {seat.streetCommitted > 0 && (
+                <span className="text-[10px] font-semibold tabular-nums text-amber-300">
+                  {formatBB(seat.streetCommitted / bigBlind)}
+                </span>
+              )}
+
               {/* Action badges + reasoning indicator */}
               {seat.actions.length > 0 && (() => {
                 const decision = decisions?.get(seat.seatIndex);
@@ -166,16 +173,19 @@ export function PlayerList({
                   <div className="flex items-center gap-0.5">
                     {seat.actions.slice(0, 4).map((action, j) => {
                       const badge = ACTION_BADGE[action.actionType] ?? { bg: "bg-gray-400", label: action.actionType, short: "?" };
+                      const amountLabel = action.amount && action.amount > 0
+                        ? ` ${formatBB(action.amount / bigBlind)}`
+                        : "";
                       return (
                         <span
                           key={j}
                           className={cn(
-                            "w-4 h-4 rounded-sm flex items-center justify-center text-[8px] font-bold text-white leading-none",
+                            "h-4 rounded-sm flex items-center justify-center text-[8px] font-bold text-white leading-none px-1",
                             badge.bg,
                           )}
-                          title={`${action.street}: ${badge.label}`}
+                          title={`${action.street}: ${badge.label}${amountLabel}`}
                         >
-                          {badge.short}
+                          {badge.short}{amountLabel && <span className="ml-0.5 font-mono">{amountLabel}</span>}
                         </span>
                       );
                     })}

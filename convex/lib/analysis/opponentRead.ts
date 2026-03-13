@@ -18,8 +18,6 @@ import type {
 import type { VisualDirective, RangeHighlight } from "../types/visuals";
 import type { CardIndex } from "../types/cards";
 import type {
-  OpponentContext,
-  OpponentProfile,
   WeightedRange,
   SituationKey,
 } from "../types/opponents";

@@ -151,7 +151,6 @@ export function topPercentRange(
   pct: number,
   knownCards: CardIndex[] = [],
 ): WeightedRange {
-  const all = allHandClasses();
   const orderedHands = HAND_STRENGTH_ORDER;
   const count = Math.ceil((pct / 100) * orderedHands.length);
   const selected = orderedHands.slice(0, count);
