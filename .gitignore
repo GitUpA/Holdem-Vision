@@ -49,8 +49,12 @@ convex/_generated
 # solver - raw outputs, exe, temp files (only parsed frequency_tables are committed)
 /data/solver/texassolver/
 /data/solver/outputs/
+/data/solver/outputs_turn_river/
 /data/solver/*.zip
 /data/solver/inputs/
+/data/solver/inputs_turn_river/
+/data/solver/javasolver/
+/data/solver/manifest*.json
 
 # external datasets
 /data/pokerbench/
