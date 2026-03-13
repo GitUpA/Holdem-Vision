@@ -4,7 +4,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ExplanationTree } from "./explanation-tree";
+import { SolutionDisplay } from "../drill/solution-display";
 import type { CoachingAdvice, CoachingValue } from "../../../convex/lib/analysis/coachingLens";
+import type { SpotSolution } from "@/hooks/use-workspace";
 
 // ═══════════════════════════════════════════════════════
 // CONSTANTS
@@ -36,10 +38,20 @@ interface CoachingPanelProps {
   consensus?: CoachingValue["consensus"];
 }
 
+/** GTO first — it's the reference point other profiles compare against */
+const PROFILE_ORDER: Record<string, number> = {
+  gto: 0, tag: 1, lag: 2, nit: 3, fish: 4,
+};
+
 export function CoachingPanel({ advices, consensus }: CoachingPanelProps) {
   const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
 
-  if (advices.length === 0) {
+  // Sort: GTO first, then TAG, LAG, NIT, FISH
+  const sorted = [...advices].sort(
+    (a, b) => (PROFILE_ORDER[a.profileId] ?? 99) - (PROFILE_ORDER[b.profileId] ?? 99),
+  );
+
+  if (sorted.length === 0) {
     return (
       <div className="text-sm text-[var(--muted-foreground)] py-2">
         Waiting for hero&apos;s turn to act...
@@ -60,7 +72,7 @@ export function CoachingPanel({ advices, consensus }: CoachingPanelProps) {
 
       {/* Profile Rows */}
       <div className="space-y-0 divide-y divide-[var(--border)]/50">
-        {advices.map((advice, i) => (
+        {sorted.map((advice, i) => (
           <ProfileRow
             key={advice.profileId}
             advice={advice}
@@ -161,8 +173,8 @@ function ProfileRow({
           {meta?.short ?? advice.profileName}
         </span>
 
-        {/* Engine badge (if not basic) */}
-        {advice.engineId !== "basic" && (
+        {/* Engine badge (shown for non-standard engines, e.g. lookup-gto solver) */}
+        {advice.engineId !== "modified-gto" && advice.engineId !== "error" && (
           <span className="text-[9px] px-1 py-0.5 rounded bg-[var(--gold-dim)]/10 text-[var(--gold-dim)] border border-[var(--gold-dim)]/20 shrink-0">
             {advice.engineId}
           </span>
@@ -221,12 +233,42 @@ function ProfileRow({
             transition={{ duration: 0.2 }}
             className="overflow-hidden px-2 pb-2"
           >
-            <div className="border-t border-[var(--border)]/50 pt-2 ml-8">
-              <ExplanationTree node={advice.explanation} defaultOpen={true} />
+            <div className="border-t border-[var(--border)]/50 pt-2">
+              {advice.solverData ? (
+                <SolutionDisplay
+                  solution={solverDataToSpotSolution(advice.solverData, advice.explanation)}
+                />
+              ) : (
+                <div className="ml-8">
+                  <ExplanationTree node={advice.explanation} defaultOpen={true} />
+                </div>
+              )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
     </motion.div>
   );
+}
+
+// ═══════════════════════════════════════════════════════
+// ADAPTER: CoachingSolverData → SpotSolution
+// ═══════════════════════════════════════════════════════
+
+function solverDataToSpotSolution(
+  data: NonNullable<CoachingAdvice["solverData"]>,
+  explanation: CoachingAdvice["explanation"],
+): SpotSolution {
+  return {
+    frequencies: data.frequencies,
+    optimalAction: data.optimalAction,
+    optimalFrequency: data.optimalFrequency,
+    availableActions: data.availableActions,
+    explanation,
+    isExactMatch: data.isExactMatch,
+    resolvedCategory: data.resolvedCategory,
+    bands: data.bands,
+    archetypeAccuracy: data.archetypeAccuracy,
+    accuracyImpact: data.accuracyImpact,
+  };
 }

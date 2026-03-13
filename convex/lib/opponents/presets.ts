@@ -139,7 +139,7 @@ const nitSituations: Record<SituationKey, BehavioralParams> = {
 export const NIT_PROFILE: OpponentProfile = {
   id: "nit",
   name: "Nit",
-  engineId: "basic",
+  engineId: "modified-gto",
   description:
     "Ultra-tight player who only enters pots with premium hands. When they bet, they mean it. Exploitable by stealing their blinds and folding to their aggression.",
   situations: nitSituations,
@@ -263,7 +263,7 @@ const fishSituations: Record<SituationKey, BehavioralParams> = {
 export const FISH_PROFILE: OpponentProfile = {
   id: "fish",
   name: "Fish / Calling Station",
-  engineId: "basic",
+  engineId: "modified-gto",
   description:
     "Loose-passive player who plays too many hands and calls too much. Rarely bluffs. Exploit by value-betting relentlessly and avoiding bluffs.",
   situations: fishSituations,
@@ -399,7 +399,7 @@ const tagSituations: Record<SituationKey, BehavioralParams> = {
 export const TAG_PROFILE: OpponentProfile = {
   id: "tag",
   name: "TAG (Tight-Aggressive)",
-  engineId: "range-aware",
+  engineId: "modified-gto",
   description:
     "Solid, selective-aggressive player. Plays good hands, bets them hard, adjusts for position. The baseline winning strategy. Hard to exploit without reads.",
   situations: tagSituations,
@@ -539,7 +539,7 @@ const lagSituations: Record<SituationKey, BehavioralParams> = {
 export const LAG_PROFILE: OpponentProfile = {
   id: "lag",
   name: "LAG (Loose-Aggressive)",
-  engineId: "range-aware",
+  engineId: "modified-gto",
   description:
     "Creative, aggressive player who plays many hands and applies constant pressure. Hard to read because they bluff frequently. Exploit by trapping with strong hands.",
   situations: lagSituations,
@@ -679,7 +679,7 @@ const gtoSituations: Record<SituationKey, BehavioralParams> = {
 export const GTO_PROFILE: OpponentProfile = {
   id: "gto",
   name: "GTO (Balanced)",
-  engineId: "lookup-gto",
+  engineId: "modified-gto",
   description:
     "Game-theory optimal player who balances value bets and bluffs at theoretically correct frequencies. Hard to exploit because their strategy is mathematically sound.",
   situations: gtoSituations,

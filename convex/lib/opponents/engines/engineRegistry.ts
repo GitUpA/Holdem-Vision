@@ -31,20 +31,20 @@ export function getAllEngines(): DecisionEngine[] {
 }
 
 /**
- * Get an engine by ID, falling back to "basic" if the ID is
- * missing or not found. Throws if "basic" isn't registered.
+ * Get an engine by ID, falling back to "modified-gto" if the ID is
+ * missing or not found. Throws if "modified-gto" isn't registered.
  */
 export function getEngineOrDefault(id?: string): DecisionEngine {
   if (id) {
     const engine = registry.get(id);
     if (engine) return engine;
   }
-  const basic = registry.get("basic");
-  if (!basic) {
+  const fallback = registry.get("modified-gto");
+  if (!fallback) {
     throw new Error(
-      `Engine "${id ?? "basic"}" not found and no "basic" fallback registered. ` +
+      `Engine "${id ?? "modified-gto"}" not found and no "modified-gto" fallback registered. ` +
       `Did you import the engine module?`,
     );
   }
-  return basic;
+  return fallback;
 }

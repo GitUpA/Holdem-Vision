@@ -294,7 +294,7 @@ function EngineReasoningSection({ decision }: { decision: AutoPlayDecision }) {
         {decision.engineId && (
           <span className={cn(
             "text-[10px] px-1.5 py-0.5 rounded-md border",
-            decision.engineId === "basic"
+            decision.engineId === "modified-gto"
               ? "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]"
               : "bg-[var(--gold-dim)]/15 text-[var(--gold-dim)] border-[var(--gold-dim)]/20",
           )}>

@@ -6,6 +6,13 @@ import { cn } from "@/lib/utils";
 import type { LegalActions, ActionType } from "../../../convex/lib/state/game-state";
 import type { PotState } from "../../../convex/lib/state/game-state";
 import type { BlindStructure } from "../../../convex/lib/types/game";
+import type { GtoAction } from "../../../convex/lib/gto/tables/types";
+import { gtoActionLabel } from "../../../convex/lib/gto/actionMapping";
+
+interface GtoMode {
+  availableActions: GtoAction[];
+  onAct: (action: GtoAction) => void;
+}
 
 interface ActionPanelProps {
   legalActions: LegalActions;
@@ -13,6 +20,8 @@ interface ActionPanelProps {
   heroStack: number;
   blinds: BlindStructure;
   onAct: (actionType: ActionType, amount?: number) => void;
+  /** When set, renders GTO bucket buttons instead of free-form sizing */
+  gtoMode?: GtoMode;
 }
 
 const SIZING_PRESETS = [
@@ -22,12 +31,24 @@ const SIZING_PRESETS = [
   { label: "Pot", pct: 1.0 },
 ];
 
+const GTO_ACTION_COLORS: Record<GtoAction, string> = {
+  fold: "text-gray-400 border-gray-600 hover:bg-gray-800",
+  check: "text-blue-300 border-blue-600 hover:bg-blue-900/40",
+  call: "text-green-300 border-green-600 hover:bg-green-900/40",
+  bet_small: "text-blue-300 border-blue-400/40 hover:bg-blue-400/10",
+  bet_medium: "text-blue-300 border-blue-500/40 hover:bg-blue-500/10",
+  bet_large: "text-purple-400 border-purple-500/40 hover:bg-purple-500/10",
+  raise_small: "text-amber-400 border-amber-500/40 hover:bg-amber-500/10",
+  raise_large: "text-orange-400 border-orange-500/40 hover:bg-orange-500/10",
+};
+
 export function ActionPanel({
   legalActions,
   pot,
   heroStack: _heroStack,
   blinds,
   onAct,
+  gtoMode,
 }: ActionPanelProps) {
   const [showSizing, setShowSizing] = useState(false);
   const [sizingAction, setSizingAction] = useState<"bet" | "raise">("bet");
@@ -63,6 +84,39 @@ export function ActionPanel({
     return bbs % 1 === 0 ? `${bbs}` : bbs.toFixed(1);
   };
 
+  // ── GTO mode: render bucket buttons ──
+  if (gtoMode) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-2"
+      >
+        {potOdds && (
+          <div className="flex items-center gap-3 text-[10px] text-[var(--muted-foreground)] px-1">
+            <span>Pot: {formatBB(potOdds.potTotal)} BB</span>
+            <span>Call: {formatBB(potOdds.callAmt)} BB</span>
+            <span className="text-[var(--gold-dim)]">
+              Odds: {potOdds.ratio.toFixed(1)}:1
+            </span>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2 justify-center">
+          {gtoMode.availableActions.map((action) => (
+            <ActionButton
+              key={action}
+              label={gtoActionLabel(action)}
+              color={GTO_ACTION_COLORS[action] ?? "text-[var(--foreground)] border-[var(--border)]"}
+              onClick={() => gtoMode.onAct(action)}
+              size="lg"
+            />
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ── Game mode: standard action buttons + sizing slider ──
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -218,11 +272,13 @@ function ActionButton({
   color,
   onClick,
   active,
+  size = "sm",
 }: {
   label: string;
   color: string;
   onClick: () => void;
   active?: boolean;
+  size?: "sm" | "lg";
 }) {
   return (
     <motion.button
@@ -230,7 +286,8 @@ function ActionButton({
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
       className={cn(
-        "text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors",
+        "font-semibold rounded-lg border transition-colors",
+        size === "lg" ? "px-5 py-3 text-sm" : "px-3 py-1.5 text-xs",
         color,
         active && "ring-1 ring-[var(--gold)]/40",
       )}

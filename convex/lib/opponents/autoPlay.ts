@@ -24,10 +24,8 @@ import { rankValue, sameSuit } from "../primitives/card";
 import { resolveProfile } from "./profileResolver";
 import type { DecisionContext } from "./engines/types";
 import { getEngineOrDefault } from "./engines/engineRegistry";
-// Ensure engines are registered (side-effect imports)
-import "./engines/basicEngine";
-import "./engines/rangeAwareEngine";
-import "./engines/gtoEngine";
+// Ensure engine is registered (side-effect import)
+import "./engines/modifiedGtoEngine";
 
 // ═══════════════════════════════════════════════════════
 // TYPES

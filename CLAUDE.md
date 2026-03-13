@@ -11,6 +11,21 @@ Texas Hold'em poker visualization & learning platform.
 - **Testing**: Vitest
 - **Package manager**: pnpm
 
+## ⛔ Critical Rules - READ FIRST
+
+**Bash - NEVER use these patterns:**
+- ❌ `| head` / `| tail` - causes output buffering, commands hang
+- ❌ `| grep ... | head` - same issue with chained pipes
+- ❌ `| less` / `| more` - interactive, will hang
+- ✅ Use command flags instead: `git log -n 10` not `git log | head -10`
+- ✅ Let commands complete fully, or use tool-specific limits
+
+**File Operations - Use dedicated tools, not bash:**
+- ❌ `cat`, `head`, `tail` → ✅ Use `Read` tool
+- ❌ `grep`, `rg` → ✅ Use `Grep` tool
+- ❌ `find`, `ls` → ✅ Use `Glob` tool
+- ❌ `sed`, `awk` → ✅ Use `Edit` tool
+
 ## Commands
 
 ```bash
@@ -20,10 +35,10 @@ pnpm install
 # Dev server
 pnpm dev
 
-# Type check
+# Type check (Run After Code Changes)
 pnpm tsc --noEmit
 
-# Lint (ESLint)
+# Lint (ESLint) (Run After Code Changes)
 pnpm run lint
 
 # Tests
@@ -38,14 +53,14 @@ pnpm test:watch    # watch mode
 - `src/hooks/` — React hooks bridging UI to domain logic.
 - `src/components/` — React UI components.
 - Core pipeline: `AnalysisContext` -> `AnalysisLens` -> `AnalysisResult`
-- Decision engines: `buildDecisionContext()` -> `engine.decide(ctx)` -> `EngineDecision`
-- All engines output `ActionFrequencies` in `reasoning.frequencies` for unified UI display.
+- Decision engine: `buildDecisionContext()` -> `engine.decide(ctx)` -> `EngineDecision`
+- Single unified engine (`modified-gto`) outputs `ActionFrequencies` in `reasoning.frequencies`.
 
 ## Key Patterns
 
 - Domain logic is pure TS in `convex/lib/` — no React, no Convex runtime.
 - Opponent profiles use situation-based model (11 SituationKeys x BehavioralParams).
-- 4 decision engines: basic, range-aware, gto (heuristic), lookup-gto (solver data).
+- 1 unified decision engine (`modified-gto`): GTO solver base + profile-specific frequency modifiers (NIT/FISH/TAG/LAG/GTO).
 - `/vision` and `/drill` routes are public (no auth required).
 
 ## Lint Notes

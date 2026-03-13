@@ -4,43 +4,35 @@ import {
   getAllEngines,
   getEngineOrDefault,
 } from "../../../convex/lib/opponents/engines/engineRegistry";
-// Importing basicEngine triggers self-registration
-import "../../../convex/lib/opponents/engines/basicEngine";
-import "../../../convex/lib/opponents/engines/rangeAwareEngine";
+// Importing modifiedGtoEngine triggers self-registration
+import "../../../convex/lib/opponents/engines/modifiedGtoEngine";
 
 describe("engineRegistry", () => {
-  it("basic engine is registered", () => {
-    const engine = getEngine("basic");
+  it("modified-gto engine is registered", () => {
+    const engine = getEngine("modified-gto");
     expect(engine).toBeDefined();
-    expect(engine!.id).toBe("basic");
+    expect(engine!.id).toBe("modified-gto");
   });
 
-  it("range-aware engine is registered", () => {
-    const engine = getEngine("range-aware");
-    expect(engine).toBeDefined();
-    expect(engine!.id).toBe("range-aware");
-  });
-
-  it("getAllEngines returns all registered engines", () => {
+  it("getAllEngines returns registered engines", () => {
     const all = getAllEngines();
-    expect(all.length).toBeGreaterThanOrEqual(2);
+    expect(all.length).toBeGreaterThanOrEqual(1);
     const ids = all.map((e) => e.id);
-    expect(ids).toContain("basic");
-    expect(ids).toContain("range-aware");
+    expect(ids).toContain("modified-gto");
   });
 
-  it("getEngineOrDefault returns basic when id is undefined", () => {
+  it("getEngineOrDefault returns modified-gto when id is undefined", () => {
     const engine = getEngineOrDefault(undefined);
-    expect(engine.id).toBe("basic");
+    expect(engine.id).toBe("modified-gto");
   });
 
-  it("getEngineOrDefault returns basic when id is unknown", () => {
+  it("getEngineOrDefault returns modified-gto when id is unknown", () => {
     const engine = getEngineOrDefault("nonexistent");
-    expect(engine.id).toBe("basic");
+    expect(engine.id).toBe("modified-gto");
   });
 
   it("getEngineOrDefault returns requested engine when it exists", () => {
-    const engine = getEngineOrDefault("range-aware");
-    expect(engine.id).toBe("range-aware");
+    const engine = getEngineOrDefault("modified-gto");
+    expect(engine.id).toBe("modified-gto");
   });
 });

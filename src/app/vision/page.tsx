@@ -1,7 +1,7 @@
 "use client";
 
-import { VisionWorkspace } from "@/components/workspace/vision-workspace";
+import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 
 export default function VisionPage() {
-  return <VisionWorkspace />;
+  return <WorkspaceShell />;
 }

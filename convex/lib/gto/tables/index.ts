@@ -61,12 +61,16 @@ export {
 } from "./preflopTables";
 
 // ═══════════════════════════════════════════════════════
-// AUTO-REGISTER PREFLOP TABLES
+// AUTO-REGISTER ALL TABLES
 // ═══════════════════════════════════════════════════════
 
 import { registerTable } from "./tableRegistry";
 import { ALL_PREFLOP_TABLES } from "./preflopTables";
 
+// Preflop tables (hand-curated)
 for (const table of ALL_PREFLOP_TABLES) {
   registerTable(table);
 }
+
+// Solver-derived flop texture tables (193 boards, 8 archetypes)
+import "./solverData";

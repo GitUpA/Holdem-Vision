@@ -105,13 +105,13 @@ describe("coachingLens", () => {
     const value = result.value as CoachingValue;
 
     const nitAdvice = value.advices.find((a) => a.profileId === "nit")!;
-    expect(nitAdvice.engineId).toBe("basic");
+    expect(nitAdvice.engineId).toBe("modified-gto");
 
     const tagAdvice = value.advices.find((a) => a.profileId === "tag")!;
-    expect(tagAdvice.engineId).toBe("range-aware");
+    expect(tagAdvice.engineId).toBe("modified-gto");
 
     const lagAdvice = value.advices.find((a) => a.profileId === "lag")!;
-    expect(lagAdvice.engineId).toBe("range-aware");
+    expect(lagAdvice.engineId).toBe("modified-gto");
   });
 
   it("detects consensus when profiles agree", () => {

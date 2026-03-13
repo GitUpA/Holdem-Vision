@@ -88,9 +88,9 @@ export function ReplayOverlay({
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--muted)]/40 text-[var(--muted-foreground)] border border-[var(--border)]">
                 {decision.engineId}
               </span>
-              {decision.reasoning.isBluff && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse">
-                  BLUFF
+              {decision.reasoning.profileId && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--gold-dim)]/15 text-[var(--gold-dim)] border border-[var(--gold-dim)]/20">
+                  {decision.reasoning.profileId.toUpperCase()}
                 </span>
               )}
             </div>
@@ -102,38 +102,32 @@ export function ReplayOverlay({
                   Hand: <span className="text-[var(--foreground)] font-medium">{(decision.reasoning.handStrength * 100).toFixed(0)}%</span>
                 </span>
               )}
-              {decision.reasoning.potOdds !== undefined && (
+              {decision.reasoning.handDescription && (
+                <span className="text-[var(--foreground)]/70">{decision.reasoning.handDescription}</span>
+              )}
+              {decision.reasoning.potOdds !== undefined && decision.reasoning.potOdds > 0 && (
                 <span>
                   Odds: <span className="text-[var(--foreground)] font-medium">{(decision.reasoning.potOdds * 100).toFixed(0)}%</span>
                 </span>
               )}
-              {decision.reasoning.foldLikelihood !== undefined && (
+              {decision.reasoning.foldEquity !== undefined && decision.reasoning.foldEquity > 0 && (
                 <span>
-                  FoldEQ: <span className="text-[var(--foreground)] font-medium">{(decision.reasoning.foldLikelihood * 100).toFixed(0)}%</span>
-                </span>
-              )}
-              {decision.reasoning.mdf !== undefined && (
-                <span>
-                  MDF: <span className="text-[var(--foreground)] font-medium">{(decision.reasoning.mdf * 100).toFixed(0)}%</span>
+                  FoldEQ: <span className="text-[var(--foreground)] font-medium">{(decision.reasoning.foldEquity * 100).toFixed(0)}%</span>
                 </span>
               )}
             </div>
 
-            {/* Draw info */}
-            {decision.reasoning.drawInfo && decision.reasoning.drawInfo.totalOuts > 0 && (
-              <div className="flex items-center gap-1.5">
-                {decision.reasoning.drawInfo.hasFlushDraw && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                    FLUSH DRAW
-                  </span>
+            {/* Modifier info */}
+            {decision.reasoning.modifierIntensity !== undefined && decision.reasoning.modifierIntensity > 0 && (
+              <div className="flex items-center gap-3 text-[10px] text-[var(--muted-foreground)]">
+                {decision.reasoning.effectiveFoldScale !== undefined && (
+                  <span>Fold ×{decision.reasoning.effectiveFoldScale.toFixed(2)}</span>
                 )}
-                {decision.reasoning.drawInfo.hasStraightDraw && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 border border-green-500/40">
-                    STR DRAW
-                  </span>
+                {decision.reasoning.effectiveAggressionScale !== undefined && (
+                  <span>Aggr ×{decision.reasoning.effectiveAggressionScale.toFixed(2)}</span>
                 )}
-                <span className="text-[10px] text-[var(--muted-foreground)]">
-                  {decision.reasoning.drawInfo.totalOuts} outs
+                <span className="text-[var(--muted-foreground)]/50">
+                  ({decision.reasoning.gtoSource === "solver" ? "solver" : "heuristic"} base)
                 </span>
               </div>
             )}

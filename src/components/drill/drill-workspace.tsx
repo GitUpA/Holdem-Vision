@@ -20,6 +20,7 @@ import { HandStateViewer } from "../replay/hand-state-viewer";
 import { DrillActionPanel } from "./drill-action-panel";
 import { ScoreDisplay } from "./score-display";
 import { SolutionDisplay } from "./solution-display";
+import { DrillGuideDrawer } from "./drill-guide-drawer";
 
 // ═══════════════════════════════════════════════════════
 // ARCHETYPE DEFINITIONS
@@ -58,9 +59,9 @@ const ALL_ARCHETYPES: ArchetypeEntry[] = [
 ];
 
 const CATEGORY_LABELS: Record<ArchetypeCategory, string> = {
-  preflop: "Preflop",
-  flop_texture: "Flop Textures",
-  postflop_principle: "Postflop Principles",
+  preflop: "Preflop Archetypes",
+  flop_texture: "Flop Texture Archetypes",
+  postflop_principle: "Postflop Archetypes",
 };
 
 const HAND_COUNT_OPTIONS = [5, 10, 20];
@@ -74,6 +75,7 @@ export type DrillMode = "learn" | "quiz";
 export function DrillWorkspace() {
   const drill = useDrillSession();
   const [drillMode, setDrillMode] = useState<DrillMode>("quiz");
+  const [guideOpen, setGuideOpen] = useState(false);
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4 space-y-4">
@@ -84,6 +86,7 @@ export function DrillWorkspace() {
               onStart={drill.startDrill}
               drillMode={drillMode}
               onModeChange={setDrillMode}
+              onOpenGuide={() => setGuideOpen(true)}
             />
           </motion.div>
         ) : drill.phase === "summary" ? (
@@ -92,10 +95,12 @@ export function DrillWorkspace() {
           </motion.div>
         ) : (
           <motion.div key="active" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <ActiveDrill drill={drill} drillMode={drillMode} />
+            <ActiveDrill drill={drill} drillMode={drillMode} onOpenGuide={() => setGuideOpen(true)} />
           </motion.div>
         )}
       </AnimatePresence>
+
+      <DrillGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   );
 }
@@ -108,10 +113,12 @@ function ArchetypeSelector({
   onStart,
   drillMode,
   onModeChange,
+  onOpenGuide,
 }: {
   onStart: (id: ArchetypeId, count?: number) => void;
   drillMode: DrillMode;
   onModeChange: (mode: DrillMode) => void;
+  onOpenGuide: () => void;
 }) {
   const [selected, setSelected] = useState<ArchetypeId | null>(null);
   const [handCount, setHandCount] = useState(10);
@@ -120,11 +127,20 @@ function ArchetypeSelector({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-[var(--foreground)]">GTO Drill Mode</h2>
-        <p className="text-xs text-[var(--muted-foreground)] mt-1">
-          Practice GTO decisions against frequency tables. Select an archetype to begin.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--foreground)]">GTO Drill Mode</h2>
+          <p className="text-xs text-[var(--muted-foreground)] mt-1">
+            Practice GTO decisions against solver-computed archetypes. Select an archetype to begin.
+          </p>
+        </div>
+        <button
+          onClick={onOpenGuide}
+          className="w-7 h-7 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors shrink-0"
+          title="How to use Drill Mode"
+        >
+          <span className="text-xs font-bold">?</span>
+        </button>
       </div>
 
       {categories.map((cat) => (
@@ -153,7 +169,7 @@ function ArchetypeSelector({
                 >
                   {arch.label}
                   {!available && (
-                    <span className="block text-[9px] mt-0.5 opacity-50">No data</span>
+                    <span className="block text-[9px] mt-0.5 opacity-50">Coming soon</span>
                   )}
                 </button>
               );
@@ -236,9 +252,11 @@ function ArchetypeSelector({
 function ActiveDrill({
   drill,
   drillMode,
+  onOpenGuide,
 }: {
   drill: ReturnType<typeof useDrillSession>;
   drillMode: DrillMode;
+  onOpenGuide: () => void;
 }) {
   const progressPct = drill.handsTarget > 0
     ? (drill.handsPlayed / drill.handsTarget) * 100
@@ -254,7 +272,16 @@ function ActiveDrill({
       <div className="space-y-1">
         <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
           <span>Hand {Math.min(drill.handsPlayed + 1, drill.handsTarget)} of {drill.handsTarget}</span>
-          <span>{drill.progress.optimal}W {drill.progress.acceptable}A {drill.progress.mistake}M {drill.progress.blunder}B</span>
+          <div className="flex items-center gap-2">
+            <span>{drill.progress.optimal}W {drill.progress.acceptable}A {drill.progress.mistake}M {drill.progress.blunder}B</span>
+            <button
+              onClick={onOpenGuide}
+              className="w-5 h-5 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors"
+              title="How to use Drill Mode"
+            >
+              <span className="text-[9px] font-bold">?</span>
+            </button>
+          </div>
         </div>
         <div className="h-1.5 rounded-full bg-[var(--muted)]/30 overflow-hidden">
           <motion.div

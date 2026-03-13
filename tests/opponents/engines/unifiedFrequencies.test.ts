@@ -1,6 +1,6 @@
 /**
- * Tests that all 4 engines produce ActionFrequencies in their reasoning output.
- * This validates the unified output format across the engine pipeline.
+ * Tests that the unified modified-gto engine produces ActionFrequencies
+ * in its reasoning output, and that paramsToFrequencies works correctly.
  */
 import { describe, it, expect } from "vitest";
 import type { DecisionContext } from "../../../convex/lib/opponents/engines/types";
@@ -10,11 +10,8 @@ import type { ActionFrequencies, GtoAction } from "../../../convex/lib/gto/table
 import { getEngineOrDefault } from "../../../convex/lib/opponents/engines/engineRegistry";
 import { paramsToFrequencies } from "../../../convex/lib/opponents/autoPlay";
 
-// Ensure engines are registered
-import "../../../convex/lib/opponents/engines/basicEngine";
-import "../../../convex/lib/opponents/engines/rangeAwareEngine";
-import "../../../convex/lib/opponents/engines/gtoEngine";
-import "../../../convex/lib/opponents/engines/lookupGtoEngine";
+// Ensure engine is registered
+import "../../../convex/lib/opponents/engines/modifiedGtoEngine";
 
 // ═══════════════════════════════════════════════════════
 // HELPERS
@@ -40,12 +37,12 @@ function makeResolvedParams(): Record<SituationKey, BehavioralParams> {
   return result;
 }
 
-function makeProfile(engineId: string): OpponentProfile {
+function makeProfile(): OpponentProfile {
   return {
     id: "test",
     name: "Test Profile",
     description: "For testing",
-    engineId,
+    engineId: "modified-gto",
     situations: makeResolvedParams(),
   };
 }
@@ -96,8 +93,8 @@ function makeGameState(street: "preflop" | "flop" = "preflop"): GameState {
   } as unknown as GameState;
 }
 
-function makeCtx(engineId: string, street: "preflop" | "flop" = "preflop"): DecisionContext {
-  const profile = makeProfile(engineId);
+function makeCtx(street: "preflop" | "flop" = "preflop"): DecisionContext {
+  const profile = makeProfile();
   const legal = makeLegal();
   const state = makeGameState(street);
   return {
@@ -218,10 +215,10 @@ describe("Unified ActionFrequencies output", () => {
     });
   });
 
-  describe("all engines produce frequencies in reasoning", () => {
-    it("basic engine includes frequencies", () => {
-      const engine = getEngineOrDefault("basic");
-      const ctx = makeCtx("basic");
+  describe("modified-gto engine produces frequencies in reasoning", () => {
+    it("includes valid frequencies in preflop reasoning", () => {
+      const engine = getEngineOrDefault("modified-gto");
+      const ctx = makeCtx("preflop");
       const decision = engine.decide(ctx);
 
       expect(decision.reasoning).toBeDefined();
@@ -230,9 +227,9 @@ describe("Unified ActionFrequencies output", () => {
       assertValidFrequencies(freqs);
     });
 
-    it("range-aware engine includes frequencies", () => {
-      const engine = getEngineOrDefault("range-aware");
-      const ctx = makeCtx("range-aware");
+    it("includes valid frequencies in postflop reasoning", () => {
+      const engine = getEngineOrDefault("modified-gto");
+      const ctx = makeCtx("flop");
       const decision = engine.decide(ctx);
 
       expect(decision.reasoning).toBeDefined();
@@ -241,58 +238,40 @@ describe("Unified ActionFrequencies output", () => {
       assertValidFrequencies(freqs);
     });
 
-    it("gto heuristic engine includes frequencies", () => {
-      const engine = getEngineOrDefault("gto");
-      const ctx = makeCtx("gto");
+    it("also includes gtoBaseFrequencies in reasoning", () => {
+      const engine = getEngineOrDefault("modified-gto");
+      const ctx = makeCtx("preflop");
       const decision = engine.decide(ctx);
 
       expect(decision.reasoning).toBeDefined();
-      const freqs = decision.reasoning!.frequencies as ActionFrequencies;
-      expect(freqs).toBeDefined();
-      assertValidFrequencies(freqs);
-    });
-
-    it("lookup-gto engine includes frequencies (fallback path)", () => {
-      // lookup-gto will fallback to heuristic gto since no solver tables
-      // are loaded for preflop in this test context
-      const engine = getEngineOrDefault("lookup-gto");
-      const ctx = makeCtx("lookup-gto");
-      const decision = engine.decide(ctx);
-
-      expect(decision.reasoning).toBeDefined();
-      const freqs = decision.reasoning!.frequencies as ActionFrequencies;
-      expect(freqs).toBeDefined();
-      assertValidFrequencies(freqs);
+      const gtoBase = decision.reasoning!.gtoBaseFrequencies as ActionFrequencies;
+      expect(gtoBase).toBeDefined();
+      assertValidFrequencies(gtoBase);
     });
   });
 
-  describe("frequency consistency across engines", () => {
-    it("strong hand produces higher continue frequency for all engines", () => {
-      const engines = ["basic", "range-aware", "gto"];
+  describe("frequency consistency", () => {
+    it("strong hand produces lower fold frequency than weak hand", () => {
+      const engine = getEngineOrDefault("modified-gto");
 
-      for (const engineId of engines) {
-        const engine = getEngineOrDefault(engineId);
+      // Strong hand: AKs (indices 12, 25 → Ah, Ks)
+      const strongCtx = makeCtx();
+      strongCtx.holeCards = [12, 25];
+      const strongDecision = engine.decide(strongCtx);
+      const strongFreqs = strongDecision.reasoning?.frequencies as ActionFrequencies | undefined;
 
-        // Strong hand: AKs (indices 12, 25 → Ah, Ks)
-        const strongCtx = makeCtx(engineId);
-        strongCtx.holeCards = [12, 25];
-        const strongDecision = engine.decide(strongCtx);
-        const strongFreqs = strongDecision.reasoning?.frequencies as ActionFrequencies | undefined;
+      // Weak hand: 7h2d (indices 5, 14)
+      const weakCtx = makeCtx();
+      weakCtx.holeCards = [5, 14];
+      weakCtx.random = (() => { let i = 0; return () => [0.3, 0.7, 0.5, 0.2, 0.8, 0.1][i++ % 6]; })();
+      const weakDecision = engine.decide(weakCtx);
+      const weakFreqs = weakDecision.reasoning?.frequencies as ActionFrequencies | undefined;
 
-        // Weak hand: 7h2d (indices 5, 14)
-        const weakCtx = makeCtx(engineId);
-        weakCtx.holeCards = [5, 14];
-        // Reset the random seed
-        weakCtx.random = (() => { let i = 0; return () => [0.3, 0.7, 0.5, 0.2, 0.8, 0.1][i++ % 6]; })();
-        const weakDecision = engine.decide(weakCtx);
-        const weakFreqs = weakDecision.reasoning?.frequencies as ActionFrequencies | undefined;
-
-        if (strongFreqs && weakFreqs) {
-          const strongFold = strongFreqs.fold ?? 0;
-          const weakFold = weakFreqs.fold ?? 0;
-          // Strong hand should fold less (or equal) than weak hand
-          expect(strongFold).toBeLessThanOrEqual(weakFold + 0.01);
-        }
+      if (strongFreqs && weakFreqs) {
+        const strongFold = strongFreqs.fold ?? 0;
+        const weakFold = weakFreqs.fold ?? 0;
+        // Strong hand should fold less (or equal) than weak hand
+        expect(strongFold).toBeLessThanOrEqual(weakFold + 0.01);
       }
     });
   });

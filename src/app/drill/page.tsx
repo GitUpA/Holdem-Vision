@@ -1,9 +1,7 @@
-import { DrillWorkspace } from "@/components/drill/drill-workspace";
+"use client";
+
+import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 
 export default function DrillPage() {
-  return (
-    <main className="min-h-screen bg-[var(--background)] py-8">
-      <DrillWorkspace />
-    </main>
-  );
+  return <WorkspaceShell initialMode="drill" />;
 }

@@ -1,15 +1,16 @@
 # GTO Trainer — Lookup Engine + Replay/Drill System
 
-## Current Status (744 tests, 2026-03-12)
+## Current Status (756 tests, 2026-03-12)
 
 | Phase | Status | Tests |
 |-------|--------|-------|
-| A: Data Foundation | MOSTLY COMPLETE (solver batch at 153/193) | ~100 |
+| A: Data Foundation | COMPLETE (193/193 solver boards) | ~100 |
 | B: Lookup Engine + Scoring | COMPLETE | ~60 |
 | C: Hand Replay | COMPLETE | 15 |
 | D: Drill Mode | COMPLETE | 40 |
 | Frequency Bands + Accuracy | COMPLETE | 49 |
 | E: Training Dashboard | NOT STARTED | — |
+| Post-phase DRY-up + UI polish | COMPLETE | — |
 
 ## Vision
 
@@ -249,10 +250,11 @@ interface FrequencyTable {
 }
 ```
 
-**Data sourcing approach (no solver needed):**
-1. MVP: manually curate from free sources (Upswing charts, GTO Wizard blog, GitHub repos)
-2. Refinement: one-time GTO Wizard subscription → export trainer data for all 20 archetypes
-3. Placeholder tables ship with the code; real data is a drop-in replacement (same JSON shape)
+**Data sourcing — COMPLETE:**
+- 193 boards solved via TexasSolver (C++ GPU, RTX 3090) across 8 flop texture archetypes (~5.4h total)
+- Parsed via `batch_solve.py parse` → JSON frequency tables + band distributions + accuracy summaries
+- Accuracy: Ace-High Dry 97.8%, K/Q-High Dry 97.3%, Two-Tone Disco 96.4% (very_high); Monotone 94.9%, Mid/Low Dry 94.1%, Paired 92.8%, Two-Tone Conn 92.0% (high); Rainbow Conn 89.9% (moderate)
+- Sample size analysis: current 193 boards sufficient for shipping; worst case ±2.4% = ~0.12 BB
 
 **Accept for Phase A:**
 - Classifier correctly maps ≥ 50 test scenarios to the right archetype
@@ -623,7 +625,7 @@ Instead of point estimates ("bet 55%"), the system computes **frequency bands** 
 **Sample Size Analysis** — determines if more solver boards are needed:
 - `analyzeSampleSize()`: marginal gain per board, sweet spot via diminishing returns (√n relationship)
 - `boardsNeededForPrecision()`: how many boards to reach a target stdError
-- Ready to run on actual solver data when batch completes
+- Ran on actual solver data — all 193 boards analyzed, sweet spots identified
 
 ### Data Flow
 

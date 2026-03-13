@@ -45,3 +45,12 @@ convex/_generated
 
 # audit data (local file storage)
 /data/audits
+
+# solver - raw outputs, exe, temp files (only parsed frequency_tables are committed)
+/data/solver/texassolver/
+/data/solver/outputs/
+/data/solver/*.zip
+/data/solver/inputs/
+
+# external datasets
+/data/pokerbench/

@@ -1,0 +1,1022 @@
+"use client";
+
+/**
+ * WorkspaceShell — unified workspace that renders ALL panels always.
+ *
+ * Mode controls what's ENABLED, not what's VISIBLE. Disabled panels
+ * show at reduced opacity with a hint overlay via PanelWrapper.
+ *
+ * Both vision-mode and drill-mode panels render side by side.
+ * The mode config determines which are interactive.
+ */
+
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import type { WorkspaceMode, WorkspaceModeId } from "@/types/workspace-mode";
+import { visionMode, drillMode as drillModeConfig } from "@/types/workspace-mode";
+import { useWorkspace, type WorkspaceState } from "@/hooks/use-workspace";
+import { PanelWrapper } from "@/components/ui/panel-wrapper";
+
+// ── Existing components ──
+import { BoardDisplay } from "./board-display";
+import { ActionPanel } from "./action-panel";
+import { PotDisplay } from "./pot-display";
+import { GameSetupPanel } from "./game-setup-panel";
+import { GuideDrawer } from "./guide-drawer";
+import { LensSelector } from "./lens-selector";
+import { CardSelector, type SelectionMode } from "../cards/card-selector";
+import { VisualRenderer } from "../analysis/visual-renderer";
+import { ExplanationTree } from "../analysis/explanation-tree";
+import { CoachingPanel } from "../analysis/coaching-panel";
+import type { CoachingAdvice, CoachingValue } from "../../../convex/lib/analysis/coachingLens";
+import { PlayerList } from "../table/player-list";
+import { TableControls } from "../table/table-controls";
+import { OpponentDetail } from "../table/opponent-detail";
+import { HandReplayer } from "../replay/hand-replayer";
+import type { HandRecord } from "../../../convex/lib/audit/types";
+import type { OpponentReadValue } from "../../../convex/lib/analysis/opponentRead";
+import type { SelectionTarget } from "@/hooks/use-workspace";
+import { evaluateHand, compareHandRanks } from "../../../convex/lib/primitives/handEvaluator";
+import type { EvaluatedHand } from "../../../convex/lib/primitives/handEvaluator";
+import type { CardIndex } from "../../../convex/lib/types/cards";
+
+// Drill components
+import { ScoreDisplay } from "../drill/score-display";
+import { SolutionDisplay } from "../drill/solution-display";
+import { DrillGuideDrawer } from "../drill/drill-guide-drawer";
+
+
+// Drill archetype data
+import type { ArchetypeId, ArchetypeCategory } from "../../../convex/lib/gto/archetypeClassifier";
+import { hasTable } from "../../../convex/lib/gto/tables/tableRegistry";
+
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+
+function SvgIcon({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("shrink-0", className)}>
+      {children}
+    </svg>
+  );
+}
+
+function TrophyIcon({ className }: { className?: string }) {
+  return (
+    <SvgIcon className={className}>
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+      <path d="M4 22h16" />
+      <path d="M10 22V8a6 6 0 0 0 12 0V2H6v6a6 6 0 0 0 4 5.66V22" />
+      <path d="M14 22V13.66A6 6 0 0 0 18 8" />
+    </SvgIcon>
+  );
+}
+
+function DefeatIcon({ className }: { className?: string }) {
+  return (
+    <SvgIcon className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="15" y1="9" x2="9" y2="15" />
+      <line x1="9" y1="9" x2="15" y2="15" />
+    </SvgIcon>
+  );
+}
+
+function CrownIcon({ className }: { className?: string }) {
+  return (
+    <SvgIcon className={className}>
+      <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" />
+      <path d="M5 16h14v2H5z" />
+    </SvgIcon>
+  );
+}
+
+function mapTargetToMode(target: SelectionTarget): SelectionMode {
+  if (target === "hero") return "hero";
+  if (target === "community") return "community";
+  return "hero";
+}
+
+const RANK_LABELS = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
+const SUIT_LABELS = ["\u2663", "\u2666", "\u2665", "\u2660"];
+
+function cardLabel(card: CardIndex): string {
+  return `${RANK_LABELS[Math.floor(card / 4)]}${SUIT_LABELS[card % 4]}`;
+}
+
+function suitColor(card: CardIndex): string {
+  const suit = card % 4;
+  return suit === 1 || suit === 2 ? "text-red-600" : "text-gray-900";
+}
+
+// ── Archetype data for drill selector ──
+interface ArchetypeEntry { id: ArchetypeId; label: string; category: ArchetypeCategory; }
+
+const ALL_ARCHETYPES: ArchetypeEntry[] = [
+  { id: "rfi_opening", label: "RFI Opening", category: "preflop" },
+  { id: "bb_defense_vs_rfi", label: "BB Defense", category: "preflop" },
+  { id: "three_bet_pots", label: "3-Bet Pots", category: "preflop" },
+  { id: "blind_vs_blind", label: "Blind vs Blind", category: "preflop" },
+  { id: "four_bet_five_bet", label: "4-Bet / 5-Bet", category: "preflop" },
+  { id: "ace_high_dry_rainbow", label: "Ace-High Dry", category: "flop_texture" },
+  { id: "kq_high_dry_rainbow", label: "K/Q-High Dry", category: "flop_texture" },
+  { id: "mid_low_dry_rainbow", label: "Mid/Low Dry", category: "flop_texture" },
+  { id: "paired_boards", label: "Paired Board", category: "flop_texture" },
+  { id: "two_tone_disconnected", label: "Two-Tone Disco", category: "flop_texture" },
+  { id: "two_tone_connected", label: "Two-Tone Conn", category: "flop_texture" },
+  { id: "monotone", label: "Monotone", category: "flop_texture" },
+  { id: "rainbow_connected", label: "Rainbow Conn", category: "flop_texture" },
+  { id: "cbet_sizing_frequency", label: "C-Bet Sizing", category: "postflop_principle" },
+  { id: "turn_barreling", label: "Turn Barreling", category: "postflop_principle" },
+  { id: "river_bluff_catching_mdf", label: "River MDF", category: "postflop_principle" },
+  { id: "thin_value_river", label: "Thin Value River", category: "postflop_principle" },
+  { id: "overbet_river", label: "Overbet River", category: "postflop_principle" },
+  { id: "three_bet_pot_postflop", label: "3-Bet Postflop", category: "postflop_principle" },
+  { id: "exploitative_overrides", label: "Exploitative", category: "postflop_principle" },
+];
+
+const CATEGORY_LABELS: Record<ArchetypeCategory, string> = {
+  preflop: "Preflop Archetypes",
+  flop_texture: "Flop Texture Archetypes",
+  postflop_principle: "Postflop Archetypes",
+};
+
+const HAND_COUNT_OPTIONS = [5, 10, 20];
+
+export type DrillMode = "learn" | "quiz";
+
+// ═══════════════════════════════════════════════════════
+// WORKSPACE SHELL
+// ═══════════════════════════════════════════════════════
+
+interface WorkspaceShellProps {
+  initialMode?: WorkspaceModeId;
+}
+
+const MODE_CONFIGS: Record<WorkspaceModeId, () => WorkspaceMode> = {
+  vision: visionMode,
+  drill: drillModeConfig,
+};
+
+export function WorkspaceShell({ initialMode = "vision" }: WorkspaceShellProps) {
+  const [modeId, setModeId] = useState<WorkspaceModeId>(initialMode);
+  const mode = useMemo(() => MODE_CONFIGS[modeId](), [modeId]);
+  const ws = useWorkspace(mode);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [drillGuideOpen, setDrillGuideOpen] = useState(false);
+  const [replayRecord, setReplayRecord] = useState<HandRecord | null>(null);
+  const [drillQuizMode, setDrillQuizMode] = useState<DrillMode>("quiz");
+
+  // Expose audit export to browser console
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    w.__exportHandHistory = ws.exportHandHistory;
+    w.__handHistory = ws.handHistory;
+  }, [ws.exportHandHistory, ws.handHistory]);
+
+  const heroStack = useMemo(() => {
+    if (!ws.gameState) return 0;
+    const hero = ws.seats.find((s) => s.isHero);
+    return hero?.stack ?? 0;
+  }, [ws.gameState, ws.seats]);
+
+  const selectedSeatAnalysis = useMemo(() => {
+    if (ws.selectedSeat === null) return undefined;
+    const oppReadResult = ws.analysisResults.get("opponent-read");
+    if (!oppReadResult) return undefined;
+    const value = oppReadResult.value as OpponentReadValue;
+    const seat = ws.seats.find((s) => s.seatIndex === ws.selectedSeat);
+    if (!seat) return undefined;
+    return value.opponents.find((o) => o.label === seat.label);
+  }, [ws.selectedSeat, ws.seats, ws.analysisResults]);
+
+  const selectedSeat = ws.selectedSeat !== null
+    ? ws.seats.find((s) => s.seatIndex === ws.selectedSeat)
+    : undefined;
+
+  const cardGridMode = mapTargetToMode(ws.selectionTarget);
+
+  const handleModeChange = useCallback(
+    (selMode: SelectionMode) => {
+      ws.setSelectionTarget(selMode === "hero" ? "hero" : selMode === "community" ? "community" : "hero");
+    },
+    [ws],
+  );
+
+  // ── Showdown result computation ──
+  const showdownResult = useMemo(() => {
+    if (!ws.isHandOver || !ws.gameState) return null;
+    const gs = ws.gameState;
+    const community = gs.communityCards;
+    const inHand = gs.players.filter((p) => p.status === "active" || p.status === "all_in");
+
+    if (inHand.length === 1) {
+      const winner = inHand[0];
+      const seat = ws.seats.find((s) => s.seatIndex === winner.seatIndex);
+      return {
+        type: "fold" as const,
+        winnerSeatIndex: winner.seatIndex,
+        winnerLabel: seat?.label ?? `Seat ${winner.seatIndex}`,
+        winnerIsHero: seat?.isHero ?? false,
+        potWon: gs.pot.total,
+      };
+    }
+
+    if (community.length < 5) return null;
+
+    const evaluations: {
+      seatIndex: number; label: string; isHero: boolean;
+      holeCards: CardIndex[]; evaluated: EvaluatedHand; status: string;
+    }[] = [];
+
+    for (const p of gs.players) {
+      if (p.holeCards.length < 2) continue;
+      const seat = ws.seats.find((s) => s.seatIndex === p.seatIndex);
+      if (!seat) continue;
+      const isInHand = p.status === "active" || p.status === "all_in";
+      const isRevealed = p.cardVisibility !== "hidden";
+      if (!isInHand && !isRevealed) continue;
+      try {
+        const evaluated = evaluateHand([...p.holeCards, ...community]);
+        evaluations.push({
+          seatIndex: p.seatIndex, label: seat.label, isHero: seat.isHero,
+          holeCards: p.holeCards, evaluated, status: p.status,
+        });
+      } catch { /* skip */ }
+    }
+
+    if (evaluations.length === 0) return null;
+
+    const inHandEvals = evaluations.filter((e) => e.status === "active" || e.status === "all_in");
+    let winnerEval = inHandEvals[0];
+    for (const e of inHandEvals.slice(1)) {
+      if (compareHandRanks(e.evaluated.rank, winnerEval.evaluated.rank) > 0) winnerEval = e;
+    }
+
+    return {
+      type: "showdown" as const,
+      winnerSeatIndex: winnerEval.seatIndex,
+      winnerLabel: winnerEval.label,
+      winnerIsHero: winnerEval.isHero,
+      winnerHand: winnerEval.evaluated.rank.name,
+      potWon: gs.pot.total,
+      evaluations,
+    };
+  }, [ws.isHandOver, ws.gameState, ws.seats]);
+
+  const handleSeatClick = (seatIndex: number) => {
+    const seat = ws.seats.find((s) => s.seatIndex === seatIndex);
+    if (seat?.isHero) return;
+    ws.setSelectedSeat(ws.selectedSeat === seatIndex ? null : seatIndex);
+  };
+
+  // ── Drill: show solution based on mode ──
+  const showDrillSolution = drillQuizMode === "learn" || ws.drillPhase === "acted";
+
+  // ── Layout ──
+  const isTwoColumn = mode.layout === "two-column";
+
+  return (
+    <div className="min-h-[calc(100vh-65px)] felt-bg">
+      <div className="max-w-[1600px] mx-auto px-4 py-4">
+        {/* ── Mode toggle ── */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+            {(["vision", "drill"] as const).map((id) => (
+              <button
+                key={id}
+                onClick={() => setModeId(id)}
+                className={cn(
+                  "px-4 py-1.5 text-xs font-medium transition-colors capitalize",
+                  id !== "vision" && "border-l border-[var(--border)]",
+                  modeId === id
+                    ? "bg-[var(--gold)]/15 text-[var(--gold)]"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
+                )}
+              >
+                {id}
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-[var(--muted-foreground)]">
+            {modeId === "vision" ? "Analyze hands with full control" : "Practice GTO decisions"}
+          </span>
+        </div>
+
+        <div className={cn(
+          "grid gap-4",
+          isTwoColumn
+            ? "grid-cols-1 lg:grid-cols-[2fr_auto_1fr]"
+            : "grid-cols-1 max-w-2xl mx-auto",
+        )}>
+
+          {/* ═══ LEFT COLUMN ═══ */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+            className="space-y-4"
+          >
+            {replayRecord ? (
+              <HandReplayer record={replayRecord} onClose={() => setReplayRecord(null)} />
+            ) : (
+            <>
+              {/* ── Drill: Archetype selector / active / summary (TOP in drill mode) ── */}
+              {mode.deal.archetypeSelector && (
+                <>
+                  {ws.drillPhase === "idle" && (
+                    <ArchetypeSelector
+                      onStart={ws.startDrill}
+                      drillMode={drillQuizMode}
+                      onModeChange={setDrillQuizMode}
+                      onOpenGuide={() => setDrillGuideOpen(true)}
+                    />
+                  )}
+
+                  {ws.drillPhase !== "idle" && ws.drillPhase !== "summary" && (
+                    <ActiveDrill ws={ws} onOpenGuide={() => setDrillGuideOpen(true)} />
+                  )}
+
+                  {ws.drillPhase === "summary" && (
+                    <DrillSummary ws={ws} onNewDrill={ws.resetDrill} />
+                  )}
+                </>
+              )}
+
+              {/* ── Player list ── */}
+              <PlayerList
+                seats={ws.seats}
+                selectedSeat={ws.selectedSeat}
+                onSeatClick={handleSeatClick}
+                bigBlind={ws.blinds.big}
+                activePlayerSeat={ws.activePlayerSeat}
+                decisions={ws.lastDecisions}
+              />
+
+              <>
+              {/* ── Opponent detail panel ── */}
+              <PanelWrapper enabled={mode.opponents.editable} hint="Switch to Vision mode to edit opponents">
+                <AnimatePresence>
+                  {selectedSeat && !selectedSeat.isHero && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                    >
+                      <OpponentDetail
+                        seat={selectedSeat}
+                        analysis={selectedSeatAnalysis}
+                        decision={ws.lastDecisions.get(selectedSeat.seatIndex)}
+                        onAssignProfile={(profile) => ws.assignProfile(selectedSeat.seatIndex, profile)}
+                        onClose={() => ws.setSelectedSeat(null)}
+                        onReveal={() => ws.revealVillainCards(selectedSeat.seatIndex)}
+                        onHide={() => ws.hideVillainCards(selectedSeat.seatIndex)}
+                        onStartCardAssign={() => ws.setSelectionTarget(`villain-${selectedSeat.seatIndex}`)}
+                        selectionTarget={ws.selectionTarget}
+                        villainCardBuffer={ws.villainCardBuffer.get(selectedSeat.seatIndex)}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </PanelWrapper>
+
+              {/* ── Game setup panel (vision mode, before deal) ── */}
+              <PanelWrapper enabled={mode.setup.enabled} hint="Switch to Vision mode for hand setup">
+                {!ws.isHandActive && !ws.isHandOver && (
+                  <GameSetupPanel
+                    blinds={ws.blinds}
+                    startingStack={ws.startingStack}
+                    onBlindsChange={ws.setBlinds}
+                    onStackChange={ws.setStartingStack}
+                    onStart={ws.startHand}
+                  />
+                )}
+              </PanelWrapper>
+
+              {/* ── Hand-over result (vision post-hand) ── */}
+              <PanelWrapper enabled={mode.postHand.dealNext || mode.postHand.revealAll} hint="Finish hand to see results">
+                {!ws.isHandActive && ws.isHandOver && (
+                  <HandOverPanel
+                    ws={ws}
+                    mode={mode}
+                    showdownResult={showdownResult}
+                    onReplay={(record) => setReplayRecord(record)}
+                  />
+                )}
+              </PanelWrapper>
+
+              {/* ── Board display ── */}
+              <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+                {/* Board header */}
+                <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--border)] bg-[var(--muted)]/20">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      {(["preflop", "flop", "turn", "river"] as const).map((s) => (
+                        <span
+                          key={s}
+                          className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full transition-colors",
+                            s === ws.street
+                              ? "bg-[var(--felt)] text-[var(--gold)] border border-[var(--gold-dim)]/40"
+                              : "text-[var(--muted-foreground)]/50",
+                          )}
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="h-4 w-px bg-[var(--border)]" />
+                    <PanelWrapper enabled={mode.setup.enabled}>
+                      <TableControls
+                        numPlayers={ws.numPlayers}
+                        onNumPlayersChange={ws.setNumPlayers}
+                        onRotateDealer={() => ws.moveDealer(ws.dealerSeatIndex + 1)}
+                        onReset={ws.newHand}
+                        isHandActive={ws.isHandActive}
+                      />
+                    </PanelWrapper>
+                  </div>
+                  <button
+                    onClick={() => mode.id === "drill" ? setDrillGuideOpen(true) : setGuideOpen(true)}
+                    className="w-7 h-7 rounded-full border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)]/40 transition-colors flex items-center justify-center text-xs font-bold shrink-0"
+                    title="How to use"
+                  >
+                    ?
+                  </button>
+                </div>
+
+                <div className="p-4 relative">
+                  {ws.isHandActive && ws.pot.total > 0 && (
+                    <div className="absolute top-2 left-3">
+                      <PotDisplay pot={ws.pot} blinds={ws.blinds} />
+                    </div>
+                  )}
+                  <BoardDisplay
+                    heroCards={ws.heroCards}
+                    communityCards={ws.communityCards}
+                    onCardClick={() => {}}
+                  />
+
+                  {/* Action buttons — mode selects game vs GTO style */}
+                  {ws.isHeroTurn && ws.legalActions && (
+                    <div className="mt-4">
+                      <ActionPanel
+                        legalActions={ws.legalActions}
+                        pot={ws.pot}
+                        heroStack={heroStack}
+                        blinds={ws.blinds}
+                        onAct={ws.act}
+                        gtoMode={
+                          mode.action.style === "gto" &&
+                          ws.drillPhase === "ready" &&
+                          ws.drillSolution
+                            ? {
+                                availableActions: ws.drillSolution.availableActions,
+                                onAct: ws.drillAct,
+                              }
+                            : undefined
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              </>
+
+              {/* ── Drill: Solution display ── */}
+              {showDrillSolution && ws.drillSolution && (
+                <SolutionDisplay
+                  solution={ws.drillSolution}
+                  userAction={ws.drillCurrentScore?.userAction}
+                  score={ws.drillCurrentScore}
+                />
+              )}
+
+              {/* ── Drill: Score feedback + next hand ── */}
+              {ws.drillPhase === "acted" && ws.drillCurrentScore && !showDrillSolution && (
+                <ScoreDisplay
+                  score={ws.drillCurrentScore}
+                  onNextHand={ws.drillNextHand}
+                  isLastHand={ws.drillHandsPlayed >= ws.drillHandsTarget}
+                />
+              )}
+              {ws.drillPhase === "acted" && (
+                <button
+                  onClick={ws.drillNextHand}
+                  className="w-full py-2 rounded-lg border border-[var(--border)] text-sm font-medium hover:bg-[var(--accent)] transition-colors"
+                >
+                  {ws.drillHandsPlayed >= ws.drillHandsTarget ? "View Summary" : "Next Hand"}
+                </button>
+              )}
+
+              {/* ── Coaching panel ── */}
+              <CoachingSection results={ws.analysisResults} />
+
+              {/* ── Card selector (52-card grid) ── */}
+              <PanelWrapper enabled={mode.cards.heroEditable || mode.cards.communityEditable} hint="Switch to Vision mode to edit cards">
+                <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3">
+                  <CardSelector
+                    cards={ws.deckVisionCards}
+                    usedCards={ws.allUsedCards}
+                    selectionMode={cardGridMode}
+                    onCardClick={ws.toggleCard}
+                    onModeChange={handleModeChange}
+                    readOnly={!ws.isHandActive && !ws.isHandOver}
+                  />
+                </div>
+              </PanelWrapper>
+
+              {/* Drill preview removed — mode toggle at top replaces it */}
+            </>
+            )}
+          </motion.div>
+
+          {/* ═══ CENTER DIVIDER ═══ */}
+          {isTwoColumn && <div className="hidden lg:block w-px bg-[var(--border)]" />}
+
+          {/* ═══ RIGHT COLUMN (analysis) ═══ */}
+          {isTwoColumn && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-4"
+            >
+              <PanelWrapper enabled={mode.analysis.enabled} hint="Switch to Vision mode for analysis">
+                {/* Analysis header */}
+                <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--gold-dim)] shrink-0">
+                      Analysis
+                    </h2>
+                    <div className="flex items-center gap-1.5">
+                      <PanelWrapper enabled={mode.opponents.randomizable}>
+                        <button
+                          onClick={ws.randomizeProfiles}
+                          className="text-[10px] px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)]/40 transition-colors font-medium"
+                          title="Randomize all villain profiles"
+                        >
+                          Randomize
+                        </button>
+                      </PanelWrapper>
+                      <button
+                        onClick={() => setGuideOpen(true)}
+                        className="w-6 h-6 rounded-full border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)]/40 transition-colors flex items-center justify-center text-[10px] font-bold shrink-0"
+                        title="How to use"
+                      >
+                        ?
+                      </button>
+                    </div>
+                  </div>
+                  <PanelWrapper enabled={mode.analysis.lensSelector}>
+                    <div className="px-3 pb-2.5">
+                      <LensSelector
+                        availableLenses={ws.availableLenses}
+                        activeLensIds={ws.activeLensIds}
+                        onToggle={ws.toggleLens}
+                      />
+                    </div>
+                  </PanelWrapper>
+                </div>
+
+                {ws.heroCards.length < 2 ? (
+                  <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-6 text-center mt-4">
+                    <p className="text-lg font-medium text-[var(--muted-foreground)]">
+                      Deal a hand to begin
+                    </p>
+                    <p className="text-sm text-[var(--muted-foreground)]/60 mt-1">
+                      Configure settings above and click Deal Hand
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 mt-4">
+                    <AnalysisPanels ws={ws} />
+                  </div>
+                )}
+              </PanelWrapper>
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* Guide drawers */}
+      <GuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
+      <DrillGuideDrawer open={drillGuideOpen} onClose={() => setDrillGuideOpen(false)} />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// SUB-COMPONENTS (extracted for readability)
+// ═══════════════════════════════════════════════════════
+
+/** Coaching panel — extracted to avoid inline IIFE */
+function CoachingSection({ results }: { results: Map<string, import("../../../convex/lib/types/analysis").AnalysisResult> }) {
+  const coachingResult = results.get("coaching");
+  if (!coachingResult || coachingResult.visuals.length === 0) return null;
+  const coachingVisual = coachingResult.visuals.find((v) => v.type === "coaching");
+  if (!coachingVisual) return null;
+  const { advices, consensus } = coachingVisual.data as {
+    advices: CoachingAdvice[];
+    consensus?: CoachingValue["consensus"];
+  };
+  if (!advices || advices.length === 0) return null;
+
+  return (
+    <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+      <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)]">Coaching</h3>
+      </div>
+      <div className="px-4 py-3">
+        <CoachingPanel advices={advices} consensus={consensus} />
+      </div>
+    </div>
+  );
+}
+
+/** Analysis lens panels */
+function AnalysisPanels({ ws }: { ws: WorkspaceState }) {
+  return (
+    <>
+      {ws.activeLensIds.map((lensId) => {
+        if (lensId === "coaching") return null;
+        const lensName = ws.availableLenses.find((l) => l.id === lensId)?.name ?? lensId;
+        const result = ws.analysisResults.get(lensId);
+        const isComputing = ws.heavyComputing.has(lensId);
+
+        if (isComputing && !result) {
+          return (
+            <motion.div key={lensId} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+              <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)]">{lensName}</h3>
+              </div>
+              <div className="p-4 flex items-center gap-3">
+                <div className="h-4 w-4 rounded-full border-2 border-[var(--gold-dim)] border-t-transparent animate-spin" />
+                <span className="text-sm text-[var(--muted-foreground)]">Calculating...</span>
+              </div>
+            </motion.div>
+          );
+        }
+
+        if (!result) return null;
+        if (result.visuals.length === 0 && !result.explanation.summary) return null;
+
+        return (
+          <motion.div key={lensId} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+            <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)]">{lensName}</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <VisualRenderer results={new Map([[lensId, result]])} street={ws.street} />
+              {!(lensId === "coaching" && result.visuals.length > 0) && (
+                <div className="border-t border-[var(--border)] pt-3">
+                  <ExplanationTree node={result.explanation} defaultOpen={true} />
+                </div>
+              )}
+            </div>
+          </motion.div>
+        );
+      })}
+    </>
+  );
+}
+
+/** Hand-over panel with showdown results and action buttons */
+function HandOverPanel({
+  ws,
+  mode,
+  showdownResult,
+  onReplay,
+}: {
+  ws: WorkspaceState;
+  mode: WorkspaceMode;
+  showdownResult: ReturnType<typeof Object> | null;
+  onReplay: (record: HandRecord) => void;
+}) {
+  // Type the showdown result properly
+  const result = showdownResult as {
+    type: "fold" | "showdown";
+    winnerSeatIndex: number;
+    winnerLabel: string;
+    winnerIsHero: boolean;
+    potWon: number;
+    winnerHand?: string;
+    evaluations?: {
+      seatIndex: number; label: string; isHero: boolean;
+      holeCards: CardIndex[]; evaluated: EvaluatedHand; status: string;
+    }[];
+  } | null;
+
+  return (
+    <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+      {/* Winner banner */}
+      {result && (
+        <div className={cn(
+          "px-4 py-3 text-center border-b border-[var(--border)]",
+          result.winnerIsHero ? "bg-[var(--gold)]/15" : "bg-red-500/10",
+        )}>
+          <div className="flex items-center justify-center gap-2">
+            {result.winnerIsHero ? <TrophyIcon className="text-[var(--gold)]" /> : <DefeatIcon className="text-red-400" />}
+            <span className={cn(
+              "text-sm font-bold uppercase tracking-wider",
+              result.winnerIsHero ? "text-[var(--gold)]" : "text-red-400",
+            )}>
+              {result.winnerIsHero ? "You Win!" : `${result.winnerLabel} Wins`}
+            </span>
+            {result.winnerIsHero ? <TrophyIcon className="text-[var(--gold)]" /> : <DefeatIcon className="text-red-400" />}
+          </div>
+          <p className="text-xs text-[var(--muted-foreground)] mt-1">
+            {result.type === "fold" ? "All opponents folded" : result.winnerHand}
+            {" · "}{(result.potWon / ws.blinds.big).toFixed(1)} BB pot
+          </p>
+        </div>
+      )}
+
+      {!result && (
+        <div className="px-4 py-3 text-center border-b border-[var(--border)]">
+          <p className="text-sm font-bold text-[var(--gold)] uppercase tracking-wider">Hand Complete</p>
+          <p className="text-xs text-[var(--muted-foreground)] mt-1">
+            Final pot: {(ws.pot.total / ws.blinds.big).toFixed(1)} BB
+          </p>
+        </div>
+      )}
+
+      {/* Evaluations list */}
+      {result?.type === "showdown" && result.evaluations && result.evaluations.length > 0 && (
+        <div className="px-4 py-3 space-y-2">
+          {result.evaluations
+            .sort((a, b) => compareHandRanks(b.evaluated.rank, a.evaluated.rank))
+            .map((e) => {
+              const isWinner = e.seatIndex === result.winnerSeatIndex;
+              const isFolded = e.status === "folded";
+              return (
+                <div key={e.seatIndex} className={cn(
+                  "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors",
+                  isWinner ? "bg-[var(--gold)]/10 ring-1 ring-[var(--gold)]/40" : "bg-[var(--muted)]/20",
+                )}>
+                  <span className="w-4 flex items-center justify-center">
+                    {isWinner && !isFolded && <CrownIcon className="text-[var(--gold)]" />}
+                  </span>
+                  <span className={cn("font-semibold min-w-[40px]", e.isHero ? "text-[var(--gold)]" : "text-[var(--foreground)]")}>
+                    {e.label}
+                  </span>
+                  <span className="inline-flex gap-1">
+                    {e.holeCards.map((c) => (
+                      <span key={c} className={`font-mono font-bold px-1.5 py-0.5 rounded bg-white/90 ${suitColor(c)}`}>
+                        {cardLabel(c)}
+                      </span>
+                    ))}
+                  </span>
+                  <span className={cn("text-[11px] font-medium", isWinner ? "text-[var(--gold)]" : "text-[var(--muted-foreground)]")}>
+                    {e.evaluated.rank.name}
+                  </span>
+                  {isFolded && <span className="text-[9px] text-[var(--muted-foreground)] ml-auto">folded</span>}
+                </div>
+              );
+            })}
+        </div>
+      )}
+
+      {result?.type === "fold" && (
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[var(--gold)]/10 ring-1 ring-[var(--gold)]/40 text-xs">
+            <CrownIcon className="text-[var(--gold)]" />
+            <span className={cn("font-semibold", result.winnerIsHero ? "text-[var(--gold)]" : "text-[var(--foreground)]")}>
+              {result.winnerLabel}
+            </span>
+            <span className="text-[var(--muted-foreground)]">
+              wins {(result.potWon / ws.blinds.big).toFixed(1)} BB uncontested
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div className="px-4 py-3 flex items-center justify-center gap-2 border-t border-[var(--border)]">
+        {mode.postHand.revealAll && (
+          <button onClick={ws.revealAllVillains}
+            className="text-[10px] px-3 py-1.5 rounded border border-[var(--gold-dim)]/30 text-[var(--gold-dim)] hover:bg-[var(--gold)]/10 transition-colors">
+            Reveal All
+          </button>
+        )}
+        {mode.postHand.replay && ws.handHistory.length > 0 && (
+          <button onClick={() => onReplay(ws.handHistory[ws.handHistory.length - 1])}
+            className="text-[10px] px-3 py-1.5 rounded border border-blue-400/30 text-blue-400 hover:bg-blue-400/10 transition-colors">
+            Replay
+          </button>
+        )}
+        {mode.postHand.dealNext && (
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={ws.startNextHand}
+            className="px-5 py-2 rounded-lg bg-[var(--felt)] text-[var(--gold)] font-semibold text-sm border border-[var(--gold-dim)]/40 hover:border-[var(--gold)]/60 transition-colors">
+            Deal Next Hand
+          </motion.button>
+        )}
+        {mode.postHand.dealNext && (
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={() => { ws.newHand(); ws.startHand(); }}
+            className="px-5 py-2 rounded-lg bg-[var(--card)] text-[var(--muted-foreground)] text-sm border border-[var(--border)] hover:border-[var(--gold-dim)]/40 hover:text-[var(--gold-dim)] transition-colors">
+            Deal Fresh
+          </motion.button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Archetype selector for drill mode */
+function ArchetypeSelector({
+  onStart,
+  drillMode,
+  onModeChange,
+  onOpenGuide,
+}: {
+  onStart: (id: ArchetypeId, count?: number) => void;
+  drillMode: DrillMode;
+  onModeChange: (mode: DrillMode) => void;
+  onOpenGuide: () => void;
+}) {
+  const [selected, setSelected] = useState<ArchetypeId | null>(null);
+  const [handCount, setHandCount] = useState(10);
+  const categories: ArchetypeCategory[] = ["preflop", "flop_texture", "postflop_principle"];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--foreground)]">GTO Drill Mode</h2>
+          <p className="text-xs text-[var(--muted-foreground)] mt-1">
+            Practice GTO decisions against solver-computed archetypes. Select an archetype to begin.
+          </p>
+        </div>
+        <button onClick={onOpenGuide}
+          className="w-7 h-7 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors shrink-0"
+          title="How to use Drill Mode">
+          <span className="text-xs font-bold">?</span>
+        </button>
+      </div>
+
+      {categories.map((cat) => (
+        <div key={cat} className="space-y-2">
+          <h3 className="text-[11px] font-medium uppercase tracking-widest text-[var(--muted-foreground)]">
+            {CATEGORY_LABELS[cat]}
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {ALL_ARCHETYPES.filter((a) => a.category === cat).map((arch) => {
+              const available = hasTable(arch.id);
+              const isSelected = selected === arch.id;
+              return (
+                <button key={arch.id} onClick={() => available && setSelected(arch.id)} disabled={!available}
+                  className={`text-left px-3 py-2 rounded-lg border text-xs transition-all
+                    ${isSelected ? "border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]"
+                      : available ? "border-[var(--border)] text-[var(--foreground)] hover:border-[var(--gold-dim)]"
+                      : "border-[var(--border)]/40 text-[var(--muted-foreground)]/40 cursor-not-allowed"}`}>
+                  {arch.label}
+                  {!available && <span className="block text-[9px] mt-0.5 opacity-50">Coming soon</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-3 pt-2 flex-wrap">
+        <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+          <button onClick={() => onModeChange("learn")}
+            className={`px-3 py-1 text-xs transition-colors ${drillMode === "learn" ? "bg-[var(--gold)]/15 text-[var(--gold)] font-medium" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
+            Learn
+          </button>
+          <button onClick={() => onModeChange("quiz")}
+            className={`px-3 py-1 text-xs transition-colors border-l border-[var(--border)] ${drillMode === "quiz" ? "bg-[var(--gold)]/15 text-[var(--gold)] font-medium" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
+            Quiz
+          </button>
+        </div>
+        <span className="text-xs text-[var(--muted-foreground)]">Hands:</span>
+        <div className="flex gap-1">
+          {HAND_COUNT_OPTIONS.map((n) => (
+            <button key={n} onClick={() => setHandCount(n)}
+              className={`px-3 py-1 rounded text-xs border transition-colors ${handCount === n ? "border-[var(--gold)] text-[var(--gold)]" : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--gold-dim)]"}`}>
+              {n}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1" />
+        <button disabled={!selected} onClick={() => selected && onStart(selected, handCount)}
+          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${selected ? "bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90 cursor-pointer" : "bg-[var(--muted)] text-[var(--muted-foreground)] cursor-not-allowed"}`}>
+          Start Drill
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Active drill with progress, game viewer, solution */
+function ActiveDrill({
+  ws,
+  onOpenGuide,
+}: {
+  ws: WorkspaceState;
+  onOpenGuide: () => void;
+}) {
+  const progressPct = ws.drillHandsTarget > 0
+    ? (ws.drillHandsPlayed / ws.drillHandsTarget) * 100 : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
+          <span>Hand {Math.min(ws.drillHandsPlayed + 1, ws.drillHandsTarget)} of {ws.drillHandsTarget}</span>
+          <div className="flex items-center gap-2">
+            <span>{ws.drillProgress.optimal}W {ws.drillProgress.acceptable}A {ws.drillProgress.mistake}M {ws.drillProgress.blunder}B</span>
+            <button onClick={ws.resetDrill}
+              className="px-2 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:text-red-400 hover:border-red-400/40 transition-colors"
+              title="Quit drill">
+              <span className="text-[9px] font-medium">Quit</span>
+            </button>
+            <button onClick={onOpenGuide}
+              className="w-5 h-5 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors"
+              title="How to use Drill Mode">
+              <span className="text-[9px] font-bold">?</span>
+            </button>
+          </div>
+        </div>
+        <div className="h-1.5 rounded-full bg-[var(--muted)]/30 overflow-hidden">
+          <motion.div className="h-full bg-[var(--gold)] rounded-full"
+            initial={{ width: 0 }} animate={{ width: `${progressPct}%` }} transition={{ duration: 0.3 }} />
+        </div>
+      </div>
+
+      {ws.drillCurrentDeal && (
+        <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
+          <span className="px-2 py-0.5 rounded bg-[var(--muted)]/20 border border-[var(--border)]">
+            {ws.drillCurrentDeal.archetype.description}
+          </span>
+          <span>{ws.drillCurrentDeal.isInPosition ? "IP" : "OOP"}</span>
+          <span>{ws.drillCurrentDeal.handCategory.category.replace(/_/g, " ")}</span>
+        </div>
+      )}
+
+      {ws.drillPhase === "dealing" && (
+        <div className="text-center text-xs text-[var(--muted-foreground)] py-4">Dealing...</div>
+      )}
+    </div>
+  );
+}
+
+/** Drill summary screen */
+function DrillSummary({ ws, onNewDrill }: { ws: WorkspaceState; onNewDrill: () => void }) {
+  const { drillProgress: progress, drillScores: scores } = ws;
+  const total = scores.length;
+  const avgEvLoss = total > 0 ? scores.reduce((sum, s) => sum + s.evLoss, 0) / total : 0;
+
+  const verdicts = [
+    { key: "Optimal", count: progress.optimal, color: "text-green-400" },
+    { key: "Acceptable", count: progress.acceptable, color: "text-yellow-400" },
+    { key: "Mistake", count: progress.mistake, color: "text-orange-400" },
+    { key: "Blunder", count: progress.blunder, color: "text-red-400" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-bold text-[var(--foreground)]">Drill Complete</h2>
+        <p className="text-xs text-[var(--muted-foreground)] mt-1">
+          {total} hands played — average EV loss: {avgEvLoss.toFixed(1)} BB
+        </p>
+      </div>
+      <div className="grid grid-cols-4 gap-3">
+        {verdicts.map((v) => (
+          <div key={v.key} className="text-center rounded-lg border border-[var(--border)] p-3">
+            <div className={`text-2xl font-bold ${v.color}`}>{v.count}</div>
+            <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{v.key}</div>
+          </div>
+        ))}
+      </div>
+      {total > 0 && (
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase tracking-widest text-[var(--muted-foreground)]">Accuracy</span>
+          <div className="h-3 rounded-full overflow-hidden flex">
+            {progress.optimal > 0 && <div className="bg-green-500 h-full" style={{ width: `${(progress.optimal / total) * 100}%` }} />}
+            {progress.acceptable > 0 && <div className="bg-yellow-500 h-full" style={{ width: `${(progress.acceptable / total) * 100}%` }} />}
+            {progress.mistake > 0 && <div className="bg-orange-500 h-full" style={{ width: `${(progress.mistake / total) * 100}%` }} />}
+            {progress.blunder > 0 && <div className="bg-red-500 h-full" style={{ width: `${(progress.blunder / total) * 100}%` }} />}
+          </div>
+          <div className="text-xs text-[var(--muted-foreground)]">
+            {((progress.optimal + progress.acceptable) / total * 100).toFixed(0)}% GTO-aligned
+          </div>
+        </div>
+      )}
+      <button onClick={onNewDrill}
+        className="w-full py-2.5 rounded-lg bg-[var(--gold)] text-black font-semibold text-sm hover:bg-[var(--gold)]/90 transition-colors">
+        New Drill
+      </button>
+    </div>
+  );
+}

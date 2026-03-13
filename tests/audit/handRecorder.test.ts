@@ -166,8 +166,8 @@ describe("HandRecorder", () => {
     }
   });
 
-  it("captures structured reasoning metrics from range-aware/GTO engines", () => {
-    // Run multiple seeds to find one where range-aware/GTO engine produces reasoning
+  it("captures structured reasoning metrics from the unified engine", () => {
+    // Run multiple seeds to find one where modifiedGtoEngine produces reasoning
     let found = false;
     for (let seed = 1; seed <= 20 && !found; seed++) {
       const { recorder } = playHandWithRecorder(seed);
@@ -176,9 +176,9 @@ describe("HandRecorder", () => {
       for (const event of record.events) {
         if (!event.decision?.reasoning) continue;
         const r = event.decision.reasoning;
-        // range-aware and GTO engines populate these
-        if (r.adjustedContinuePct !== undefined) {
-          expect(typeof r.adjustedContinuePct).toBe("number");
+        // modifiedGtoEngine populates handStrength
+        if (r.handStrength !== undefined) {
+          expect(typeof r.handStrength).toBe("number");
           found = true;
           break;
         }

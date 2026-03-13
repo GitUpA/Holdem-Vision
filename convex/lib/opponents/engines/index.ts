@@ -1,7 +1,7 @@
 /**
  * Decision Engines barrel export.
  *
- * Importing this module ensures all built-in engines are registered.
+ * Importing this module ensures the unified engine is registered.
  */
 export type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
 export {
@@ -13,8 +13,5 @@ export {
 
 export { detectDraws, type DrawInfo, type DrawType } from "./drawDetector";
 
-// ─── Import engines to trigger self-registration ───
-export { basicEngine } from "./basicEngine";
-export { rangeAwareEngine } from "./rangeAwareEngine";
-export { gtoEngine } from "./gtoEngine";
-export { lookupGtoEngine } from "./lookupGtoEngine";
+// ─── Import engine to trigger self-registration ───
+export { modifiedGtoEngine } from "./modifiedGtoEngine";

@@ -35,7 +35,7 @@ export default function RootLayout({
                   href="/vision"
                   className="text-sm px-3 py-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
                 >
-                  Vision
+                  Play
                 </Link>
               </nav>
             </div>

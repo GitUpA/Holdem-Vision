@@ -13,7 +13,7 @@
  * In learn mode it's always visible. In quiz mode it appears after acting.
  */
 import { motion } from "framer-motion";
-import type { SpotSolution } from "@/hooks/use-drill-session";
+import type { SpotSolution } from "@/hooks/use-workspace";
 import type { ActionScore } from "../../../convex/lib/gto/evScoring";
 import type { GtoAction } from "../../../convex/lib/gto/tables/types";
 import { gtoActionLabel } from "../../../convex/lib/gto/actionMapping";

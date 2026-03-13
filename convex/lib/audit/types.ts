@@ -100,28 +100,35 @@ export interface DecisionSnapshot {
 
 /**
  * Structured reasoning data extracted from EngineDecision.reasoning.
- * These fields come from rangeAwareEngine and gtoEngine.
- * basicEngine doesn't populate most of these.
+ *
+ * Captures the full modifiedGtoEngine output for modifier tuning validation.
+ * Fields marked "debug" can be moved to verbose-only once modifiers are dialed in.
  */
 export interface DecisionReasoning {
+  // ── Context factors ──
   handStrength?: number;
-  potOdds?: number;
-  foldLikelihood?: number;
-  spr?: number;
+  handDescription?: string;
   boardWetness?: number;
-  mdf?: number;
-  adjustedContinuePct?: number;
-  adjustedRaisePct?: number;
-  adjustedBluffFrequency?: number;
-  isBluff?: boolean;
-  drawInfo?: {
-    bestDrawType: string;
-    totalOuts: number;
-    hasFlushDraw: boolean;
-    hasStraightDraw: boolean;
-    isCombo: boolean;
-  };
-  position?: string;
+  potOdds?: number;
+  foldEquity?: number;
+  spr?: number;
+  isInPosition?: boolean;
+
+  // ── GTO base ──
+  gtoSource?: "solver" | "heuristic";
+  archetypeId?: string;
+  archetypeConfidence?: number;
+  handCategory?: string;
+  /** GTO solver/heuristic frequencies BEFORE modifier */
+  gtoBaseFrequencies?: Record<string, number>;
+
+  // ── Modifier output ──
+  profileId?: string;
+  modifierIntensity?: number;
+  effectiveFoldScale?: number;
+  effectiveAggressionScale?: number;
+  /** Final frequencies AFTER modifier (what the engine sampled from) */
+  frequencies?: Record<string, number>;
 }
 
 // ═══════════════════════════════════════════════════════

@@ -249,30 +249,45 @@ export class HandRecorder {
 
     const r: DecisionReasoning = {};
 
+    // Context factors
     if (typeof raw.handStrength === "number") r.handStrength = raw.handStrength;
-    if (typeof raw.potOdds === "number") r.potOdds = raw.potOdds;
-    if (typeof raw.foldLikelihood === "number") r.foldLikelihood = raw.foldLikelihood;
-    if (typeof raw.spr === "number") r.spr = raw.spr;
+    if (typeof raw.handDescription === "string") r.handDescription = raw.handDescription;
     if (typeof raw.boardWetness === "number") r.boardWetness = raw.boardWetness;
-    if (typeof raw.mdf === "number") r.mdf = raw.mdf;
-    if (typeof raw.adjustedContinuePct === "number") r.adjustedContinuePct = raw.adjustedContinuePct;
-    if (typeof raw.adjustedRaisePct === "number") r.adjustedRaisePct = raw.adjustedRaisePct;
-    if (typeof raw.adjustedBluffFrequency === "number") r.adjustedBluffFrequency = raw.adjustedBluffFrequency;
-    if (typeof raw.isBluff === "boolean") r.isBluff = raw.isBluff;
-    if (typeof raw.position === "string") r.position = raw.position;
+    if (typeof raw.potOdds === "number") r.potOdds = raw.potOdds;
+    if (typeof raw.foldEquity === "number") r.foldEquity = raw.foldEquity;
+    if (typeof raw.spr === "number") r.spr = raw.spr;
+    if (typeof raw.isInPosition === "boolean") r.isInPosition = raw.isInPosition;
 
-    if (raw.drawInfo && typeof raw.drawInfo === "object") {
-      const d = raw.drawInfo as Record<string, unknown>;
-      r.drawInfo = {
-        bestDrawType: String(d.bestDrawType ?? "none"),
-        totalOuts: Number(d.totalOuts ?? 0),
-        hasFlushDraw: Boolean(d.hasFlushDraw),
-        hasStraightDraw: Boolean(d.hasStraightDraw),
-        isCombo: Boolean(d.isCombo),
-      };
+    // GTO base
+    if (typeof raw.gtoSource === "string") r.gtoSource = raw.gtoSource as "solver" | "heuristic";
+    if (typeof raw.archetypeId === "string") r.archetypeId = raw.archetypeId;
+    if (typeof raw.archetypeConfidence === "number") r.archetypeConfidence = raw.archetypeConfidence;
+    if (typeof raw.handCategory === "string") r.handCategory = raw.handCategory;
+    if (raw.gtoBaseFrequencies && typeof raw.gtoBaseFrequencies === "object") {
+      r.gtoBaseFrequencies = this.extractFreqMap(raw.gtoBaseFrequencies as Record<string, unknown>);
+    }
+
+    // Modifier output
+    if (typeof raw.profileId === "string") r.profileId = raw.profileId;
+    if (typeof raw.modifierIntensity === "number") r.modifierIntensity = raw.modifierIntensity;
+    if (typeof raw.effectiveFoldScale === "number") r.effectiveFoldScale = raw.effectiveFoldScale;
+    if (typeof raw.effectiveAggressionScale === "number") r.effectiveAggressionScale = raw.effectiveAggressionScale;
+    if (raw.frequencies && typeof raw.frequencies === "object") {
+      r.frequencies = this.extractFreqMap(raw.frequencies as Record<string, unknown>);
     }
 
     return r;
+  }
+
+  /** Extract a frequency map, keeping only non-zero number values. */
+  private extractFreqMap(raw: Record<string, unknown>): Record<string, number> {
+    const result: Record<string, number> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      if (typeof value === "number" && value > 0) {
+        result[key] = Math.round(value * 1000) / 1000; // 3 decimal places
+      }
+    }
+    return result;
   }
 
   private extractOutcome(gameState: GameState): HandOutcome {

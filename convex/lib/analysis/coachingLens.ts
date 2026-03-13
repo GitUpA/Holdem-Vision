@@ -30,20 +30,35 @@ import {
   lookupFrequencies,
   hasTable,
 } from "../gto/tables";
+import type { ActionFrequencies, ActionFrequencyBands, GtoAction } from "../gto/tables/types";
+import type { ArchetypeAccuracy } from "../gto/tables/types";
+import type { AccuracyImpact } from "../gto/tables/types";
 import {
   classifyArchetype,
   contextFromGameState,
 } from "../gto/archetypeClassifier";
 import { categorizeHand } from "../gto/handCategorizer";
+import { explainArchetype } from "../gto/archetypeExplainer";
 
-// Ensure engines are registered
-import "../opponents/engines/basicEngine";
-import "../opponents/engines/rangeAwareEngine";
-import "../opponents/engines/lookupGtoEngine";
+// Ensure engine is registered
+import "../opponents/engines/modifiedGtoEngine";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════
+
+/** Solver frequency data when available — same shape as SpotSolution */
+export interface CoachingSolverData {
+  frequencies: ActionFrequencies;
+  optimalAction: GtoAction;
+  optimalFrequency: number;
+  availableActions: GtoAction[];
+  isExactMatch: boolean;
+  resolvedCategory: string;
+  bands?: ActionFrequencyBands;
+  archetypeAccuracy?: ArchetypeAccuracy;
+  accuracyImpact?: AccuracyImpact;
+}
 
 export interface CoachingAdvice {
   profileName: string;
@@ -52,6 +67,8 @@ export interface CoachingAdvice {
   actionType: ActionType;
   amount?: number;
   explanation: ExplanationNode;
+  /** Raw solver data — present when GTO profile uses lookup tables */
+  solverData?: CoachingSolverData;
 }
 
 export interface CoachingValue {
@@ -249,56 +266,48 @@ function tryGtoSolverLookup(
   const actionType = mapGtoActionToActionType(optimalGtoAction, legal);
   const amount = mapGtoActionToAmount(optimalGtoAction, legal, gameState.pot.total);
 
-  // Format frequencies for explanation
-  const freqChildren: ExplanationNode[] = Object.entries(lookup.frequencies)
-    .filter(([, v]) => v && v > 0.01)
-    .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
-    .map(([action, freq]) => ({
-      summary: `${action}: ${((freq ?? 0) * 100).toFixed(0)}%`,
-      sentiment: "neutral" as const,
-      tags: ["frequency"],
-    }));
+  // Use shared explainer — same rich explanation for coaching and drill
+  const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition);
 
-  const explanation: ExplanationNode = {
-    summary: `${archetype.description} — ${handCat.description}: ${actionType}${amount !== undefined ? ` ${amount}` : ""}`,
-    sentiment: actionType === "fold"
-      ? "negative"
-      : (actionType === "raise" || actionType === "bet")
-        ? "positive"
-        : "neutral",
-    children: [
-      {
-        summary: `Hand: ${handCat.description} (${handCat.category})`,
-        sentiment: handCat.relativeStrength > 0.6 ? "positive" : handCat.relativeStrength > 0.3 ? "neutral" : "negative",
-        tags: ["hand-category"],
-      },
-      {
-        summary: `Archetype: ${archetype.description} (${(archetype.confidence * 100).toFixed(0)}% confidence)`,
-        sentiment: "neutral",
-        tags: ["archetype"],
-      },
-      {
-        summary: `GTO frequencies (solver data):`,
-        children: freqChildren,
-        sentiment: "neutral",
-        tags: ["frequencies", "solver"],
-      },
-      ...(lookup.isExact ? [] : [{
-        summary: `Note: closest category match (original: ${handCat.category})`,
-        sentiment: "neutral" as const,
-        tags: ["fallback-category"],
-      }]),
-    ],
-    tags: ["lookup-gto", "solver"],
+  // Remap solver frequencies to match what's actually legal
+  // (e.g., solver "check" → "call" when facing a bet)
+  const remappedFreqs = remapFrequenciesToLegal(lookup.frequencies, legal);
+  const remappedBands = lookup.bands
+    ? remapBandsToLegal(lookup.bands, legal)
+    : undefined;
+
+  // Recompute optimal after remapping
+  let remappedOptimalAction = "check";
+  let remappedOptimalFreq = 0;
+  for (const [action, freq] of Object.entries(remappedFreqs)) {
+    if ((freq ?? 0) > remappedOptimalFreq) {
+      remappedOptimalFreq = freq ?? 0;
+      remappedOptimalAction = action;
+    }
+  }
+
+  // Build solver data for SolutionDisplay in coaching UI
+  const solverData: CoachingSolverData = {
+    frequencies: remappedFreqs,
+    optimalAction: remappedOptimalAction as GtoAction,
+    optimalFrequency: remappedOptimalFreq,
+    availableActions: Object.keys(remappedFreqs).filter(
+      (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
+    ) as GtoAction[],
+    isExactMatch: lookup.isExact,
+    resolvedCategory: handCat.category,
+    bands: remappedBands,
+    archetypeAccuracy: lookup.archetypeAccuracy,
   };
 
   return {
     profileName: "GTO",
     profileId: "gto",
-    engineId: "lookup-gto",
+    engineId: "modified-gto",
     actionType,
     amount,
     explanation,
+    solverData,
   };
 }
 
@@ -308,8 +317,8 @@ function tryGtoSolverLookup(
 function mapGtoActionToActionType(gtoAction: string, legal: LegalActions): ActionType {
   switch (gtoAction) {
     case "fold": return legal.canFold ? "fold" : "check";
-    case "check": return legal.canCheck ? "check" : "fold";
-    case "call": return legal.canCall ? "call" : "check";
+    case "check": return legal.canCheck ? "check" : legal.canCall ? "call" : "fold";
+    case "call": return legal.canCall ? "call" : legal.canCheck ? "check" : "fold";
     case "bet_small":
     case "bet_medium":
     case "bet_large":
@@ -401,6 +410,111 @@ function detectConsensus(
   }
 
   return undefined;
+}
+
+/**
+ * Remap solver frequencies so action labels match what's actually legal.
+ * check↔call when one isn't available, bet↔raise similarly.
+ */
+function remapFrequenciesToLegal(
+  freqs: ActionFrequencies,
+  legal: LegalActions,
+): ActionFrequencies {
+  const result: ActionFrequencies = { ...freqs };
+
+  // fold → check: if can't fold but can check, fold means "don't commit chips"
+  if (!legal.canFold && legal.canCheck && result.fold) {
+    result.check = (result.check ?? 0) + result.fold;
+    delete result.fold;
+  }
+
+  // check ↔ call: if one isn't legal, merge into the other
+  if (!legal.canCheck && result.check) {
+    result.call = (result.call ?? 0) + result.check;
+    delete result.check;
+  } else if (!legal.canCall && result.call) {
+    result.check = (result.check ?? 0) + result.call;
+    delete result.call;
+  }
+
+  // bet → raise when can't bet but can raise
+  if (!legal.canBet && legal.canRaise) {
+    for (const betKey of ["bet_small", "bet_medium", "bet_large"] as const) {
+      if (result[betKey]) {
+        // Map bet sizes to raise: small→raise_small, medium/large→raise_large
+        const raiseKey = betKey === "bet_small" ? "raise_small" : "raise_large";
+        result[raiseKey] = (result[raiseKey] ?? 0) + (result[betKey] ?? 0);
+        delete result[betKey];
+      }
+    }
+  }
+
+  // raise → bet when can't raise but can bet
+  if (!legal.canRaise && legal.canBet) {
+    for (const raiseKey of ["raise_small", "raise_large"] as const) {
+      if (result[raiseKey]) {
+        const betKey = raiseKey === "raise_small" ? "bet_small" : "bet_large";
+        result[betKey] = (result[betKey] ?? 0) + (result[raiseKey] ?? 0);
+        delete result[raiseKey];
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Remap frequency bands to match legal actions (same logic as frequencies).
+ */
+function remapBandsToLegal(
+  bands: ActionFrequencyBands,
+  legal: LegalActions,
+): ActionFrequencyBands {
+  const result: ActionFrequencyBands = { ...bands };
+
+  // fold → check: if can't fold but can check
+  if (!legal.canFold && legal.canCheck && result.fold) {
+    if (result.check) {
+      result.check = mergeBands(result.check, result.fold);
+    } else {
+      result.check = result.fold;
+    }
+    delete result.fold;
+  }
+
+  if (!legal.canCheck && result.check) {
+    // Merge check band into call band (take wider range)
+    if (result.call) {
+      result.call = mergeBands(result.call, result.check);
+    } else {
+      result.call = result.check;
+    }
+    delete result.check;
+  } else if (!legal.canCall && result.call) {
+    if (result.check) {
+      result.check = mergeBands(result.check, result.call);
+    } else {
+      result.check = result.call;
+    }
+    delete result.call;
+  }
+
+  return result;
+}
+
+function mergeBands(
+  a: ActionFrequencyBands[keyof ActionFrequencyBands],
+  b: ActionFrequencyBands[keyof ActionFrequencyBands],
+): ActionFrequencyBands[keyof ActionFrequencyBands] {
+  if (!a) return b;
+  if (!b) return a;
+  return {
+    mean: a.mean + b.mean,
+    stdDev: Math.max(a.stdDev, b.stdDev),
+    min: a.min + b.min,
+    max: Math.min(1, a.max + b.max),
+    sampleCount: Math.min(a.sampleCount, b.sampleCount),
+  };
 }
 
 /**
