@@ -19,6 +19,7 @@ import {
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
 import { hasTable, hasAnyTableForStreet } from "./tables/tableRegistry";
 import { positionsForTableSize } from "../primitives/position";
+import { getPrototype } from "./archetypePrototypes";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -106,6 +107,49 @@ const PREFLOP_HERO_POSITIONS: Record<string, Position[]> = {
   blind_vs_blind: ["sb"],
   four_bet_five_bet: ["btn", "sb"],
 };
+
+// ═══════════════════════════════════════════════════════
+// PREFLOP PLAYABILITY FILTER
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Returns true if the 2-card hand is in a reasonable ~30% opening range
+ * from a late position (BTN/CO). Used to filter postflop drill hands so
+ * hero never practices spots they'd never reach in real play.
+ *
+ * Covers: pairs, suited aces, broadway combos, suited connectors/gappers,
+ * offsuit broadways ATo+/KJo+/QJo.
+ */
+function isReasonablePreflop(heroCards: CardIndex[]): boolean {
+  const rank0 = Math.floor(heroCards[0] / 4); // 0=2 .. 12=A
+  const rank1 = Math.floor(heroCards[1] / 4);
+  const suited = (heroCards[0] % 4) === (heroCards[1] % 4);
+
+  const hi = Math.max(rank0, rank1);
+  const lo = Math.min(rank0, rank1);
+  const gap = hi - lo;
+
+  // Any pair
+  if (rank0 === rank1) return true;
+  // Suited ace
+  if (suited && hi === 12) return true;
+  // Suited king (K2s+)
+  if (suited && hi === 11) return true;
+  // Both broadway (T+ = rank >= 8)
+  if (hi >= 8 && lo >= 8) return true;
+  // Suited with one broadway card
+  if (suited && hi >= 8 && gap <= 4) return true;
+  // Suited connectors 54s+
+  if (suited && gap === 1 && lo >= 3) return true;
+  // Suited one-gappers 64s+
+  if (suited && gap === 2 && lo >= 2) return true;
+  // Offsuit ace-broadway: ATo+
+  if (!suited && hi === 12 && lo >= 8) return true;
+  // Offsuit KJo+
+  if (!suited && hi === 11 && lo >= 9) return true;
+
+  return false;
+}
 
 // ═══════════════════════════════════════════════════════
 // TEXTURE MATCHERS
@@ -233,7 +277,12 @@ function dealFlopTexture(
 ): ConstrainedDeal {
   const numPlayers = 6;
   const { archetypeId } = constraints;
-  const heroPosition = constraints.heroPosition ?? "btn";
+
+  // Use prototype position preference if available
+  const proto = getPrototype(archetypeId);
+  const heroPosition = constraints.heroPosition
+    ?? proto?.preferredPosition
+    ?? "btn";
 
   const { heroSeatIndex, dealerSeatIndex } = seatIndicesForPosition(
     heroPosition, numPlayers,
@@ -242,41 +291,43 @@ function dealFlopTexture(
   // Generate matching flop
   const flop = generateFlopForTexture(archetypeId, random);
 
-  // Deal hero hand (excluding flop cards)
+  // Determine acceptable hand categories:
+  // 1. Explicit constraint from caller
+  // 2. Prototype acceptable hands
+  // 3. No filter (any hand)
+  const allowedCategories = constraints.handCategories
+    ?? proto?.acceptableHands
+    ?? null;
+
+  // Deal hero hand with prototype-aware retry
+  const isIP = heroPosition === "btn" || heroPosition === "co";
+  for (let i = 0; i < 30; i++) {
+    const deck = createShuffledDeck(flop, random);
+    const heroCards = deal(deck, 2);
+
+    // Filter: must be a reasonable preflop hand
+    if (!isReasonablePreflop(heroCards)) continue;
+
+    const handCategory = categorizeHand(heroCards, flop);
+
+    // Filter: must match allowed categories (if any)
+    if (allowedCategories && !allowedCategories.includes(handCategory.category)) continue;
+
+    return buildDeal({
+      heroSeatIndex, dealerSeatIndex, heroCards,
+      communityCards: flop, numPlayers, archetypeId,
+      handCategory, isInPosition: isIP,
+    });
+  }
+
+  // Fallback: deal anything reasonable
   const deck = createShuffledDeck(flop, random);
   const heroCards = deal(deck, 2);
   const handCategory = categorizeHand(heroCards, flop);
-
-  // Retry for acceptable hand category
-  if (constraints.handCategories && !constraints.handCategories.includes(handCategory.category)) {
-    for (let i = 0; i < 20; i++) {
-      const retryDeck = createShuffledDeck(flop, random);
-      const retryCards = deal(retryDeck, 2);
-      const retryCat = categorizeHand(retryCards, flop);
-      if (constraints.handCategories.includes(retryCat.category)) {
-        return buildDeal({
-          heroSeatIndex,
-          dealerSeatIndex,
-          heroCards: retryCards,
-          communityCards: flop,
-          numPlayers,
-          archetypeId,
-          handCategory: retryCat,
-          isInPosition: heroPosition === "btn" || heroPosition === "co",
-        });
-      }
-    }
-  }
-
   return buildDeal({
-    heroSeatIndex,
-    dealerSeatIndex,
-    heroCards,
-    communityCards: flop,
-    numPlayers,
-    archetypeId,
-    handCategory,
-    isInPosition: heroPosition === "btn" || heroPosition === "co",
+    heroSeatIndex, dealerSeatIndex, heroCards,
+    communityCards: flop, numPlayers, archetypeId,
+    handCategory, isInPosition: isIP,
   });
 }
 
@@ -323,9 +374,12 @@ function dealPostflopPrinciple(
 ): ConstrainedDeal {
   const numPlayers = 6;
   const { archetypeId } = constraints;
+  const proto = getPrototype(archetypeId);
 
-  // Most postflop principles: hero is BTN (IP) in SRP, facing a flop/turn/river decision
-  const heroPosition = constraints.heroPosition ?? "btn";
+  // Use prototype position preference
+  const heroPosition = constraints.heroPosition
+    ?? proto?.preferredPosition
+    ?? "btn";
   const { heroSeatIndex, dealerSeatIndex } = seatIndicesForPosition(
     heroPosition, numPlayers,
   );
@@ -334,32 +388,94 @@ function dealPostflopPrinciple(
   const communityCount = getCommunityCountForPrinciple(archetypeId);
   const street = POSTFLOP_PRINCIPLE_STREET[archetypeId] ?? "flop";
 
-  // Pick a random texture archetype that has solver data for this street
-  const availableTextures = TEXTURE_ARCHETYPE_IDS.filter(id => hasTable(id, street));
-  const textureArchetypeId = availableTextures.length > 0
-    ? availableTextures[Math.floor(random() * availableTextures.length)]
-    : TEXTURE_ARCHETYPE_IDS[Math.floor(random() * TEXTURE_ARCHETYPE_IDS.length)];
+  // Filter texture archetypes by prototype board preferences and solver data
+  const preferredTextures = proto?.boardConstraints?.preferredTextures;
+  let texturePool = preferredTextures
+    ? TEXTURE_ARCHETYPE_IDS.filter(id => preferredTextures.includes(id))
+    : [...TEXTURE_ARCHETYPE_IDS];
 
-  // Generate a flop matching the chosen texture, then add turn/river cards
+  // Further filter to textures with solver data for this street
+  const withData = texturePool.filter(id => hasTable(id, street));
+  if (withData.length > 0) texturePool = withData;
+
+  // Apply board constraints to texture selection
+  if (proto?.boardConstraints) {
+    const bc = proto.boardConstraints;
+    if (bc.requireDry) {
+      const dry = texturePool.filter(id =>
+        id.includes("dry") || id.includes("rainbow") || id === "paired_boards"
+      );
+      if (dry.length > 0) texturePool = dry;
+    }
+    if (bc.requireWet) {
+      const wet = texturePool.filter(id =>
+        id.includes("two_tone") || id.includes("connected") || id === "monotone"
+      );
+      if (wet.length > 0) texturePool = wet;
+    }
+    if (bc.requirePaired) {
+      const paired = texturePool.filter(id => id === "paired_boards");
+      if (paired.length > 0) texturePool = paired;
+    }
+  }
+
+  // Pick from filtered pool (fallback to all textures if pool is empty)
+  if (texturePool.length === 0) texturePool = [...TEXTURE_ARCHETYPE_IDS];
+  const textureArchetypeId = texturePool[Math.floor(random() * texturePool.length)];
+
+  // Determine acceptable hand categories
+  const allowedCategories = constraints.handCategories
+    ?? proto?.acceptableHands
+    ?? null;
+
+  const isIP = heroPosition === "btn" || heroPosition === "co";
+
+  // Retry loop: generate board + hero hand matching prototype constraints
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const flop = generateFlopForTexture(textureArchetypeId, random);
+    const deck = createShuffledDeck(flop, random);
+    const extraCards = communityCount > 3 ? deal(deck, communityCount - 3) : [];
+    const communityCards = [...flop, ...extraCards];
+
+    // Apply board-level constraints
+    if (proto?.boardConstraints) {
+      const bc = proto.boardConstraints;
+      const tex = analyzeBoard(communityCards);
+
+      if (bc.requirePaired && !tex.isPaired) continue;
+      if (bc.requireUnpaired && tex.isPaired) continue;
+      // requireDry/requireWet are handled at texture selection level
+    }
+
+    const heroCards = deal(deck, 2);
+
+    // Must be a playable preflop hand
+    if (!isReasonablePreflop(heroCards)) continue;
+
+    const handCategory = categorizeHand(heroCards, communityCards);
+
+    // Must match allowed categories
+    if (allowedCategories && !allowedCategories.includes(handCategory.category)) continue;
+
+    return buildDeal({
+      heroSeatIndex, dealerSeatIndex, heroCards,
+      communityCards, numPlayers, archetypeId,
+      handCategory, isInPosition: isIP, textureArchetypeId,
+    });
+  }
+
+  // Fallback: deal with just the playability filter
   const flop = generateFlopForTexture(textureArchetypeId, random);
   const deck = createShuffledDeck(flop, random);
   const extraCards = communityCount > 3 ? deal(deck, communityCount - 3) : [];
   const communityCards = [...flop, ...extraCards];
-
-  // Deal hero hand
   const heroCards = deal(deck, 2);
   const handCategory = categorizeHand(heroCards, communityCards);
 
   return buildDeal({
-    heroSeatIndex,
-    dealerSeatIndex,
-    heroCards,
-    communityCards,
-    numPlayers,
-    archetypeId,
-    handCategory,
-    isInPosition: heroPosition === "btn" || heroPosition === "co",
-    textureArchetypeId,
+    heroSeatIndex, dealerSeatIndex, heroCards,
+    communityCards, numPlayers, archetypeId,
+    handCategory, isInPosition: isIP, textureArchetypeId,
   });
 }
 

@@ -43,7 +43,6 @@ import type { CardIndex } from "../../../convex/lib/types/cards";
 
 // Drill components
 import { ScoreDisplay } from "../drill/score-display";
-import { SolutionDisplay } from "../drill/solution-display";
 import { DrillGuideDrawer } from "../drill/drill-guide-drawer";
 
 
@@ -313,6 +312,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
 
   // ── Drill: show solution based on mode ──
   const showDrillSolution = drillQuizMode === "learn" || ws.drillPhase === "acted";
+  const isDrillActive = modeId === "drill" && ws.drillPhase !== "idle";
 
   // ── Layout ──
   const isTwoColumn = mode.layout === "two-column";
@@ -396,7 +396,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
 
               <>
               {/* ── Opponent detail panel ── */}
-              <PanelWrapper enabled={mode.opponents.editable} hint="Switch to Vision mode to edit opponents">
+              <PanelWrapper enabled={mode.opponents.editable || isDrillActive} hint={isDrillActive ? undefined : "Switch to Vision mode to edit opponents"}>
                 <AnimatePresence>
                   {selectedSeat && !selectedSeat.isHero && (
                     <motion.div
@@ -415,6 +415,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
                         onStartCardAssign={() => ws.setSelectionTarget(`villain-${selectedSeat.seatIndex}`)}
                         selectionTarget={ws.selectionTarget}
                         villainCardBuffer={ws.villainCardBuffer.get(selectedSeat.seatIndex)}
+                        readOnly={isDrillActive}
                       />
                     </motion.div>
                   )}
@@ -422,6 +423,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
               </PanelWrapper>
 
               {/* ── Game setup panel (vision mode, before deal) ── */}
+              {!isDrillActive && (
               <PanelWrapper enabled={mode.setup.enabled} hint="Switch to Vision mode for hand setup">
                 {!ws.isHandActive && !ws.isHandOver && (
                   <GameSetupPanel
@@ -433,8 +435,10 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
                   />
                 )}
               </PanelWrapper>
+              )}
 
               {/* ── Hand-over result (vision post-hand) ── */}
+              {!isDrillActive && (
               <PanelWrapper enabled={mode.postHand.dealNext || mode.postHand.revealAll} hint="Finish hand to see results">
                 {!ws.isHandActive && ws.isHandOver && (
                   <HandOverPanel
@@ -445,6 +449,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
                   />
                 )}
               </PanelWrapper>
+              )}
 
               {/* ── Board display ── */}
               <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
@@ -466,6 +471,8 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
                         </span>
                       ))}
                     </div>
+                    {!isDrillActive && (
+                    <>
                     <div className="h-4 w-px bg-[var(--border)]" />
                     <PanelWrapper enabled={mode.setup.enabled}>
                       <TableControls
@@ -476,6 +483,8 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
                         isHandActive={ws.isHandActive}
                       />
                     </PanelWrapper>
+                    </>
+                    )}
                   </div>
                   <button
                     onClick={() => mode.id === "drill" ? setDrillGuideOpen(true) : setGuideOpen(true)}
@@ -524,37 +533,25 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
               </div>
               </>
 
-              {/* ── Drill: Solution display ── */}
-              {showDrillSolution && ws.drillSolution && (
-                <SolutionDisplay
-                  solution={ws.drillSolution}
-                  userAction={ws.drillCurrentScore?.userAction}
-                  score={ws.drillCurrentScore}
-                />
-              )}
+              {/* ── Coaching + Solution (unified in drill mode) ── */}
+              <CoachingSection
+                results={ws.analysisResults}
+                drillSolution={showDrillSolution && ws.drillSolution ? ws.drillSolution : undefined}
+                drillScore={ws.drillCurrentScore ?? undefined}
+                isDrill={isDrillActive}
+              />
 
               {/* ── Drill: Score feedback + next hand ── */}
-              {ws.drillPhase === "acted" && ws.drillCurrentScore && !showDrillSolution && (
+              {ws.drillPhase === "acted" && ws.drillCurrentScore && (
                 <ScoreDisplay
                   score={ws.drillCurrentScore}
                   onNextHand={ws.drillNextHand}
                   isLastHand={ws.drillHandsPlayed >= ws.drillHandsTarget}
                 />
               )}
-              {ws.drillPhase === "acted" && (
-                <button
-                  onClick={ws.drillNextHand}
-                  className="w-full py-2 rounded-lg border border-[var(--border)] text-sm font-medium hover:bg-[var(--accent)] transition-colors"
-                >
-                  {ws.drillHandsPlayed >= ws.drillHandsTarget ? "View Summary" : "Next Hand"}
-                </button>
-              )}
-
-              {/* ── Coaching panel ── */}
-              <CoachingSection results={ws.analysisResults} />
 
               {/* ── Card selector (52-card grid) ── */}
-              <PanelWrapper enabled={mode.cards.heroEditable || mode.cards.communityEditable} hint="Switch to Vision mode to edit cards">
+              <PanelWrapper enabled={mode.cards.heroEditable || mode.cards.communityEditable || isDrillActive} hint={isDrillActive ? undefined : "Switch to Vision mode to edit cards"}>
                 <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3">
                   <CardSelector
                     cards={ws.deckVisionCards}
@@ -562,7 +559,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
                     selectionMode={cardGridMode}
                     onCardClick={ws.toggleCard}
                     onModeChange={handleModeChange}
-                    readOnly={!ws.isHandActive && !ws.isHandOver}
+                    readOnly={isDrillActive || (!ws.isHandActive && !ws.isHandOver)}
                   />
                 </div>
               </PanelWrapper>
@@ -651,8 +648,13 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
 // SUB-COMPONENTS (extracted for readability)
 // ═══════════════════════════════════════════════════════
 
-/** Coaching panel — extracted to avoid inline IIFE */
-function CoachingSection({ results }: { results: Map<string, import("../../../convex/lib/types/analysis").AnalysisResult> }) {
+/** Coaching panel — unified with drill solution in drill mode */
+function CoachingSection({ results, drillSolution, drillScore, isDrill }: {
+  results: Map<string, import("../../../convex/lib/types/analysis").AnalysisResult>;
+  drillSolution?: import("@/hooks/use-workspace").SpotSolution;
+  drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
+  isDrill?: boolean;
+}) {
   const coachingResult = results.get("coaching");
   if (!coachingResult || coachingResult.visuals.length === 0) return null;
   const coachingVisual = coachingResult.visuals.find((v) => v.type === "coaching");
@@ -666,10 +668,18 @@ function CoachingSection({ results }: { results: Map<string, import("../../../co
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
       <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)]">Coaching</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)]">
+          {isDrill ? "GTO Solution & Coaching" : "Coaching"}
+        </h3>
       </div>
       <div className="px-4 py-3">
-        <CoachingPanel advices={advices} consensus={consensus} />
+        <CoachingPanel
+          advices={advices}
+          consensus={consensus}
+          drillSolution={drillSolution}
+          drillScore={drillScore}
+          autoExpandGto={isDrill}
+        />
       </div>
     </div>
   );

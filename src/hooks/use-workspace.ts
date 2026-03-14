@@ -361,7 +361,11 @@ export function useWorkspace(mode: WorkspaceMode) {
   // ═══════════════════════════════════════════════════════
 
   const [activeLensIds, setActiveLensIds] = useState<string[]>(
-    mode.analysis.enabled ? ["raw-equity", "threats", "outs", "draws"] : [],
+    mode.analysis.enabled
+      ? mode.id === "drill"
+        ? ["raw-equity", "threats", "outs", "draws", "coaching"]
+        : ["raw-equity", "threats", "outs", "draws"]
+      : [],
   );
   const availableLenses = useMemo(() => getLensInfo(), []);
 

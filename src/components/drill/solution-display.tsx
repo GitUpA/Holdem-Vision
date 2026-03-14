@@ -17,6 +17,7 @@ import type { SpotSolution } from "@/hooks/use-workspace";
 import type { ActionScore } from "../../../convex/lib/gto/evScoring";
 import type { GtoAction } from "../../../convex/lib/gto/tables/types";
 import { gtoActionLabel } from "../../../convex/lib/gto/actionMapping";
+import { InfoTip } from "../ui/tooltip";
 
 interface SolutionDisplayProps {
   solution: SpotSolution;
@@ -47,10 +48,15 @@ export function SolutionDisplay({ solution, userAction, score }: SolutionDisplay
       animate={{ opacity: 1, y: 0 }}
       className="space-y-3 rounded-lg border border-[var(--border)] p-3 bg-[var(--card)]/50"
     >
-      {/* Header: "GTO plays" */}
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-widest text-[var(--muted-foreground)]">
+        <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-widest text-[var(--muted-foreground)]">
           GTO Solution
+          <InfoTip
+            text="GTO (Game Theory Optimal) frequencies show how often a solver plays each action in this exact spot. These are the mathematically balanced play frequencies that cannot be exploited."
+            variant="info"
+            position="bottom"
+          />
         </span>
         {solution.accuracyImpact && (
           <span className="text-[10px] text-[var(--muted-foreground)]">
@@ -167,6 +173,7 @@ function ExplanationSection({ solution }: { solution: SpotSolution }) {
   const handCategory = explanation.children.find((c) => c.tags?.includes("hand-category"));
   const position = explanation.children.find((c) => c.tags?.includes("position"));
   const principle = explanation.children.find((c) => c.tags?.includes("principle"));
+  const feeling = explanation.children.find((c) => c.tags?.includes("feeling"));
   const mistakes = explanation.children.find((c) => c.tags?.includes("mistakes"));
 
   return (
@@ -180,15 +187,40 @@ function ExplanationSection({ solution }: { solution: SpotSolution }) {
 
       {/* Key principle — the "why" */}
       {principle && (
-        <div className="text-[11px] text-[var(--foreground)]/80 border-l-2 border-[var(--gold)]/40 pl-2">
-          {principle.summary}
+        <div className="flex items-start gap-1.5 text-[11px] text-[var(--foreground)]/80 border-l-2 border-[var(--gold)]/40 pl-2">
+          <InfoTip
+            text="Key Principle — The core concept behind this spot. This is what GTO strategy exploits in this board/hand/position configuration."
+            variant="insight"
+            position="right"
+            className="text-[var(--gold)]"
+          />
+          <span>{principle.summary}</span>
+        </div>
+      )}
+
+      {/* Feeling — the visceral coaching voice */}
+      {feeling && (
+        <div className="flex items-start gap-1.5 text-[10px] italic text-[var(--gold)]/70 border-l-2 border-[var(--gold)]/20 pl-2">
+          <InfoTip
+            text="Coach's Voice — What you should be thinking when you see this spot at the table. Internalize this feeling to build pattern recognition."
+            variant="coach"
+            position="right"
+            className="not-italic text-[var(--gold)]"
+          />
+          <span>{feeling.summary}</span>
         </div>
       )}
 
       {/* Common mistakes */}
       {mistakes && mistakes.children && mistakes.children.length > 0 && (
-        <div className="text-[10px] text-orange-400/70 border-l-2 border-orange-500/20 pl-2">
-          {mistakes.children[0].summary}
+        <div className="flex items-start gap-1.5 text-[10px] text-orange-400/70 border-l-2 border-orange-500/20 pl-2">
+          <InfoTip
+            text="Common Mistake — A frequent error players make in this spot. Being aware of the trap helps you avoid it."
+            variant="warning"
+            position="right"
+            className="text-orange-400"
+          />
+          <span>{mistakes.children[0].summary}</span>
         </div>
       )}
 

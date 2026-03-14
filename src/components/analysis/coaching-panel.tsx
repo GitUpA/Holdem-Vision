@@ -36,6 +36,12 @@ const PROFILE_META: Record<string, { short: string; desc: string }> = {
 interface CoachingPanelProps {
   advices: CoachingAdvice[];
   consensus?: CoachingValue["consensus"];
+  /** In drill mode, pass the drill solution to embed in the GTO row */
+  drillSolution?: SpotSolution;
+  /** In drill mode, pass the user's score */
+  drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
+  /** Auto-expand the GTO row (drill mode) */
+  autoExpandGto?: boolean;
 }
 
 /** GTO first — it's the reference point other profiles compare against */
@@ -43,8 +49,10 @@ const PROFILE_ORDER: Record<string, number> = {
   gto: 0, tag: 1, lag: 2, nit: 3, fish: 4,
 };
 
-export function CoachingPanel({ advices, consensus }: CoachingPanelProps) {
-  const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
+export function CoachingPanel({ advices, consensus, drillSolution, drillScore, autoExpandGto }: CoachingPanelProps) {
+  const [expandedProfile, setExpandedProfile] = useState<string | null>(
+    autoExpandGto ? "gto" : null,
+  );
 
   // Sort: GTO first, then TAG, LAG, NIT, FISH
   const sorted = [...advices].sort(
@@ -84,6 +92,8 @@ export function CoachingPanel({ advices, consensus }: CoachingPanelProps) {
                 expandedProfile === advice.profileId ? null : advice.profileId,
               )
             }
+            drillSolution={advice.profileId === "gto" ? drillSolution : undefined}
+            drillScore={advice.profileId === "gto" ? drillScore : undefined}
           />
         ))}
       </div>
@@ -139,12 +149,16 @@ function ProfileRow({
   isAgreeing,
   isExpanded,
   onToggle,
+  drillSolution,
+  drillScore,
 }: {
   advice: CoachingAdvice;
   index: number;
   isAgreeing: boolean;
   isExpanded: boolean;
   onToggle: () => void;
+  drillSolution?: SpotSolution;
+  drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
 }) {
   const meta = PROFILE_META[advice.profileId];
   const actionColor = ACTION_COLORS[advice.actionType] ?? ACTION_COLORS.check;
@@ -234,7 +248,14 @@ function ProfileRow({
             className="overflow-hidden px-2 pb-2"
           >
             <div className="border-t border-[var(--border)]/50 pt-2">
-              {advice.solverData ? (
+              {drillSolution ? (
+                /* Drill mode: use the drill solution (includes teaching content) */
+                <SolutionDisplay
+                  solution={drillSolution}
+                  userAction={drillScore?.userAction}
+                  score={drillScore}
+                />
+              ) : advice.solverData ? (
                 <SolutionDisplay
                   solution={solverDataToSpotSolution(advice.solverData, advice.explanation)}
                 />

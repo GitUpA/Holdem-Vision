@@ -16,6 +16,7 @@ import {
   type GtoAction,
   type ActionFrequencies,
 } from "./tables";
+import { getTeachingContent } from "./archetypePrototypes";
 
 // ═══════════════════════════════════════════════════════
 // MAIN EXPLAINER
@@ -113,8 +114,21 @@ export function explainArchetype(
     });
   }
 
-  // Key principle
-  if (table?.keyPrinciple) {
+  // Prototype teaching content
+  const teaching = getTeachingContent(archetype.archetypeId);
+  if (teaching) {
+    children.push({
+      summary: `Key principle: ${teaching.concept}`,
+      sentiment: "neutral",
+      tags: ["principle", "prototype"],
+    });
+    children.push({
+      summary: teaching.feeling,
+      sentiment: "neutral",
+      tags: ["feeling", "prototype"],
+    });
+  } else if (table?.keyPrinciple) {
+    // Fallback to table-level principle if no prototype
     children.push({
       summary: `Key principle: ${table.keyPrinciple}`,
       sentiment: "neutral",

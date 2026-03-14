@@ -66,3 +66,13 @@ export {
   gtoActionLabel,
   type GameActionResult,
 } from "./actionMapping";
+
+export {
+  getPrototype,
+  getAllPrototypes,
+  getPrototypeHands,
+  getTeachingContent,
+  type ArchetypePrototype,
+  type BoardConstraint,
+  type DerivativeShift,
+} from "./archetypePrototypes";

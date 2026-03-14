@@ -39,6 +39,7 @@ import {
 } from "../gto/archetypeClassifier";
 import { categorizeHand } from "../gto/handCategorizer";
 import { explainArchetype } from "../gto/archetypeExplainer";
+import { gtoActionToGameAction } from "../gto/actionMapping";
 
 // Ensure engine is registered
 import "../opponents/engines/modifiedGtoEngine";
@@ -267,10 +268,6 @@ function tryGtoSolverLookup(
     }
   }
 
-  // Map GTO action to game ActionType
-  const actionType = mapGtoActionToActionType(optimalGtoAction, legal);
-  const amount = mapGtoActionToAmount(optimalGtoAction, legal, gameState.pot.total);
-
   // Use shared explainer — same rich explanation for coaching and drill
   const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition, undefined, street);
 
@@ -290,6 +287,16 @@ function tryGtoSolverLookup(
       remappedOptimalAction = action;
     }
   }
+
+  // Map the remapped optimal GTO action to game ActionType
+  // Uses the shared actionMapping to ensure coaching row matches the solver panel
+  const gameAction = gtoActionToGameAction(
+    remappedOptimalAction as GtoAction,
+    legal,
+    gameState.pot.total,
+  );
+  const actionType = gameAction.actionType;
+  const amount = gameAction.amount;
 
   // Build solver data for SolutionDisplay in coaching UI
   const solverData: CoachingSolverData = {
@@ -314,66 +321,6 @@ function tryGtoSolverLookup(
     explanation,
     solverData,
   };
-}
-
-/**
- * Map a GTO action string to a game ActionType, respecting what's legal.
- */
-function mapGtoActionToActionType(gtoAction: string, legal: LegalActions): ActionType {
-  switch (gtoAction) {
-    case "fold": return legal.canFold ? "fold" : "check";
-    case "check": return legal.canCheck ? "check" : legal.canCall ? "call" : "fold";
-    case "call": return legal.canCall ? "call" : legal.canCheck ? "check" : "fold";
-    case "bet_small":
-    case "bet_medium":
-    case "bet_large":
-      if (legal.canBet) return "bet";
-      if (legal.canRaise) return "raise";
-      return legal.canCall ? "call" : "check";
-    case "raise_small":
-    case "raise_large":
-      if (legal.canRaise) return "raise";
-      if (legal.canBet) return "bet";
-      return legal.canCall ? "call" : "check";
-    default:
-      return legal.canCheck ? "check" : "fold";
-  }
-}
-
-/**
- * Map a GTO action to a chip amount for bets/raises.
- */
-function mapGtoActionToAmount(
-  gtoAction: string,
-  legal: LegalActions,
-  potSize: number,
-): number | undefined {
-  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
-  switch (gtoAction) {
-    case "bet_small":
-      if (legal.canBet) return clamp(Math.round(potSize * 0.33), legal.betMin, legal.betMax);
-      if (legal.canRaise) return clamp(legal.raiseMin + Math.round(potSize * 0.33), legal.raiseMin, legal.raiseMax);
-      return undefined;
-    case "bet_medium":
-      if (legal.canBet) return clamp(Math.round(potSize * 0.75), legal.betMin, legal.betMax);
-      if (legal.canRaise) return clamp(legal.raiseMin + Math.round(potSize * 0.75), legal.raiseMin, legal.raiseMax);
-      return undefined;
-    case "bet_large":
-      if (legal.canBet) return clamp(Math.round(potSize * 1.2), legal.betMin, legal.betMax);
-      if (legal.canRaise) return clamp(legal.raiseMin + Math.round(potSize * 1.2), legal.raiseMin, legal.raiseMax);
-      return undefined;
-    case "raise_small":
-      if (legal.canRaise) return legal.raiseMin;
-      return undefined;
-    case "raise_large":
-      if (legal.canRaise) return clamp(Math.round(legal.raiseMin * 1.5), legal.raiseMin, legal.raiseMax);
-      return undefined;
-    case "call":
-      return legal.canCall ? legal.callAmount : undefined;
-    default:
-      return undefined;
-  }
 }
 
 function detectConsensus(

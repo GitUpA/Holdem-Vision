@@ -25,6 +25,8 @@ interface OpponentDetailProps {
   onStartCardAssign?: () => void;
   selectionTarget?: SelectionTarget;
   villainCardBuffer?: CardIndex[];
+  /** When true, hide editing controls (profile picker, card assignment) but show info */
+  readOnly?: boolean;
 }
 
 const SUIT_SYMBOLS: Record<string, string> = { c: "\u2663", d: "\u2666", h: "\u2665", s: "\u2660" };
@@ -67,6 +69,7 @@ export function OpponentDetail({
   onStartCardAssign,
   selectionTarget,
   villainCardBuffer,
+  readOnly,
 }: OpponentDetailProps) {
   const posShort = seat.position.toUpperCase();
 
@@ -101,18 +104,30 @@ export function OpponentDetail({
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Profile selector */}
+        {/* Profile — show name in readOnly, full picker otherwise */}
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-2">
             Profile
           </h4>
-          <ProfilePicker
-            currentProfile={seat.profile}
-            onSelect={onAssignProfile}
-          />
+          {readOnly ? (
+            <span className="text-sm text-[var(--foreground)]">
+              {seat.profile?.name ?? "Unknown"}
+              {seat.profile?.engineId && (
+                <span className="text-[10px] text-[var(--muted-foreground)] ml-2">
+                  ({seat.profile.engineId})
+                </span>
+              )}
+            </span>
+          ) : (
+            <ProfilePicker
+              currentProfile={seat.profile}
+              onSelect={onAssignProfile}
+            />
+          )}
         </div>
 
-        {/* Card assignment + visibility */}
+        {/* Card assignment + visibility — hidden in readOnly */}
+        {!readOnly && (
         <div>
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
@@ -180,6 +195,7 @@ export function OpponentDetail({
             )}
           </div>
         </div>
+        )}
 
         {/* Action history (read-only — actions come from the state machine) */}
         {seat.actions.length > 0 && (
