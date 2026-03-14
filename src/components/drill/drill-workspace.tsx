@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ArchetypeId, ArchetypeCategory } from "../../../convex/lib/gto/archetypeClassifier";
-import { hasTable } from "../../../convex/lib/gto/tables/tableRegistry";
+import { hasTable, hasAnyTableForStreet } from "../../../convex/lib/gto/tables/tableRegistry";
 import { useDrillSession } from "@/hooks/use-drill-session";
 import { HandStateViewer } from "../replay/hand-state-viewer";
 import { DrillActionPanel } from "./drill-action-panel";
@@ -63,6 +63,25 @@ const CATEGORY_LABELS: Record<ArchetypeCategory, string> = {
   flop_texture: "Flop Texture Archetypes",
   postflop_principle: "Postflop Archetypes",
 };
+
+/** Map postflop principle archetypes to the street they need solver data for */
+const POSTFLOP_STREET: Partial<Record<ArchetypeId, "flop" | "turn" | "river">> = {
+  cbet_sizing_frequency: "flop",
+  three_bet_pot_postflop: "flop",
+  turn_barreling: "turn",
+  river_bluff_catching_mdf: "river",
+  thin_value_river: "river",
+  overbet_river: "river",
+  exploitative_overrides: "flop",
+};
+
+function isArchetypeAvailable(arch: ArchetypeEntry): boolean {
+  if (arch.category === "preflop") return hasTable(arch.id, "preflop");
+  if (arch.category === "flop_texture") return hasTable(arch.id, "flop");
+  // Postflop principles use texture tables — check if any exist for the needed street
+  const street = POSTFLOP_STREET[arch.id] ?? "flop";
+  return hasAnyTableForStreet(street);
+}
 
 const HAND_COUNT_OPTIONS = [5, 10, 20];
 
@@ -150,7 +169,7 @@ function ArchetypeSelector({
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {ALL_ARCHETYPES.filter((a) => a.category === cat).map((arch) => {
-              const available = hasTable(arch.id);
+              const available = isArchetypeAvailable(arch);
               const isSelected = selected === arch.id;
               return (
                 <button

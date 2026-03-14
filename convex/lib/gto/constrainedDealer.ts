@@ -17,7 +17,7 @@ import {
   type ArchetypeCategory,
 } from "./archetypeClassifier";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
-import { hasTable } from "./tables/tableRegistry";
+import { hasTable, hasAnyTableForStreet } from "./tables/tableRegistry";
 import { positionsForTableSize } from "../primitives/position";
 
 // ═══════════════════════════════════════════════════════
@@ -314,6 +314,9 @@ function generateFlopForTexture(
 // POSTFLOP PRINCIPLE DEALING
 // ═══════════════════════════════════════════════════════
 
+/** All flop texture archetype IDs that have texture matchers */
+const TEXTURE_ARCHETYPE_IDS: ArchetypeId[] = Object.keys(TEXTURE_MATCHERS) as ArchetypeId[];
+
 function dealPostflopPrinciple(
   constraints: DrillConstraints,
   random: () => number,
@@ -329,10 +332,19 @@ function dealPostflopPrinciple(
 
   // Determine how many community cards we need
   const communityCount = getCommunityCountForPrinciple(archetypeId);
+  const street = POSTFLOP_PRINCIPLE_STREET[archetypeId] ?? "flop";
 
-  // Generate a random board of the right size
-  const deck = createShuffledDeck([], random);
-  const communityCards = deal(deck, communityCount);
+  // Pick a random texture archetype that has solver data for this street
+  const availableTextures = TEXTURE_ARCHETYPE_IDS.filter(id => hasTable(id, street));
+  const textureArchetypeId = availableTextures.length > 0
+    ? availableTextures[Math.floor(random() * availableTextures.length)]
+    : TEXTURE_ARCHETYPE_IDS[Math.floor(random() * TEXTURE_ARCHETYPE_IDS.length)];
+
+  // Generate a flop matching the chosen texture, then add turn/river cards
+  const flop = generateFlopForTexture(textureArchetypeId, random);
+  const deck = createShuffledDeck(flop, random);
+  const extraCards = communityCount > 3 ? deal(deck, communityCount - 3) : [];
+  const communityCards = [...flop, ...extraCards];
 
   // Deal hero hand
   const heroCards = deal(deck, 2);
@@ -347,6 +359,7 @@ function dealPostflopPrinciple(
     archetypeId,
     handCategory,
     isInPosition: heroPosition === "btn" || heroPosition === "co",
+    textureArchetypeId,
   });
 }
 
@@ -371,6 +384,25 @@ function getCommunityCountForPrinciple(archetypeId: ArchetypeId): number {
 // ═══════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════
+
+/** Map postflop principle archetypes to the street they need solver data for */
+const POSTFLOP_PRINCIPLE_STREET: Partial<Record<ArchetypeId, "flop" | "turn" | "river">> = {
+  cbet_sizing_frequency: "flop",
+  three_bet_pot_postflop: "flop",
+  turn_barreling: "turn",
+  river_bluff_catching_mdf: "river",
+  thin_value_river: "river",
+  overbet_river: "river",
+  exploitative_overrides: "flop",
+};
+
+function archetypeHasData(archetypeId: ArchetypeId, category: ArchetypeCategory): boolean {
+  if (category === "preflop") return hasTable(archetypeId, "preflop");
+  if (category === "flop_texture") return hasTable(archetypeId, "flop");
+  // Postflop principles use texture tables — check if any exist for the needed street
+  const street = POSTFLOP_PRINCIPLE_STREET[archetypeId] ?? "flop";
+  return hasAnyTableForStreet(street);
+}
 
 function seatIndicesForPosition(
   heroPosition: Position,
@@ -399,8 +431,9 @@ function buildDeal(params: {
   archetypeId: ArchetypeId;
   handCategory: HandCategorization;
   isInPosition: boolean;
+  textureArchetypeId?: ArchetypeId;
 }): ConstrainedDeal {
-  const { archetypeId, heroSeatIndex, heroCards } = params;
+  const { archetypeId, heroSeatIndex, heroCards, textureArchetypeId } = params;
   const category = ARCHETYPE_CATEGORY[archetypeId];
 
   return {
@@ -410,8 +443,9 @@ function buildDeal(params: {
       confidence: 1.0,
       category,
       description: ARCHETYPE_DESCRIPTION[archetypeId],
+      textureArchetypeId,
     },
-    hasFrequencyData: hasTable(archetypeId),
+    hasFrequencyData: archetypeHasData(archetypeId, category),
     cardOverrides: [{
       seatIndex: heroSeatIndex,
       cards: [...heroCards],

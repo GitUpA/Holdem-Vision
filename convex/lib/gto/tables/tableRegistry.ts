@@ -5,6 +5,9 @@
  * or hand-curated preflop data). The lookup engine queries this registry
  * at runtime.
  *
+ * Uses composite keys ("street:archetypeId") internally so flop, turn,
+ * and river tables with the same archetypeId don't collide.
+ *
  * Pure TypeScript, zero Convex imports.
  */
 import type { ArchetypeId } from "../archetypeClassifier";
@@ -20,16 +23,33 @@ import type {
 } from "./types";
 
 // ═══════════════════════════════════════════════════════
+// COMPOSITE KEY
+// ═══════════════════════════════════════════════════════
+
+type Street = "preflop" | "flop" | "turn" | "river";
+
+/** Internal composite key: "flop:ace_high_dry_rainbow" */
+function makeKey(archetypeId: ArchetypeId, street: Street): string {
+  return `${street}:${archetypeId}`;
+}
+
+/** Derive the street to use as key from a FrequencyTable */
+function streetFromTable(table: FrequencyTable): Street {
+  return table.context.street;
+}
+
+// ═══════════════════════════════════════════════════════
 // REGISTRY
 // ═══════════════════════════════════════════════════════
 
-const tables = new Map<ArchetypeId, FrequencyTable>();
-const bandData = new Map<ArchetypeId, { ip: PositionFrequencyBands; oop: PositionFrequencyBands }>();
-const accuracyData = new Map<ArchetypeId, ArchetypeAccuracy>();
+const tables = new Map<string, FrequencyTable>();
+const bandData = new Map<string, { ip: PositionFrequencyBands; oop: PositionFrequencyBands }>();
+const accuracyData = new Map<string, ArchetypeAccuracy>();
 
-/** Register a frequency table for an archetype */
+/** Register a frequency table for an archetype. Street is derived from table.context.street. */
 export function registerTable(table: FrequencyTable): void {
-  tables.set(table.archetypeId, table);
+  const key = makeKey(table.archetypeId, streetFromTable(table));
+  tables.set(key, table);
 }
 
 /** Register frequency band data for an archetype (from solver output with distributions) */
@@ -38,29 +58,40 @@ export function registerBands(
   ipBands: PositionFrequencyBands,
   oopBands: PositionFrequencyBands,
   accuracy: ArchetypeAccuracy,
+  street: Street = "flop",
 ): void {
-  bandData.set(archetypeId, { ip: ipBands, oop: oopBands });
-  accuracyData.set(archetypeId, accuracy);
+  const key = makeKey(archetypeId, street);
+  bandData.set(key, { ip: ipBands, oop: oopBands });
+  accuracyData.set(key, accuracy);
 }
 
 /** Get accuracy metrics for an archetype, if available */
-export function getAccuracy(archetypeId: ArchetypeId): ArchetypeAccuracy | undefined {
-  return accuracyData.get(archetypeId);
+export function getAccuracy(archetypeId: ArchetypeId, street: Street = "flop"): ArchetypeAccuracy | undefined {
+  return accuracyData.get(makeKey(archetypeId, street));
 }
 
 /** Get the frequency table for an archetype, or undefined */
-export function getTable(archetypeId: ArchetypeId): FrequencyTable | undefined {
-  return tables.get(archetypeId);
+export function getTable(archetypeId: ArchetypeId, street: Street = "flop"): FrequencyTable | undefined {
+  return tables.get(makeKey(archetypeId, street));
 }
 
 /** Check if a table is registered for an archetype */
-export function hasTable(archetypeId: ArchetypeId): boolean {
-  return tables.has(archetypeId);
+export function hasTable(archetypeId: ArchetypeId, street: Street = "flop"): boolean {
+  return tables.has(makeKey(archetypeId, street));
 }
 
-/** Get all registered archetype IDs */
+/** Check if ANY texture table exists for a given street */
+export function hasAnyTableForStreet(street: Street): boolean {
+  const prefix = `${street}:`;
+  for (const key of tables.keys()) {
+    if (key.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+/** Get all registered archetype IDs (may contain duplicates across streets) */
 export function registeredArchetypes(): ArchetypeId[] {
-  return [...tables.keys()];
+  return [...tables.values()].map(t => t.archetypeId);
 }
 
 /** Get count of registered tables */
@@ -101,17 +132,19 @@ export function lookupFrequencies(
   archetypeId: ArchetypeId,
   handCategory: HandCategory,
   isInPosition: boolean,
+  street: Street = "flop",
 ): FrequencyLookup | null {
-  const table = tables.get(archetypeId);
+  const key = makeKey(archetypeId, street);
+  const table = tables.get(key);
   if (!table) return null;
 
   const posFreqs = isInPosition ? table.ipFrequencies : table.oopFrequencies;
   const actions = isInPosition ? table.actionsIp : table.actionsOop;
 
   // Get band data if available
-  const bands = bandData.get(archetypeId);
+  const bands = bandData.get(key);
   const posBands = bands ? (isInPosition ? bands.ip : bands.oop) : undefined;
-  const accuracy = accuracyData.get(archetypeId);
+  const accuracy = accuracyData.get(key);
 
   // Try exact match first
   const exact = posFreqs[handCategory];
@@ -149,8 +182,9 @@ export function lookupFrequencies(
 export function getPositionFrequencies(
   archetypeId: ArchetypeId,
   isInPosition: boolean,
+  street: Street = "flop",
 ): PositionFrequencies | null {
-  const table = tables.get(archetypeId);
+  const table = tables.get(makeKey(archetypeId, street));
   if (!table) return null;
   return isInPosition ? table.ipFrequencies : table.oopFrequencies;
 }

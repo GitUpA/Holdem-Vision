@@ -236,8 +236,12 @@ function tryGtoSolverLookup(
   const classCtx = contextFromGameState(gameState, heroSeat);
   const archetype = classifyArchetype(classCtx);
 
+  // For turn/river, use textureArchetypeId for solver lookup (flop texture)
+  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
+  const street = gameState.currentStreet;
+
   // Need sufficient confidence and a registered table
-  if (archetype.confidence < 0.6 || !hasTable(archetype.archetypeId)) {
+  if (archetype.confidence < 0.6 || !hasTable(lookupArchetypeId, street)) {
     return null;
   }
 
@@ -246,9 +250,10 @@ function tryGtoSolverLookup(
 
   // Look up GTO frequencies
   const lookup = lookupFrequencies(
-    archetype.archetypeId,
+    lookupArchetypeId,
     handCat.category,
     classCtx.isInPosition,
+    street,
   );
   if (!lookup) return null;
 
@@ -267,7 +272,7 @@ function tryGtoSolverLookup(
   const amount = mapGtoActionToAmount(optimalGtoAction, legal, gameState.pot.total);
 
   // Use shared explainer — same rich explanation for coaching and drill
-  const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition);
+  const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition, undefined, street);
 
   // Remap solver frequencies to match what's actually legal
   // (e.g., solver "check" → "call" when facing a bet)

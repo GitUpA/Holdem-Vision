@@ -53,34 +53,34 @@ describe("scoreAction", () => {
 
   it("scores bet_medium with premium pair in RFI as optimal", () => {
     // RFI preflop tables use bet_medium for opening raises
-    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "bet_medium", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "bet_medium", 100, true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.verdict).toBe("optimal");
     expect(result!.userActionFrequency).toBeGreaterThan(0.3);
   });
 
   it("scores a fold with premium pair in RFI as blunder", () => {
-    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 100, true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.verdict).toBe("blunder");
     expect(result!.userActionFrequency).toBeLessThan(0.05);
   });
 
   it("calculates positive EV loss for suboptimal plays", () => {
-    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 100, true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.evLoss).toBeGreaterThan(0);
   });
 
   it("calculates zero EV loss for optimal plays", () => {
     // bet_medium is 100% frequency for premium pairs in RFI IP
-    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "bet_medium", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "bet_medium", 100, true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.evLoss).toBe(0);
   });
 
   it("identifies the optimal action", () => {
-    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 100, true, "preflop");
     expect(result).not.toBeNull();
     // RFI preflop uses bet_medium for opens
     expect(result!.optimalAction).toBe("bet_medium");
@@ -94,29 +94,29 @@ describe("scoreAction", () => {
       description: "Middle pair",
       relativeStrength: 0.4,
     };
-    const result = scoreAction(RFI_ARCHETYPE, middlePair, "bet_medium", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, middlePair, "bet_medium", 100, true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.allFrequencies).toBeDefined();
     expect(Object.keys(result!.allFrequencies).length).toBeGreaterThanOrEqual(2);
   });
 
   it("scales EV loss with pot size", () => {
-    const small = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 50, true);
-    const large = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 200, true);
+    const small = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 50, true, "preflop");
+    const large = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 200, true, "preflop");
     expect(small).not.toBeNull();
     expect(large).not.toBeNull();
     expect(large!.evLoss).toBeGreaterThan(small!.evLoss);
   });
 
   it("returns explanation with children", () => {
-    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "raise_small", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "raise_small", 100, true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.explanation.children).toBeDefined();
     expect(result!.explanation.children!.length).toBeGreaterThan(0);
   });
 
   it("explanation contains verdict in summary", () => {
-    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, PREMIUM_HAND, "fold", 100, true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.explanation.summary).toContain("BLUNDER");
   });
@@ -128,7 +128,7 @@ describe("scoreAction", () => {
 
 describe("verdict thresholds", () => {
   it("scores air folding in RFI as optimal (GTO folds air)", () => {
-    const result = scoreAction(RFI_ARCHETYPE, AIR_HAND, "fold", 100, true);
+    const result = scoreAction(RFI_ARCHETYPE, AIR_HAND, "fold", 100, true, "preflop");
     expect(result).not.toBeNull();
     // Air should fold most of the time in RFI
     expect(["optimal", "acceptable"]).toContain(result!.verdict);
@@ -187,8 +187,8 @@ describe("normalizeToGtoAction", () => {
 
 describe("position sensitivity", () => {
   it("may produce different scores IP vs OOP for same action", () => {
-    const ipResult = scoreAction(RFI_ARCHETYPE, TPTK_HAND, "raise_small", 100, true);
-    const oopResult = scoreAction(RFI_ARCHETYPE, TPTK_HAND, "raise_small", 100, false);
+    const ipResult = scoreAction(RFI_ARCHETYPE, TPTK_HAND, "raise_small", 100, true, "preflop");
+    const oopResult = scoreAction(RFI_ARCHETYPE, TPTK_HAND, "raise_small", 100, false, "preflop");
 
     // Both should return results (preflop tables have both IP/OOP)
     expect(ipResult).not.toBeNull();

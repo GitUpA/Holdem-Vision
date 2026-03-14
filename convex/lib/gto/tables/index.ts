@@ -41,6 +41,7 @@ export {
   registerBands,
   getTable,
   hasTable,
+  hasAnyTableForStreet,
   getAccuracy,
   registeredArchetypes,
   tableCount,
@@ -53,6 +54,8 @@ export {
 export {
   ALL_PREFLOP_TABLES,
   FLOP_ARCHETYPE_METADATA,
+  TURN_ARCHETYPE_METADATA,
+  RIVER_ARCHETYPE_METADATA,
   RFI_OPENING,
   BB_DEFENSE,
   THREE_BET_POTS,

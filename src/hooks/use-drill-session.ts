@@ -153,13 +153,19 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
   // ── Compute the full GTO solution for a deal ──
 
   const computeSolution = useCallback((deal: ConstrainedDeal): SpotSolution | null => {
-    const archId = deal.archetype.archetypeId;
+    // For postflop principles, use textureArchetypeId for solver lookup
+    const lookupId = deal.archetype.textureArchetypeId ?? deal.archetype.archetypeId;
+    // Derive street from community card count
+    const street = deal.communityCards.length <= 0 ? "preflop" as const
+      : deal.communityCards.length <= 3 ? "flop" as const
+      : deal.communityCards.length === 4 ? "turn" as const
+      : "river" as const;
 
     // Look up frequencies (with bands if available)
-    const lookup = lookupFrequencies(archId, deal.handCategory.category, deal.isInPosition);
+    const lookup = lookupFrequencies(lookupId, deal.handCategory.category, deal.isInPosition, street);
     if (!lookup) return null;
 
-    const table = getTable(archId);
+    const table = getTable(lookupId, street);
 
     // Find optimal action
     let optimalAction: GtoAction = "check";
@@ -177,16 +183,16 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
       : (table?.actionsOop ?? []);
 
     // Teaching explanation (without user action — pure "what GTO does and why")
-    const explanation = explainArchetype(deal.archetype, deal.handCategory, deal.isInPosition);
+    const explanation = explainArchetype(deal.archetype, deal.handCategory, deal.isInPosition, undefined, street);
 
     // Accuracy impact — compute "within X BB" number
     let accuracyImpact: AccuracyImpact | undefined;
-    const archetypeAccuracy = getAccuracy(archId);
+    const archetypeAccuracy = getAccuracy(lookupId, street);
     if (archetypeAccuracy && deal.communityCards.length >= 3) {
       // Compute board typicality from community cards
       const boardTexture = analyzeBoard(deal.communityCards as CardIndex[]);
       const features = boardToFeatures(boardTexture);
-      const typicality = scoreBoardTypicality(archId, features);
+      const typicality = scoreBoardTypicality(lookupId, features);
 
       // Top action gap for precise impact assessment
       const topGap = computeTopActionGap(lookup.frequencies);
@@ -241,6 +247,40 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
 
     // Start hand with card overrides + community cards
     session.startHand(undefined, deal.cardOverrides, deal.communityCards);
+
+    // For postflop drills, auto-advance hero through earlier streets
+    // until we reach the target street (where the real decision happens).
+    const STREET_ORDER = ["preflop", "flop", "turn", "river"] as const;
+    const targetStreet = deal.communityCards.length <= 0 ? "preflop"
+      : deal.communityCards.length <= 3 ? "flop"
+      : deal.communityCards.length === 4 ? "turn"
+      : "river";
+    const targetIdx = STREET_ORDER.indexOf(targetStreet);
+
+    let safety = 0;
+    while (safety < 20) {
+      safety++;
+      const state = session.state;
+      if (!state || state.phase === "complete" || state.phase === "showdown") break;
+
+      const currentIdx = STREET_ORDER.indexOf(state.currentStreet);
+      if (currentIdx >= targetIdx) break;
+
+      if (state.activePlayerIndex === null) break;
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (activePlayer.seatIndex !== session.heroSeatIndex) break;
+
+      const legal = currentLegalActions(state);
+      if (!legal) break;
+
+      if (legal.canCheck) {
+        session.act("check");
+      } else if (legal.canCall) {
+        session.act("call");
+      } else {
+        break;
+      }
+    }
 
     phaseRef.current = "ready";
     rerender();
@@ -301,13 +341,18 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
       // Apply action
       session.act(actionType, amount);
 
-      // Score against GTO
+      // Score against GTO — derive street from community card count
+      const drillStreet = deal.communityCards.length <= 0 ? "preflop" as const
+        : deal.communityCards.length <= 3 ? "flop" as const
+        : deal.communityCards.length === 4 ? "turn" as const
+        : "river" as const;
       const score = scoreAction(
         deal.archetype,
         deal.handCategory,
         gtoAction,
         state.pot.total / DEFAULT_BLINDS.big, // pot in BB
         deal.isInPosition,
+        drillStreet,
       );
 
       currentScoreRef.current = score;

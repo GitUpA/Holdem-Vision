@@ -10,7 +10,7 @@
  * The mode config determines which are interactive.
  */
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { WorkspaceMode, WorkspaceModeId } from "@/types/workspace-mode";
@@ -49,7 +49,7 @@ import { DrillGuideDrawer } from "../drill/drill-guide-drawer";
 
 // Drill archetype data
 import type { ArchetypeId, ArchetypeCategory } from "../../../convex/lib/gto/archetypeClassifier";
-import { hasTable } from "../../../convex/lib/gto/tables/tableRegistry";
+import { hasTable, hasAnyTableForStreet } from "../../../convex/lib/gto/tables/tableRegistry";
 
 // ═══════════════════════════════════════════════════════
 // HELPERS
@@ -145,6 +145,24 @@ const CATEGORY_LABELS: Record<ArchetypeCategory, string> = {
   postflop_principle: "Postflop Archetypes",
 };
 
+/** Map postflop principle archetypes to the street they need solver data for */
+const POSTFLOP_STREET: Partial<Record<ArchetypeId, "flop" | "turn" | "river">> = {
+  cbet_sizing_frequency: "flop",
+  three_bet_pot_postflop: "flop",
+  turn_barreling: "turn",
+  river_bluff_catching_mdf: "river",
+  thin_value_river: "river",
+  overbet_river: "river",
+  exploitative_overrides: "flop",
+};
+
+function isArchetypeAvailable(arch: ArchetypeEntry): boolean {
+  if (arch.category === "preflop") return hasTable(arch.id, "preflop");
+  if (arch.category === "flop_texture") return hasTable(arch.id, "flop");
+  const street = POSTFLOP_STREET[arch.id] ?? "flop";
+  return hasAnyTableForStreet(street);
+}
+
 const HAND_COUNT_OPTIONS = [5, 10, 20];
 
 export type DrillMode = "learn" | "quiz";
@@ -153,8 +171,15 @@ export type DrillMode = "learn" | "quiz";
 // WORKSPACE SHELL
 // ═══════════════════════════════════════════════════════
 
+export interface DrillParams {
+  archetype: ArchetypeId;
+  hands?: number;
+  mode?: DrillMode;
+}
+
 interface WorkspaceShellProps {
   initialMode?: WorkspaceModeId;
+  drillParams?: DrillParams;
 }
 
 const MODE_CONFIGS: Record<WorkspaceModeId, () => WorkspaceMode> = {
@@ -162,14 +187,25 @@ const MODE_CONFIGS: Record<WorkspaceModeId, () => WorkspaceMode> = {
   drill: drillModeConfig,
 };
 
-export function WorkspaceShell({ initialMode = "vision" }: WorkspaceShellProps) {
+export function WorkspaceShell({ initialMode = "vision", drillParams }: WorkspaceShellProps) {
   const [modeId, setModeId] = useState<WorkspaceModeId>(initialMode);
   const mode = useMemo(() => MODE_CONFIGS[modeId](), [modeId]);
   const ws = useWorkspace(mode);
   const [guideOpen, setGuideOpen] = useState(false);
   const [drillGuideOpen, setDrillGuideOpen] = useState(false);
   const [replayRecord, setReplayRecord] = useState<HandRecord | null>(null);
-  const [drillQuizMode, setDrillQuizMode] = useState<DrillMode>("quiz");
+  const [drillQuizMode, setDrillQuizMode] = useState<DrillMode>(drillParams?.mode ?? "quiz");
+
+  // Auto-start drill from URL params
+  const drillAutoStarted = useRef(false);
+  const { startDrill } = ws;
+  useEffect(() => {
+    if (drillAutoStarted.current || !drillParams?.archetype) return;
+    const entry = ALL_ARCHETYPES.find((a) => a.id === drillParams.archetype);
+    if (!entry || !isArchetypeAvailable(entry)) return;
+    drillAutoStarted.current = true;
+    startDrill(drillParams.archetype, drillParams.hands ?? 10);
+  }, [drillParams, startDrill]);
 
   // Expose audit export to browser console
   useEffect(() => {
@@ -870,7 +906,7 @@ function ArchetypeSelector({
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {ALL_ARCHETYPES.filter((a) => a.category === cat).map((arch) => {
-              const available = hasTable(arch.id);
+              const available = isArchetypeAvailable(arch);
               const isSelected = selected === arch.id;
               return (
                 <button key={arch.id} onClick={() => available && setSelected(arch.id)} disabled={!available}

@@ -336,6 +336,188 @@ export const FLOP_ARCHETYPE_METADATA: Record<
 };
 
 // ═══════════════════════════════════════════════════════
+// TURN ARCHETYPE METADATA
+// ═══════════════════════════════════════════════════════
+
+/** Metadata for each turn texture archetype — same 8 flop textures applied on the turn */
+export const TURN_ARCHETYPE_METADATA: Record<
+  string,
+  { name: string; description: string; keyPrinciple: string; commonMistakes: string[] }
+> = {
+  ace_high_dry_rainbow: {
+    name: "Turn — Ace-High Dry Rainbow",
+    description: "Turn play on Axx rainbow board texture in SRP, BTN vs BB",
+    keyPrinciple: "Turn barreling on A-high dry: continue betting with strong hands and draws, check-back medium strength for pot control.",
+    commonMistakes: [
+      "Barreling too wide on the turn — tighten up from the flop range",
+      "Not value betting thinly enough with top pair+",
+      "Missing check-back opportunities with showdown value",
+    ],
+  },
+  kq_high_dry_rainbow: {
+    name: "Turn — K/Q-High Dry Rainbow",
+    description: "Turn play on K/Q-xx rainbow board texture in SRP, BTN vs BB",
+    keyPrinciple: "Continue with strong hands but check-back marginal top pairs. Turn cards that change the board texture affect strategy significantly.",
+    commonMistakes: [
+      "Barreling too often with weak top pair on turns that complete draws",
+      "Not adjusting to scare cards (A completing overcards)",
+      "Over-bluffing on blank turns",
+    ],
+  },
+  mid_low_dry_rainbow: {
+    name: "Turn — Mid/Low Dry Rainbow",
+    description: "Turn play on 7-T high dry rainbow board texture in SRP, BTN vs BB",
+    keyPrinciple: "Smaller range advantage persists. Be selective with barrels — overcards arriving help IP range more.",
+    commonMistakes: [
+      "Continuation betting too frequently after checking the flop",
+      "Not recognizing when turn overcard gives you barrel equity",
+      "Over-folding to turn probes when you checked the flop",
+    ],
+  },
+  paired_boards: {
+    name: "Turn — Paired Boards",
+    description: "Turn play on paired flop texture in SRP, BTN vs BB",
+    keyPrinciple: "Trips dominate the turn. Continue betting with trips and strong hands, give up with air that missed.",
+    commonMistakes: [
+      "Bluffing too much on paired board turns (villain has strong continuing range)",
+      "Not value betting trips aggressively enough",
+      "Forgetting kicker matters heavily with trips",
+    ],
+  },
+  two_tone_disconnected: {
+    name: "Turn — Two-Tone Disconnected",
+    description: "Turn play on two-tone disconnected flop texture in SRP, BTN vs BB",
+    keyPrinciple: "Flush completing turns change everything. Barrel for value on bricks, slow down when draws complete.",
+    commonMistakes: [
+      "Continuing to barrel when the flush completes on the turn",
+      "Not betting enough on brick turns where your range is ahead",
+      "Missing value with overpairs on safe turns",
+    ],
+  },
+  two_tone_connected: {
+    name: "Turn — Two-Tone Connected",
+    description: "Turn play on two-tone connected flop texture in SRP, BTN vs BB",
+    keyPrinciple: "Many draws complete on the turn. Polarize: bet big with strong hands and bluffs, check medium strength.",
+    commonMistakes: [
+      "Using small sizing on wet turns (give draws bad price with larger bets)",
+      "Not polarizing enough — medium hands should mostly check",
+      "Bluffing with hands that have no equity on draw-completing turns",
+    ],
+  },
+  monotone: {
+    name: "Turn — Monotone",
+    description: "Turn play on monotone flop texture in SRP, BTN vs BB",
+    keyPrinciple: "If you bet the flop on a monotone board, you have the suit or a strong hand. Turn strategy depends on whether the 4th suited card arrives.",
+    commonMistakes: [
+      "Continuing to barrel without the suit on a monotone board",
+      "Not value betting made flushes aggressively enough",
+      "Over-folding to turn bets when you have a strong non-flush hand",
+    ],
+  },
+  rainbow_connected: {
+    name: "Turn — Rainbow Connected",
+    description: "Turn play on rainbow connected flop texture in SRP, BTN vs BB",
+    keyPrinciple: "Straight draws dominate. Turn cards that complete straights are key decision points. Two-tone turns add flush draw complexity.",
+    commonMistakes: [
+      "Not adjusting to straight-completing turn cards",
+      "Betting too small when draws pick up equity on the turn",
+      "Missing that a turn card creating a flush draw changes defender's continuing range",
+    ],
+  },
+};
+
+// ═══════════════════════════════════════════════════════
+// RIVER ARCHETYPE METADATA
+// ═══════════════════════════════════════════════════════
+
+/** Metadata for each river texture archetype — same 8 flop textures applied on the river */
+export const RIVER_ARCHETYPE_METADATA: Record<
+  string,
+  { name: string; description: string; keyPrinciple: string; commonMistakes: string[] }
+> = {
+  ace_high_dry_rainbow: {
+    name: "River — Ace-High Dry Rainbow",
+    description: "River play on Axx rainbow board texture in SRP, BTN vs BB",
+    keyPrinciple: "River decisions are pure value vs bluff. Size bets based on what worse hands can call and what better hands will fold.",
+    commonMistakes: [
+      "Betting medium-strength hands for thin value when only better hands call",
+      "Not bluffing enough on rivers that look scary for defender",
+      "Using wrong sizing — polarize with large bets or check",
+    ],
+  },
+  kq_high_dry_rainbow: {
+    name: "River — K/Q-High Dry Rainbow",
+    description: "River play on K/Q-xx rainbow board texture in SRP, BTN vs BB",
+    keyPrinciple: "River value betting requires hands that beat villain's calling range. Check-call or check-fold showdown-value hands.",
+    commonMistakes: [
+      "Value betting too thinly when villain only calls with better",
+      "Not bluff-catching enough when villain could be bluffing missed draws",
+      "Ignoring river card texture when deciding bet size",
+    ],
+  },
+  mid_low_dry_rainbow: {
+    name: "River — Mid/Low Dry Rainbow",
+    description: "River play on 7-T high dry rainbow board texture in SRP, BTN vs BB",
+    keyPrinciple: "Low board rivers often go check-check. Value bet strong hands, but recognize that villain's continuing range is strong.",
+    commonMistakes: [
+      "Over-bluffing on low board rivers where villain rarely folds",
+      "Not value betting sets and two pair aggressively enough",
+      "Missing river check-raise opportunities with strong hands",
+    ],
+  },
+  paired_boards: {
+    name: "River — Paired Boards",
+    description: "River play on paired flop texture in SRP, BTN vs BB",
+    keyPrinciple: "Trips and full houses control river play. Thin value betting is difficult — focus on clear value and bluffs.",
+    commonMistakes: [
+      "Bluffing into polarized ranges where villain has trips or better",
+      "Not value betting full houses large enough",
+      "Over-folding to river bets when you have trips with a decent kicker",
+    ],
+  },
+  two_tone_disconnected: {
+    name: "River — Two-Tone Disconnected",
+    description: "River play on two-tone disconnected flop texture in SRP, BTN vs BB",
+    keyPrinciple: "Rivers after flush-draw boards: if flush missed, missed draws become bluffs. If flush hit earlier, river is about sizing.",
+    commonMistakes: [
+      "Not bluffing with busted flush draws when the flush missed",
+      "Over-calling river bets when the flush completed and you don't have it",
+      "Using the wrong bet size — river sizing should be polarized",
+    ],
+  },
+  two_tone_connected: {
+    name: "River — Two-Tone Connected",
+    description: "River play on two-tone connected flop texture in SRP, BTN vs BB",
+    keyPrinciple: "Many possible completed draws. River decisions are about which draws got there and which missed. MDF applies.",
+    commonMistakes: [
+      "Folding too much to river bets (violating MDF when villain can have bluffs)",
+      "Not value betting strong hands because the board looks scary",
+      "Bluffing with hands that block villain's folding range",
+    ],
+  },
+  monotone: {
+    name: "River — Monotone",
+    description: "River play on monotone flop texture in SRP, BTN vs BB",
+    keyPrinciple: "By the river on monotone boards, nut flushes and bluffs dominate. Very polarized spot — size large or check.",
+    commonMistakes: [
+      "Making thin value bets with non-nut flushes (only the nuts can go big)",
+      "Not using blocker information to decide whether to bluff",
+      "Over-folding to large river bets when you have a strong hand",
+    ],
+  },
+  rainbow_connected: {
+    name: "River — Rainbow Connected",
+    description: "River play on rainbow connected flop texture in SRP, BTN vs BB",
+    keyPrinciple: "Straights, two-pair, and sets are common completed hands. River play depends heavily on which draws completed.",
+    commonMistakes: [
+      "Not considering straight-completing river cards when deciding to call",
+      "Bluffing with hands that don't unblock villain's folding range",
+      "Missing value bet opportunities when draws bricked",
+    ],
+  },
+};
+
+// ═══════════════════════════════════════════════════════
 // ALL PREFLOP TABLES
 // ═══════════════════════════════════════════════════════
 

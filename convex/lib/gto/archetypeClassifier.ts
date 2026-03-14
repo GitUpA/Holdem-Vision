@@ -49,6 +49,13 @@ export interface ArchetypeClassification {
   category: ArchetypeCategory;
   description: string;
   fallback?: ArchetypeId;
+  /**
+   * Flop texture archetype for solver table lookup on turn/river.
+   * On flop, this equals archetypeId. On turn/river, the primary archetypeId
+   * is a postflop principle (e.g., "turn_barreling") while textureArchetypeId
+   * points to the flop texture (e.g., "ace_high_dry_rainbow") for solver lookup.
+   */
+  textureArchetypeId?: ArchetypeId;
 }
 
 /** Minimal context needed for classification — avoids coupling to full GameState */
@@ -308,12 +315,18 @@ function classifyFlopTexture(texture: BoardTexture): ArchetypeClassification {
 }
 
 function classifyTurn(ctx: ClassificationContext): ArchetypeClassification {
+  // Compute flop texture from first 3 cards for solver lookup
+  const flopTexture = ctx.communityCards.length >= 3
+    ? classifyFlopTexture(analyzeBoard(ctx.communityCards.slice(0, 3)))
+    : undefined;
+  const textureId = flopTexture?.archetypeId;
+
   const turnActions = ctx.actionHistory.filter((a) => a.street === "turn");
   const heroTurnActions = turnActions.filter((a) => a.isHero);
 
   // Aggressor on turn → barreling decision
   if (ctx.isAggressor && heroTurnActions.length === 0) {
-    return make("turn_barreling", 0.85);
+    return makeWithTexture("turn_barreling", 0.85, textureId);
   }
 
   // Caller facing turn bet → also turn barreling (defender's perspective)
@@ -321,12 +334,12 @@ function classifyTurn(ctx: ClassificationContext): ArchetypeClassification {
     (a) => !a.isHero && (a.actionType === "bet" || a.actionType === "raise"),
   );
   if (facingTurnBet) {
-    return make("turn_barreling", 0.8);
+    return makeWithTexture("turn_barreling", 0.8, textureId);
   }
 
   // Checked to on turn → probe opportunity
   if (!ctx.isAggressor && heroTurnActions.length === 0) {
-    return make("turn_barreling", 0.7, "cbet_sizing_frequency");
+    return makeWithTexture("turn_barreling", 0.7, textureId, "cbet_sizing_frequency");
   }
 
   // Fallback to texture
@@ -335,6 +348,12 @@ function classifyTurn(ctx: ClassificationContext): ArchetypeClassification {
 }
 
 function classifyRiver(ctx: ClassificationContext): ArchetypeClassification {
+  // Compute flop texture from first 3 cards for solver lookup
+  const flopTexture = ctx.communityCards.length >= 3
+    ? classifyFlopTexture(analyzeBoard(ctx.communityCards.slice(0, 3)))
+    : undefined;
+  const textureId = flopTexture?.archetypeId;
+
   const riverActions = ctx.actionHistory.filter((a) => a.street === "river");
   const heroRiverActions = riverActions.filter((a) => a.isHero);
 
@@ -343,17 +362,15 @@ function classifyRiver(ctx: ClassificationContext): ArchetypeClassification {
     (a) => !a.isHero && (a.actionType === "bet" || a.actionType === "raise"),
   );
   if (facingRiverBet && heroRiverActions.length === 0) {
-    return make("river_bluff_catching_mdf", 0.9);
+    return makeWithTexture("river_bluff_catching_mdf", 0.9, textureId);
   }
 
   // Hero's turn to bet on river
   if (heroRiverActions.length === 0) {
-    // Could be thin value or overbet — both are river principles
-    // Default to thin value (more common)
-    return make("thin_value_river", 0.75, "overbet_river");
+    return makeWithTexture("thin_value_river", 0.75, textureId, "overbet_river");
   }
 
-  return make("river_bluff_catching_mdf", 0.6);
+  return makeWithTexture("river_bluff_catching_mdf", 0.6, textureId);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -372,6 +389,24 @@ function make(
     category: info.category,
     description: info.description,
     fallback,
+  };
+}
+
+/** Like make() but includes textureArchetypeId for turn/river solver lookup */
+function makeWithTexture(
+  id: ArchetypeId,
+  confidence: number,
+  textureArchetypeId?: ArchetypeId,
+  fallback?: ArchetypeId,
+): ArchetypeClassification {
+  const info = ARCHETYPE_INFO[id];
+  return {
+    archetypeId: id,
+    confidence,
+    category: info.category,
+    description: info.description,
+    fallback,
+    textureArchetypeId,
   };
 }
 

@@ -46,11 +46,11 @@ describe("Auto-registered preflop tables", () => {
   // Tables are registered on import in tables/index.ts
 
   it("has all 5 preflop tables registered", () => {
-    expect(hasTable("rfi_opening")).toBe(true);
-    expect(hasTable("bb_defense_vs_rfi")).toBe(true);
-    expect(hasTable("three_bet_pots")).toBe(true);
-    expect(hasTable("blind_vs_blind")).toBe(true);
-    expect(hasTable("four_bet_five_bet")).toBe(true);
+    expect(hasTable("rfi_opening", "preflop")).toBe(true);
+    expect(hasTable("bb_defense_vs_rfi", "preflop")).toBe(true);
+    expect(hasTable("three_bet_pots", "preflop")).toBe(true);
+    expect(hasTable("blind_vs_blind", "preflop")).toBe(true);
+    expect(hasTable("four_bet_five_bet", "preflop")).toBe(true);
   });
 
   it("tableCount includes at least 5 preflop tables", () => {
@@ -109,14 +109,14 @@ describe("Preflop table structure", () => {
 
 describe("lookupFrequencies", () => {
   it("returns exact match for registered category", () => {
-    const result = lookupFrequencies("rfi_opening", "premium_pair", true);
+    const result = lookupFrequencies("rfi_opening", "premium_pair", true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.isExact).toBe(true);
     expect(result!.frequencies.bet_medium).toBe(1.0);
   });
 
   it("returns fallback for unregistered category", () => {
-    const result = lookupFrequencies("rfi_opening", "combo_draw", true);
+    const result = lookupFrequencies("rfi_opening", "combo_draw", true, "preflop");
     expect(result).not.toBeNull();
     expect(result!.isExact).toBe(false);
     // combo_draw (0.5 strength) should fall back to middle_pair (0.45) or flush_draw (0.4)
@@ -133,8 +133,8 @@ describe("lookupFrequencies", () => {
   });
 
   it("returns different frequencies for IP vs OOP", () => {
-    const ip = lookupFrequencies("bb_defense_vs_rfi", "premium_pair", true);
-    const oop = lookupFrequencies("bb_defense_vs_rfi", "premium_pair", false);
+    const ip = lookupFrequencies("bb_defense_vs_rfi", "premium_pair", true, "preflop");
+    const oop = lookupFrequencies("bb_defense_vs_rfi", "premium_pair", false, "preflop");
     expect(ip).not.toBeNull();
     expect(oop).not.toBeNull();
     // Both should 3-bet premium, but frequencies may differ
@@ -145,7 +145,7 @@ describe("lookupFrequencies", () => {
 
 describe("getPositionFrequencies", () => {
   it("returns all categories for a registered archetype", () => {
-    const freqs = getPositionFrequencies("rfi_opening", true);
+    const freqs = getPositionFrequencies("rfi_opening", true, "preflop");
     expect(freqs).not.toBeNull();
     expect(Object.keys(freqs!).length).toBeGreaterThan(3);
   });

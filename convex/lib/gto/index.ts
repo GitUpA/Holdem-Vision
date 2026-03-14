@@ -29,6 +29,7 @@ export {
   registerTable,
   getTable,
   hasTable,
+  hasAnyTableForStreet,
   registeredArchetypes,
   tableCount,
   clearTables,

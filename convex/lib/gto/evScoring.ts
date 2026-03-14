@@ -84,16 +84,20 @@ export function scoreAction(
   userAction: GtoAction,
   potSize: number,
   isInPosition: boolean,
+  street: "preflop" | "flop" | "turn" | "river" = "flop",
 ): ActionScore | null {
+  // For turn/river, use textureArchetypeId for solver lookup
+  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
   const lookup = lookupFrequencies(
-    archetype.archetypeId,
+    lookupArchetypeId,
     handCat.category,
     isInPosition,
+    street,
   );
   if (!lookup) return null;
 
   const frequencies = lookup.frequencies;
-  const table = getTable(archetype.archetypeId);
+  const table = getTable(lookupArchetypeId, street);
 
   // Find optimal action (highest frequency)
   let optimalAction: GtoAction = "check";

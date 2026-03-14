@@ -32,12 +32,16 @@ export function explainArchetype(
   handCat: HandCategorization,
   isInPosition: boolean,
   userAction?: GtoAction,
+  street: "preflop" | "flop" | "turn" | "river" = "flop",
 ): ExplanationNode {
-  const table = getTable(archetype.archetypeId);
+  // For turn/river, use textureArchetypeId for solver lookup
+  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
+  const table = getTable(lookupArchetypeId, street);
   const lookup = lookupFrequencies(
-    archetype.archetypeId,
+    lookupArchetypeId,
     handCat.category,
     isInPosition,
+    street,
   );
 
   const children: ExplanationNode[] = [];

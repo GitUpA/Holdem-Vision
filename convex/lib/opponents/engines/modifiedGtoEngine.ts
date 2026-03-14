@@ -251,12 +251,17 @@ function getGtoBaseFrequencies(
     const classCtx = contextFromGameState(ctx.state, ctx.seatIndex);
     const archetype = classifyArchetype(classCtx);
 
-    if (archetype.confidence >= CONFIDENCE_THRESHOLD && hasTable(archetype.archetypeId)) {
+    // For turn/river, use textureArchetypeId for solver lookup
+    const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
+    const street = ctx.state.currentStreet;
+
+    if (archetype.confidence >= CONFIDENCE_THRESHOLD && hasTable(lookupArchetypeId, street)) {
       const handCat = categorizeHand(ctx.holeCards, ctx.state.communityCards);
       const lookup = lookupFrequencies(
-        archetype.archetypeId,
+        lookupArchetypeId,
         handCat.category,
         classCtx.isInPosition,
+        street,
       );
 
       if (lookup) {

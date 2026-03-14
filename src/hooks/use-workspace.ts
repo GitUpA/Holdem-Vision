@@ -547,11 +547,18 @@ export function useWorkspace(mode: WorkspaceMode) {
   }, []);
 
   const computeSolution = useCallback((deal: ConstrainedDeal): SpotSolution | null => {
-    const archId = deal.archetype.archetypeId;
-    const lookup = lookupFrequencies(archId, deal.handCategory.category, deal.isInPosition);
+    // For postflop principles, use textureArchetypeId for solver lookup
+    const lookupId = deal.archetype.textureArchetypeId ?? deal.archetype.archetypeId;
+    // Derive street from community card count
+    const street = deal.communityCards.length <= 0 ? "preflop" as const
+      : deal.communityCards.length <= 3 ? "flop" as const
+      : deal.communityCards.length === 4 ? "turn" as const
+      : "river" as const;
+
+    const lookup = lookupFrequencies(lookupId, deal.handCategory.category, deal.isInPosition, street);
     if (!lookup) return null;
 
-    const table = getTable(archId);
+    const table = getTable(lookupId, street);
     let optimalAction: GtoAction = "check";
     let optimalFrequency = 0;
     for (const [action, freq] of Object.entries(lookup.frequencies)) {
@@ -565,14 +572,14 @@ export function useWorkspace(mode: WorkspaceMode) {
       ? (table?.actionsIp ?? [])
       : (table?.actionsOop ?? []);
 
-    const explanation = explainArchetype(deal.archetype, deal.handCategory, deal.isInPosition);
+    const explanation = explainArchetype(deal.archetype, deal.handCategory, deal.isInPosition, undefined, street);
 
     let accuracyImpact: AccuracyImpact | undefined;
-    const archetypeAccuracy = getAccuracy(archId);
+    const archetypeAccuracy = getAccuracy(lookupId, street);
     if (archetypeAccuracy && deal.communityCards.length >= 3) {
       const boardTexture = analyzeBoard(deal.communityCards as CardIndex[]);
       const features = boardToFeatures(boardTexture);
-      const typicality = scoreBoardTypicality(archId, features);
+      const typicality = scoreBoardTypicality(lookupId, features);
       const topGap = computeTopActionGap(lookup.frequencies);
       const potBB = 7;
       accuracyImpact = estimateBoardAccuracy(archetypeAccuracy, typicality, potBB, topGap);
@@ -619,6 +626,40 @@ export function useWorkspace(mode: WorkspaceMode) {
     setNumPlayers(deal.numPlayers);
 
     sess.startHand(undefined, deal.cardOverrides, deal.communityCards);
+
+    // For postflop drills, auto-advance hero through earlier streets
+    // until we reach the target street (where the real decision happens).
+    const STREET_ORDER = ["preflop", "flop", "turn", "river"] as const;
+    const targetStreet = deal.communityCards.length <= 0 ? "preflop"
+      : deal.communityCards.length <= 3 ? "flop"
+      : deal.communityCards.length === 4 ? "turn"
+      : "river";
+    const targetIdx = STREET_ORDER.indexOf(targetStreet);
+
+    let safety = 0;
+    while (safety < 20) {
+      safety++;
+      const state = sess.state;
+      if (!state || state.phase === "complete" || state.phase === "showdown") break;
+
+      const currentIdx = STREET_ORDER.indexOf(state.currentStreet);
+      if (currentIdx >= targetIdx) break; // reached target street
+
+      if (state.activePlayerIndex === null) break;
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (activePlayer.seatIndex !== sess.heroSeatIndex) break;
+
+      const legal = currentLegalActions(state);
+      if (!legal) break;
+
+      if (legal.canCheck) {
+        sess.act("check");
+      } else if (legal.canCall) {
+        sess.act("call");
+      } else {
+        break;
+      }
+    }
 
     drillPhaseRef.current = "ready";
     forceRender();
@@ -704,12 +745,17 @@ export function useWorkspace(mode: WorkspaceMode) {
       const { actionType, amount } = gtoActionToGameAction(gtoAction, legal, state.pot.total);
       sess.act(actionType, amount);
 
+      const drillStreet = deal.communityCards.length <= 0 ? "preflop" as const
+        : deal.communityCards.length <= 3 ? "flop" as const
+        : deal.communityCards.length === 4 ? "turn" as const
+        : "river" as const;
       const score = scoreAction(
         deal.archetype,
         deal.handCategory,
         gtoAction,
         state.pot.total / DEFAULT_DRILL_BLINDS.big,
         deal.isInPosition,
+        drillStreet,
       );
 
       drillCurrentScoreRef.current = score;
