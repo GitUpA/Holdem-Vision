@@ -5,7 +5,7 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { ActionType, LegalActions } from "../state/game-state";
-import type { GtoAction } from "./tables/types";
+import type { GtoAction, ActionFrequencies } from "./tables/types";
 
 export interface GameActionResult {
   actionType: ActionType;
@@ -105,6 +105,57 @@ export function gtoActionLabel(action: GtoAction): string {
     case "raise_large": return "Raise Large";
     default: return action;
   }
+}
+
+/**
+ * Remap solver frequencies so action labels match what's actually legal.
+ * check↔call when one isn't available, bet↔raise similarly.
+ * Used by coaching lens and drill mode solution display.
+ */
+export function remapFrequenciesToLegal(
+  freqs: ActionFrequencies,
+  legal: LegalActions,
+): ActionFrequencies {
+  const result: ActionFrequencies = { ...freqs };
+
+  // fold → check: if can't fold but can check, fold means "don't commit chips"
+  if (!legal.canFold && legal.canCheck && result.fold) {
+    result.check = (result.check ?? 0) + result.fold;
+    delete result.fold;
+  }
+
+  // check ↔ call: if one isn't legal, merge into the other
+  if (!legal.canCheck && result.check) {
+    result.call = (result.call ?? 0) + result.check;
+    delete result.check;
+  } else if (!legal.canCall && result.call) {
+    result.check = (result.check ?? 0) + result.call;
+    delete result.call;
+  }
+
+  // bet → raise when can't bet but can raise
+  if (!legal.canBet && legal.canRaise) {
+    for (const betKey of ["bet_small", "bet_medium", "bet_large"] as const) {
+      if (result[betKey]) {
+        const raiseKey = betKey === "bet_small" ? "raise_small" : "raise_large";
+        result[raiseKey] = (result[raiseKey] ?? 0) + (result[betKey] ?? 0);
+        delete result[betKey];
+      }
+    }
+  }
+
+  // raise → bet when can't raise but can bet
+  if (!legal.canRaise && legal.canBet) {
+    for (const raiseKey of ["raise_small", "raise_large"] as const) {
+      if (result[raiseKey]) {
+        const betKey = raiseKey === "raise_small" ? "bet_small" : "bet_large";
+        result[betKey] = (result[betKey] ?? 0) + (result[raiseKey] ?? 0);
+        delete result[raiseKey];
+      }
+    }
+  }
+
+  return result;
 }
 
 function clamp(value: number, min: number, max: number): number {

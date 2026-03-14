@@ -61,7 +61,7 @@ pnpm test:watch    # watch mode
 - Domain logic is pure TS in `convex/lib/` — no React, no Convex runtime.
 - Opponent profiles use situation-based model (11 SituationKeys x BehavioralParams).
 - 1 unified decision engine (`modified-gto`): GTO solver base + profile-specific frequency modifiers (NIT/FISH/TAG/LAG/GTO).
-- `/vision` and `/drill` routes are public (no auth required).
+- `/vision` is public (no auth required). Drill mode lives at `/vision?mode=drill` (no separate `/drill` route).
 
 ## Lint Notes
 

@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * useDrillSession — orchestrates GTO drill mode.
+ * useDrillSession — React hook orchestrating GTO drill mode.
  *
  * Flow: select archetype → constrained deal → compute full GTO solution →
  * user picks GtoAction (or studies solution) → score → next hand.
  *
- * KEY DESIGN: The GTO solution (frequencies, bands, accuracy, explanation)
- * is computed at DEAL TIME and held in state. The UI decides when to reveal
- * it — "learn mode" shows everything immediately, "quiz mode" hides until
- * after the user acts. This is a UI concern, not a hook concern.
+ * KEY DESIGN: The pipeline logic (deal → solve → advance → remap) lives in
+ * convex/lib/gto/drillPipeline.ts — a pure TS module shared with tests.
+ * This ensures that what the user sees in the UI is identical to what
+ * tests verify. The hook is a thin React wrapper over that pipeline.
  *
- * Wraps HandSession for state machine / auto-play / audit.
+ * The GTO solution is computed at DEAL TIME and held in state. The UI decides
+ * when to reveal it — "learn mode" shows everything immediately, "quiz mode"
+ * hides until after the user acts. This is a UI concern, not a hook concern.
  */
 import { useState, useCallback, useRef } from "react";
 import type { GameState } from "../../convex/lib/state/game-state";
@@ -19,40 +21,18 @@ import { currentLegalActions } from "../../convex/lib/state/state-machine";
 import { HandSession } from "../../convex/lib/session/handSession";
 import { PRESET_PROFILES } from "../../convex/lib/opponents/presets";
 import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
-import type { ExplanationNode } from "../../convex/lib/types/analysis";
-import type {
-  GtoAction,
-  ActionFrequencies,
-  ActionFrequencyBands,
-  ArchetypeAccuracy,
-  AccuracyImpact,
-} from "../../convex/lib/gto/tables/types";
-import {
-  estimateBoardAccuracy,
-  scoreBoardTypicality,
-  boardToFeatures,
-  computeTopActionGap,
-} from "../../convex/lib/gto/tables/types";
-import {
-  dealForArchetype,
-  type ConstrainedDeal,
-  type DrillConstraints,
-} from "../../convex/lib/gto/constrainedDealer";
-import {
-  gtoActionToGameAction,
-} from "../../convex/lib/gto/actionMapping";
+import type { GtoAction } from "../../convex/lib/gto/tables/types";
+import type { ConstrainedDeal } from "../../convex/lib/gto/constrainedDealer";
+import { gtoActionToGameAction } from "../../convex/lib/gto/actionMapping";
 import {
   scoreAction,
   type ActionScore,
 } from "../../convex/lib/gto/evScoring";
 import {
-  getTable,
-  lookupFrequencies,
-  getAccuracy,
-} from "../../convex/lib/gto/tables/tableRegistry";
-import { explainArchetype } from "../../convex/lib/gto/archetypeExplainer";
-import { analyzeBoard } from "../../convex/lib/opponents/engines/boardTexture";
-import type { CardIndex } from "../../convex/lib/types/cards";
+  executeDrillPipeline,
+  streetFromCommunityCount,
+  type SpotSolution,
+} from "../../convex/lib/gto/drillPipeline";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -60,38 +40,14 @@ import type { CardIndex } from "../../convex/lib/types/cards";
 
 export type DrillPhase = "idle" | "dealing" | "ready" | "acted" | "summary";
 
+// Re-export SpotSolution from the shared pipeline module
+export type { SpotSolution } from "../../convex/lib/gto/drillPipeline";
+
 export interface DrillProgress {
   optimal: number;
   acceptable: number;
   mistake: number;
   blunder: number;
-}
-
-/**
- * Full GTO solution for the current spot — computed at deal time.
- * The UI decides when/what to reveal.
- */
-export interface SpotSolution {
-  /** GTO frequency distribution for this hand category + position */
-  frequencies: ActionFrequencies;
-  /** The highest-frequency GTO action */
-  optimalAction: GtoAction;
-  /** How often GTO takes the optimal action */
-  optimalFrequency: number;
-  /** Available actions for this position */
-  availableActions: GtoAction[];
-  /** Teaching explanation (archetype + hand + position + why) */
-  explanation: ExplanationNode;
-  /** Whether the lookup was an exact category match */
-  isExactMatch: boolean;
-  /** Fallback category used (if not exact) */
-  resolvedCategory: string;
-  /** Frequency bands — range across solved boards (if solver data available) */
-  bands?: ActionFrequencyBands;
-  /** Archetype-level accuracy metrics (if available) */
-  archetypeAccuracy?: ArchetypeAccuracy;
-  /** Board-specific accuracy impact — the "within X BB" number */
-  accuracyImpact?: AccuracyImpact;
 }
 
 export interface DrillSessionState {
@@ -150,74 +106,7 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
     };
   }, []);
 
-  // ── Compute the full GTO solution for a deal ──
-
-  const computeSolution = useCallback((deal: ConstrainedDeal): SpotSolution | null => {
-    // For postflop principles, use textureArchetypeId for solver lookup
-    const lookupId = deal.archetype.textureArchetypeId ?? deal.archetype.archetypeId;
-    // Derive street from community card count
-    const street = deal.communityCards.length <= 0 ? "preflop" as const
-      : deal.communityCards.length <= 3 ? "flop" as const
-      : deal.communityCards.length === 4 ? "turn" as const
-      : "river" as const;
-
-    // Look up frequencies (with bands if available)
-    const lookup = lookupFrequencies(lookupId, deal.handCategory.category, deal.isInPosition, street);
-    if (!lookup) return null;
-
-    const table = getTable(lookupId, street);
-
-    // Find optimal action
-    let optimalAction: GtoAction = "check";
-    let optimalFrequency = 0;
-    for (const [action, freq] of Object.entries(lookup.frequencies)) {
-      if ((freq ?? 0) > optimalFrequency) {
-        optimalFrequency = freq ?? 0;
-        optimalAction = action as GtoAction;
-      }
-    }
-
-    // Available actions for this position
-    const availableActions = deal.isInPosition
-      ? (table?.actionsIp ?? [])
-      : (table?.actionsOop ?? []);
-
-    // Teaching explanation (without user action — pure "what GTO does and why")
-    const explanation = explainArchetype(deal.archetype, deal.handCategory, deal.isInPosition, undefined, street);
-
-    // Accuracy impact — compute "within X BB" number
-    let accuracyImpact: AccuracyImpact | undefined;
-    const archetypeAccuracy = getAccuracy(lookupId, street);
-    if (archetypeAccuracy && deal.communityCards.length >= 3) {
-      // Compute board typicality from community cards
-      const boardTexture = analyzeBoard(deal.communityCards as CardIndex[]);
-      const features = boardToFeatures(boardTexture);
-      const typicality = scoreBoardTypicality(lookupId, features);
-
-      // Top action gap for precise impact assessment
-      const topGap = computeTopActionGap(lookup.frequencies);
-
-      // Estimate pot size in BB (at flop, typically ~6-7 BB in SRP)
-      const potBB = 7; // conservative SRP estimate
-
-      accuracyImpact = estimateBoardAccuracy(archetypeAccuracy, typicality, potBB, topGap);
-    }
-
-    return {
-      frequencies: lookup.frequencies,
-      optimalAction,
-      optimalFrequency,
-      availableActions,
-      explanation,
-      isExactMatch: lookup.isExact,
-      resolvedCategory: lookup.handCategory,
-      bands: lookup.bands,
-      archetypeAccuracy: lookup.archetypeAccuracy,
-      accuracyImpact,
-    };
-  }, []);
-
-  // ── Deal a single hand ──
+  // ── Deal a single hand (delegates to shared pipeline) ──
 
   const dealNextHand = useCallback(() => {
     const archId = archetypeRef.current;
@@ -226,65 +115,20 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
     phaseRef.current = "dealing";
     rerender();
 
-    // Generate constrained deal
-    const deal = dealForArchetype(
-      { archetypeId: archId } as DrillConstraints,
+    // Execute the canonical pipeline — same code path as tests
+    const result = executeDrillPipeline(
+      archId,
       rngRef.current,
+      sessionRef.current,
     );
-    currentDealRef.current = deal;
+
+    currentDealRef.current = result.deal;
     currentScoreRef.current = null;
-
-    // Compute full GTO solution at deal time
-    solutionRef.current = computeSolution(deal);
-
-    // Update session config for this deal's seats
-    const session = sessionRef.current;
-    session.updateConfig({
-      heroSeatIndex: deal.heroSeatIndex,
-      dealerSeatIndex: deal.dealerSeatIndex,
-      numPlayers: deal.numPlayers,
-    });
-
-    // Start hand with card overrides + community cards
-    session.startHand(undefined, deal.cardOverrides, deal.communityCards);
-
-    // For postflop drills, auto-advance hero through earlier streets
-    // until we reach the target street (where the real decision happens).
-    const STREET_ORDER = ["preflop", "flop", "turn", "river"] as const;
-    const targetStreet = deal.communityCards.length <= 0 ? "preflop"
-      : deal.communityCards.length <= 3 ? "flop"
-      : deal.communityCards.length === 4 ? "turn"
-      : "river";
-    const targetIdx = STREET_ORDER.indexOf(targetStreet);
-
-    let safety = 0;
-    while (safety < 20) {
-      safety++;
-      const state = session.state;
-      if (!state || state.phase === "complete" || state.phase === "showdown") break;
-
-      const currentIdx = STREET_ORDER.indexOf(state.currentStreet);
-      if (currentIdx >= targetIdx) break;
-
-      if (state.activePlayerIndex === null) break;
-      const activePlayer = state.players[state.activePlayerIndex];
-      if (activePlayer.seatIndex !== session.heroSeatIndex) break;
-
-      const legal = currentLegalActions(state);
-      if (!legal) break;
-
-      if (legal.canCheck) {
-        session.act("check");
-      } else if (legal.canCall) {
-        session.act("call");
-      } else {
-        break;
-      }
-    }
+    solutionRef.current = result.solution;
 
     phaseRef.current = "ready";
     rerender();
-  }, [rerender, computeSolution]);
+  }, [rerender]);
 
   // ── Public API ──
 
@@ -341,11 +185,8 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
       // Apply action
       session.act(actionType, amount);
 
-      // Score against GTO — derive street from community card count
-      const drillStreet = deal.communityCards.length <= 0 ? "preflop" as const
-        : deal.communityCards.length <= 3 ? "flop" as const
-        : deal.communityCards.length === 4 ? "turn" as const
-        : "river" as const;
+      // Score against GTO — use shared street derivation
+      const drillStreet = streetFromCommunityCount(deal.communityCards.length);
       const score = scoreAction(
         deal.archetype,
         deal.handCategory,

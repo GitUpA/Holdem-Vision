@@ -247,6 +247,78 @@ describe("Category Strength Ordering", () => {
 // closestCategory
 // ═══════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════
+// BOARD-LEVEL HANDS (hero doesn't contribute)
+// ═══════════════════════════════════════════════════════
+
+describe("Board-Level Hands", () => {
+  it("board full house with unrelated hero → air/overcards, not sets_plus", () => {
+    // Board: 9s Ts 9d Th 9h → Full House on board
+    // Hero: Ad 3d → doesn't contribute, ace is overcard
+    const r = classify(["Ad", "3d"], ["9s", "Ts", "9d", "Th", "9h"]);
+    expect(r.category).not.toBe("sets_plus");
+    // Ace is above board ranks, should be overcards
+    expect(r.category).toBe("overcards");
+  });
+
+  it("board full house with low hero cards → air", () => {
+    // Board: 9s Ts 9d Th 9h → Full House on board
+    // Hero: 4h 3c → no kicker value
+    const r = classify(["4h", "3c"], ["9s", "Ts", "9d", "Th", "9h"]);
+    expect(r.category).toBe("air");
+    expect(r.subCategory).toBe("board_monster");
+  });
+
+  it("board full house but hero improves to quads → sets_plus", () => {
+    // Board: 9s Ts 9d Th 9h → Full House on board
+    // Hero: 9c Ad → Hero has quad 9s!
+    const r = classify(["9c", "Ad"], ["9s", "Ts", "9d", "Th", "9h"]);
+    expect(r.category).toBe("sets_plus");
+  });
+
+  it("board straight with unrelated hero → air/overcards", () => {
+    // Board: 5s 6h 7d 8c 9s → Straight on board
+    // Hero: 2h 3d → no improvement
+    const r = classify(["2h", "3d"], ["5s", "6h", "7d", "8c", "9s"]);
+    expect(r.category).not.toBe("sets_plus");
+  });
+
+  it("board straight but hero has higher straight → sets_plus", () => {
+    // Board: 5s 6h 7d 8c 9s → Straight on board (5-9)
+    // Hero: Th Jd → Hero has higher straight (7-J)
+    const r = classify(["Th", "Jd"], ["5s", "6h", "7d", "8c", "9s"]);
+    expect(r.category).toBe("sets_plus");
+  });
+
+  it("board flush with unrelated hero → air", () => {
+    // Board: 2s 5s 7s 9s Ks → Flush on board
+    // Hero: Ad 3h → no spade, ace kicker irrelevant (board flush)
+    const r = classify(["Ad", "3h"], ["2s", "5s", "7s", "9s", "Ks"]);
+    expect(r.category).not.toBe("sets_plus");
+  });
+
+  it("board flush but hero has higher flush card → sets_plus", () => {
+    // Board: 2s 5s 7s 9s Ks → Flush on board
+    // Hero: As 3h → Hero has nut flush (As replaces 2s)
+    const r = classify(["As", "3h"], ["2s", "5s", "7s", "9s", "Ks"]);
+    expect(r.category).toBe("sets_plus");
+  });
+
+  it("board trips with unrelated hero → not sets_plus", () => {
+    // Board: 9s 9d 9h Th 3c → Trips on board
+    // Hero: 4d 5d → doesn't improve
+    const r = classify(["4d", "5d"], ["9s", "9d", "9h", "Th", "3c"]);
+    expect(r.category).not.toBe("sets_plus");
+  });
+
+  it("board trips but hero has the 4th card → sets_plus (quads)", () => {
+    // Board: 9s 9d 9h Th 3c → Trips on board
+    // Hero: 9c Ad → Quad 9s
+    const r = classify(["9c", "Ad"], ["9s", "9d", "9h", "Th", "3c"]);
+    expect(r.category).toBe("sets_plus");
+  });
+});
+
 describe("closestCategory", () => {
   it("returns exact match when available", () => {
     const available: HandCategory[] = ["air", "top_pair_top_kicker", "sets_plus"];
@@ -264,5 +336,57 @@ describe("closestCategory", () => {
     const available: HandCategory[] = ["top_pair_top_kicker", "middle_pair", "air"];
     // overpair (0.78) → closest to TPTK (0.7)
     expect(closestCategory("overpair", available)).toBe("top_pair_top_kicker");
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// RIVER DRAW SUPPRESSION
+// ═══════════════════════════════════════════════════════
+
+describe("River draw suppression", () => {
+  it("gutshot on flop is classified as straight_draw", () => {
+    // T♦ J♥ on Q♦ 4♣ 8♠ — gutshot (needs 9 for T-J-Q-K... no, 9 for 8-9-T-J)
+    const result = classify(["Td", "Jh"], ["Qd", "4c", "8s"]);
+    // Has a gutshot to a straight (8-9-T-J or T-J-Q-K)
+    expect(["straight_draw", "combo_draw", "overcards"]).toContain(result.category);
+  });
+
+  it("gutshot on river is NOT classified as straight_draw", () => {
+    // T♦ J♥ on Q♦ 4♣ 8♠ 5♠ 2♥ — same draw structure but on river
+    const result = classify(["Td", "Jh"], ["Qd", "4c", "8s", "5s", "2h"]);
+    // On river, draws are meaningless — should be overcards or air
+    expect(result.category).not.toBe("straight_draw");
+    expect(result.category).not.toBe("combo_draw");
+    expect(result.category).not.toBe("flush_draw");
+    expect(result.category).not.toBe("weak_draw");
+  });
+
+  it("flush draw on river is NOT classified as flush_draw", () => {
+    // A♠ 5♠ on K♠ 9♠ 3♦ 7♣ 2♥ — 4 spades (missed flush draw)
+    const result = classify(["As", "5s"], ["Ks", "9s", "3d", "7c", "2h"]);
+    // On river, missed flush draw = air or overcards
+    expect(result.category).not.toBe("flush_draw");
+    expect(result.category).not.toBe("combo_draw");
+  });
+
+  it("combo draw on river is NOT classified as combo_draw", () => {
+    // 7♠ 8♠ on 9♠ T♦ 2♠ K♣ 3♥ — flush draw + OESD on flop, busted on river
+    const result = classify(["7s", "8s"], ["9s", "Td", "2s", "Kc", "3h"]);
+    expect(result.category).not.toBe("combo_draw");
+    expect(result.category).not.toBe("flush_draw");
+    expect(result.category).not.toBe("straight_draw");
+  });
+
+  it("made flush on river IS still classified as sets_plus", () => {
+    // A♠ 5♠ on K♠ 9♠ 3♠ 7♣ 2♥ — 5 spades = made flush
+    const result = classify(["As", "5s"], ["Ks", "9s", "3s", "7c", "2h"]);
+    expect(result.category).toBe("sets_plus");
+    expect(result.subCategory).toBe("flush");
+  });
+
+  it("made straight on river IS still classified as sets_plus", () => {
+    // T♦ J♥ on Q♦ K♣ A♠ 5♠ 2♥ — broadway straight
+    const result = classify(["Td", "Jh"], ["Qd", "Kc", "As", "5s", "2h"]);
+    expect(result.category).toBe("sets_plus");
   });
 });

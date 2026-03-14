@@ -301,7 +301,10 @@ function dealFlopTexture(
 
   // Deal hero hand with prototype-aware retry
   const isIP = heroPosition === "btn" || heroPosition === "co";
-  for (let i = 0; i < 30; i++) {
+
+  // Phase 1: Try for both reasonable preflop AND matching category (50 attempts)
+  let bestFallback: { heroCards: CardIndex[]; handCategory: HandCategorization } | null = null;
+  for (let i = 0; i < 50; i++) {
     const deck = createShuffledDeck(flop, random);
     const heroCards = deal(deck, 2);
 
@@ -309,6 +312,9 @@ function dealFlopTexture(
     if (!isReasonablePreflop(heroCards)) continue;
 
     const handCategory = categorizeHand(heroCards, flop);
+
+    // Save as fallback (first reasonable hand we find)
+    if (!bestFallback) bestFallback = { heroCards, handCategory };
 
     // Filter: must match allowed categories (if any)
     if (allowedCategories && !allowedCategories.includes(handCategory.category)) continue;
@@ -320,7 +326,16 @@ function dealFlopTexture(
     });
   }
 
-  // Fallback: deal anything reasonable
+  // Phase 2: Fallback — use best reasonable hand (category may not match)
+  if (bestFallback) {
+    return buildDeal({
+      heroSeatIndex, dealerSeatIndex, heroCards: bestFallback.heroCards,
+      communityCards: flop, numPlayers, archetypeId,
+      handCategory: bestFallback.handCategory, isInPosition: isIP,
+    });
+  }
+
+  // Phase 3: Last resort — deal any hand (should never reach here)
   const deck = createShuffledDeck(flop, random);
   const heroCards = deal(deck, 2);
   const handCategory = categorizeHand(heroCards, flop);
@@ -431,7 +446,12 @@ function dealPostflopPrinciple(
   const isIP = heroPosition === "btn" || heroPosition === "co";
 
   // Retry loop: generate board + hero hand matching prototype constraints
-  for (let attempt = 0; attempt < 30; attempt++) {
+  let bestFallback: {
+    heroCards: CardIndex[]; communityCards: CardIndex[];
+    handCategory: HandCategorization; textureId: ArchetypeId;
+  } | null = null;
+
+  for (let attempt = 0; attempt < 50; attempt++) {
     const flop = generateFlopForTexture(textureArchetypeId, random);
     const deck = createShuffledDeck(flop, random);
     const extraCards = communityCount > 3 ? deal(deck, communityCount - 3) : [];
@@ -444,7 +464,6 @@ function dealPostflopPrinciple(
 
       if (bc.requirePaired && !tex.isPaired) continue;
       if (bc.requireUnpaired && tex.isPaired) continue;
-      // requireDry/requireWet are handled at texture selection level
     }
 
     const heroCards = deal(deck, 2);
@@ -453,6 +472,11 @@ function dealPostflopPrinciple(
     if (!isReasonablePreflop(heroCards)) continue;
 
     const handCategory = categorizeHand(heroCards, communityCards);
+
+    // Save as fallback (first reasonable hand with valid board)
+    if (!bestFallback) {
+      bestFallback = { heroCards, communityCards, handCategory, textureId: textureArchetypeId };
+    }
 
     // Must match allowed categories
     if (allowedCategories && !allowedCategories.includes(handCategory.category)) continue;
@@ -464,14 +488,39 @@ function dealPostflopPrinciple(
     });
   }
 
-  // Fallback: deal with just the playability filter
+  // Fallback: use best reasonable hand found (category may not match prototype)
+  if (bestFallback) {
+    return buildDeal({
+      heroSeatIndex, dealerSeatIndex, heroCards: bestFallback.heroCards,
+      communityCards: bestFallback.communityCards, numPlayers, archetypeId,
+      handCategory: bestFallback.handCategory, isInPosition: isIP,
+      textureArchetypeId: bestFallback.textureId,
+    });
+  }
+
+  // Last resort: deal any reasonable hand (should rarely reach here)
   const flop = generateFlopForTexture(textureArchetypeId, random);
   const deck = createShuffledDeck(flop, random);
   const extraCards = communityCount > 3 ? deal(deck, communityCount - 3) : [];
   const communityCards = [...flop, ...extraCards];
+
+  // Even last resort tries for reasonable preflop
+  for (let i = 0; i < 10; i++) {
+    const lastDeck = createShuffledDeck(communityCards, random);
+    const heroCards = deal(lastDeck, 2);
+    if (isReasonablePreflop(heroCards)) {
+      const handCategory = categorizeHand(heroCards, communityCards);
+      return buildDeal({
+        heroSeatIndex, dealerSeatIndex, heroCards,
+        communityCards, numPlayers, archetypeId,
+        handCategory, isInPosition: isIP, textureArchetypeId,
+      });
+    }
+  }
+
+  // Absolute last resort
   const heroCards = deal(deck, 2);
   const handCategory = categorizeHand(heroCards, communityCards);
-
   return buildDeal({
     heroSeatIndex, dealerSeatIndex, heroCards,
     communityCards, numPlayers, archetypeId,

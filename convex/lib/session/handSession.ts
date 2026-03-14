@@ -157,14 +157,40 @@ export class HandSession {
 
     // Stack community cards at front of deck so advanceStreet() deals them
     // in order. Same trick used by buildTimeline.ts for replay.
+    //
+    // Community cards may have been randomly dealt to villain hands during
+    // initializeHand(). We must resolve these conflicts: swap any community
+    // card found in a villain's hand with a safe card from the deck.
     if (communityCards?.length) {
+      const players = state.players.map((p) => ({
+        ...p,
+        holeCards: [...p.holeCards],
+      }));
       const deck = [...state.deck];
+
       for (const card of communityCards) {
-        const idx = deck.indexOf(card);
-        if (idx !== -1) deck.splice(idx, 1);
+        // First, try to remove from deck
+        const deckIdx = deck.indexOf(card);
+        if (deckIdx !== -1) {
+          deck.splice(deckIdx, 1);
+        } else {
+          // Card is in a player's hand — swap it out with a safe deck card
+          for (const player of players) {
+            const handIdx = player.holeCards.indexOf(card);
+            if (handIdx !== -1) {
+              // Replace with a card from the back of the deck
+              const replacement = deck.pop();
+              if (replacement !== undefined) {
+                player.holeCards[handIdx] = replacement;
+              }
+              break;
+            }
+          }
+        }
       }
+
       deck.unshift(...communityCards);
-      state = { ...state, deck };
+      state = { ...state, deck, players };
     }
 
     // Mark hero as revealed

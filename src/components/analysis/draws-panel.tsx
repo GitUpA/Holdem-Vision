@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 interface DrawInfo {
   type: string;
   outsCount: number;
+  probability?: number;
   description: string;
 }
 
@@ -83,9 +84,20 @@ export function DrawsPanel({
             <div className="flex-1 min-w-0">
               <p className="text-sm text-[var(--foreground)]">{draw.description}</p>
             </div>
-            <span className="text-sm font-bold tabular-nums text-[var(--out-color)]">
-              {draw.outsCount}
-            </span>
+            {draw.probability != null ? (
+              <span className={cn(
+                "text-sm font-bold tabular-nums",
+                draw.probability >= 0.3 ? "text-[var(--equity-win)]"
+                  : draw.probability >= 0.15 ? "text-[var(--out-color)]"
+                  : "text-[var(--muted-foreground)]",
+              )}>
+                {(draw.probability * 100).toFixed(1)}%
+              </span>
+            ) : (
+              <span className="text-sm font-bold tabular-nums text-[var(--out-color)]">
+                {draw.outsCount}
+              </span>
+            )}
           </motion.div>
         ))}
       </div>

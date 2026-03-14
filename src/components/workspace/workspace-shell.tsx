@@ -164,6 +164,18 @@ function isArchetypeAvailable(arch: ArchetypeEntry): boolean {
 
 const HAND_COUNT_OPTIONS = [5, 10, 20];
 
+/** Look up the user-friendly label for an archetype ID */
+function archetypeLabel(id: ArchetypeId): string {
+  return ALL_ARCHETYPES.find((a) => a.id === id)?.label ?? id.replace(/_/g, " ");
+}
+
+/** Category display for an archetype ID */
+function archetypeCategoryLabel(id: ArchetypeId): string {
+  const cat = ALL_ARCHETYPES.find((a) => a.id === id)?.category;
+  if (!cat) return "";
+  return CATEGORY_LABELS[cat].replace(" Archetypes", "");
+}
+
 export type DrillMode = "learn" | "quiz";
 
 // ═══════════════════════════════════════════════════════
@@ -176,9 +188,18 @@ export interface DrillParams {
   mode?: DrillMode;
 }
 
+export interface VisionParams {
+  deal: boolean;
+  street?: "preflop" | "flop" | "turn" | "river";
+  players?: number;
+  dealer?: number;
+  lenses?: string[];
+}
+
 interface WorkspaceShellProps {
   initialMode?: WorkspaceModeId;
   drillParams?: DrillParams;
+  visionParams?: VisionParams;
 }
 
 const MODE_CONFIGS: Record<WorkspaceModeId, () => WorkspaceMode> = {
@@ -186,7 +207,7 @@ const MODE_CONFIGS: Record<WorkspaceModeId, () => WorkspaceMode> = {
   drill: drillModeConfig,
 };
 
-export function WorkspaceShell({ initialMode = "vision", drillParams }: WorkspaceShellProps) {
+export function WorkspaceShell({ initialMode = "vision", drillParams, visionParams }: WorkspaceShellProps) {
   const [modeId, setModeId] = useState<WorkspaceModeId>(initialMode);
   const mode = useMemo(() => MODE_CONFIGS[modeId](), [modeId]);
   const ws = useWorkspace(mode);
@@ -205,6 +226,33 @@ export function WorkspaceShell({ initialMode = "vision", drillParams }: Workspac
     drillAutoStarted.current = true;
     startDrill(drillParams.archetype, drillParams.hands ?? 10);
   }, [drillParams, startDrill]);
+
+  // Auto-setup vision mode from URL params
+  const visionAutoStarted = useRef(false);
+  useEffect(() => {
+    if (visionAutoStarted.current || !visionParams?.deal || modeId !== "vision") return;
+    visionAutoStarted.current = true;
+
+    // Configure table before dealing
+    if (visionParams.players) ws.setNumPlayers(visionParams.players);
+    if (visionParams.dealer !== undefined) ws.moveDealer(visionParams.dealer);
+
+    // Set active lenses if specified
+    if (visionParams.lenses) {
+      const desired = new Set(visionParams.lenses);
+      // Toggle off defaults not in desired set, toggle on desired not in current
+      for (const id of ws.activeLensIds) {
+        if (!desired.has(id)) ws.toggleLens(id);
+      }
+      for (const id of desired) {
+        if (!ws.activeLensIds.includes(id)) ws.toggleLens(id);
+      }
+    }
+
+    // Deal hand — auto-play will advance through streets
+    ws.startHand();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time auto-setup from URL params
+  }, [visionParams, modeId]);
 
   // Expose audit export to browser console
   useEffect(() => {
@@ -723,7 +771,7 @@ function AnalysisPanels({ ws }: { ws: WorkspaceState }) {
               <VisualRenderer results={new Map([[lensId, result]])} street={ws.street} />
               {!(lensId === "coaching" && result.visuals.length > 0) && (
                 <div className="border-t border-[var(--border)] pt-3">
-                  <ExplanationTree node={result.explanation} defaultOpen={true} />
+                  <ExplanationTree node={result.explanation} defaultOpen={lensId !== "threats" && lensId !== "outs"} />
                 </div>
               )}
             </div>
@@ -976,22 +1024,35 @@ function ActiveDrill({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
+      <div className="space-y-2">
+        {/* Drill header — archetype name prominently displayed */}
+        {ws.drillArchetypeId && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-[var(--foreground)]">
+                {archetypeLabel(ws.drillArchetypeId)}
+              </h2>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20 font-medium">
+                {archetypeCategoryLabel(ws.drillArchetypeId)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button onClick={ws.resetDrill}
+                className="px-2 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:text-red-400 hover:border-red-400/40 transition-colors"
+                title="Quit drill">
+                <span className="text-[9px] font-medium">Quit</span>
+              </button>
+              <button onClick={onOpenGuide}
+                className="w-5 h-5 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors"
+                title="How to use Drill Mode">
+                <span className="text-[9px] font-bold">?</span>
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
           <span>Hand {Math.min(ws.drillHandsPlayed + 1, ws.drillHandsTarget)} of {ws.drillHandsTarget}</span>
-          <div className="flex items-center gap-2">
-            <span>{ws.drillProgress.optimal}W {ws.drillProgress.acceptable}A {ws.drillProgress.mistake}M {ws.drillProgress.blunder}B</span>
-            <button onClick={ws.resetDrill}
-              className="px-2 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:text-red-400 hover:border-red-400/40 transition-colors"
-              title="Quit drill">
-              <span className="text-[9px] font-medium">Quit</span>
-            </button>
-            <button onClick={onOpenGuide}
-              className="w-5 h-5 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors"
-              title="How to use Drill Mode">
-              <span className="text-[9px] font-bold">?</span>
-            </button>
-          </div>
+          <span>{ws.drillProgress.optimal}W {ws.drillProgress.acceptable}A {ws.drillProgress.mistake}M {ws.drillProgress.blunder}B</span>
         </div>
         <div className="h-1.5 rounded-full bg-[var(--muted)]/30 overflow-hidden">
           <motion.div className="h-full bg-[var(--gold)] rounded-full"
@@ -999,6 +1060,7 @@ function ActiveDrill({
         </div>
       </div>
 
+      {/* Deal info — board texture + position + hand category */}
       {ws.drillCurrentDeal && (
         <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
           <span className="px-2 py-0.5 rounded bg-[var(--muted)]/20 border border-[var(--border)]">
@@ -1033,6 +1095,16 @@ function DrillSummary({ ws, onNewDrill }: { ws: WorkspaceState; onNewDrill: () =
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">Drill Complete</h2>
+        {ws.drillArchetypeId && (
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-sm font-semibold text-[var(--gold)]">
+              {archetypeLabel(ws.drillArchetypeId)}
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)]/70 border border-[var(--gold)]/20">
+              {archetypeCategoryLabel(ws.drillArchetypeId)}
+            </span>
+          </div>
+        )}
         <p className="text-xs text-[var(--muted-foreground)] mt-1">
           {total} hands played — average EV loss: {avgEvLoss.toFixed(1)} BB
         </p>

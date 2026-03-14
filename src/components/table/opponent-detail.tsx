@@ -126,8 +126,7 @@ export function OpponentDetail({
           )}
         </div>
 
-        {/* Card assignment + visibility — hidden in readOnly */}
-        {!readOnly && (
+        {/* Card visibility — always available (reveal/hide + display) */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
@@ -152,7 +151,7 @@ export function OpponentDetail({
             </div>
           </div>
 
-          {/* Card slots */}
+          {/* Card display / assignment */}
           <div className="flex items-center gap-2">
             {seat.cardVisibility !== "hidden" && seat.holeCards.length === 2 ? (
               <>
@@ -167,7 +166,7 @@ export function OpponentDetail({
                   {seat.cardVisibility === "revealed" ? "Visible" : "Assigned"}
                 </span>
               </>
-            ) : (
+            ) : !readOnly ? (
               <>
                 <MiniCardSlot
                   card={villainCardBuffer?.[0]}
@@ -192,10 +191,11 @@ export function OpponentDetail({
                   </button>
                 )}
               </>
+            ) : (
+              <span className="text-[10px] text-[var(--muted-foreground)]">Hidden</span>
             )}
           </div>
         </div>
-        )}
 
         {/* Action history (read-only — actions come from the state machine) */}
         {seat.actions.length > 0 && (

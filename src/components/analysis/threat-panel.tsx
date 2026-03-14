@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { cardToDisplay } from "../../../convex/lib/primitives/card";
+import { cardToDisplay, rankValue } from "../../../convex/lib/primitives/card";
 import type { CardIndex } from "../../../convex/lib/types/cards";
 
 interface ThreatCard {
@@ -46,19 +46,65 @@ function urgencyColor(urgency: number): string {
   return "text-yellow-400";
 }
 
+function urgencyChipBg(urgency: number): string {
+  if (urgency >= 0.7) return "bg-red-500/20 text-red-300";
+  if (urgency >= 0.4) return "bg-orange-500/20 text-orange-300";
+  return "bg-yellow-500/20 text-yellow-300";
+}
+
+/** Group threats that share the same reason into collapsed rows. */
+interface ThreatGroup {
+  cards: CardIndex[];
+  urgency: number;
+  reason: string;
+  category: string;
+}
+
+function groupThreats(threats: ThreatCard[]): ThreatGroup[] {
+  const map = new Map<string, ThreatGroup>();
+
+  for (const t of threats) {
+    // Group key: same rank + same primary category = same group
+    // For flush threats (suit-based), group by category + suit count pattern instead
+    const primaryCat = t.categories[0] ?? "unknown";
+    const rank = rankValue(t.cardIndex);
+    const key =
+      primaryCat === "completes_flush"
+        ? `flush-${t.reasons[0]}`  // flush reasons already encode suit info
+        : `${primaryCat}-${rank}`;
+
+    const existing = map.get(key);
+    if (existing) {
+      existing.cards.push(t.cardIndex);
+      existing.urgency = Math.max(existing.urgency, t.urgency);
+    } else {
+      map.set(key, {
+        cards: [t.cardIndex],
+        urgency: t.urgency,
+        reason: t.reasons[0],
+        category: primaryCat,
+      });
+    }
+  }
+
+  const groups = [...map.values()];
+  groups.sort((a, b) => b.urgency - a.urgency);
+  return groups;
+}
+
 export function ThreatPanel({ threats, threatCount, safeCount }: ThreatPanelProps) {
   const total = threatCount + safeCount;
   const threatPct = total > 0 ? ((threatCount / total) * 100).toFixed(0) : "0";
-  const highThreats = threats.filter((t) => t.urgency >= 0.6);
-  const otherThreats = threats.filter((t) => t.urgency < 0.6);
 
-  // Group threats by category for summary
+  // Group threats by category for summary pills
   const byCat: Record<string, number> = {};
   for (const t of threats) {
     for (const c of t.categories) {
       byCat[c] = (byCat[c] || 0) + 1;
     }
   }
+
+  const groups = groupThreats(threats);
 
   return (
     <div className="space-y-3">
@@ -93,28 +139,20 @@ export function ThreatPanel({ threats, threatCount, safeCount }: ThreatPanelProp
                   CATEGORY_COLORS[cat] ?? "bg-gray-500/20 text-gray-400 border-gray-500/30",
                 )}
               >
-                {CATEGORY_LABELS[cat] ?? cat} ×{count}
+                {CATEGORY_LABELS[cat] ?? cat} x{count}
               </span>
             ))}
         </div>
       )}
 
-      {/* Threat list */}
-      {threatCount > 0 && (
-        <div className="space-y-1 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+      {/* Grouped threat list */}
+      {groups.length > 0 && (
+        <div className="space-y-2">
           <AnimatePresence>
-            {highThreats.slice(0, 10).map((t, i) => (
-              <ThreatRow key={t.cardIndex} threat={t} index={i} />
-            ))}
-            {otherThreats.slice(0, 6).map((t, i) => (
-              <ThreatRow key={t.cardIndex} threat={t} index={highThreats.length + i} />
+            {groups.map((group, i) => (
+              <ThreatGroupRow key={`${group.category}-${group.cards[0]}`} group={group} index={i} />
             ))}
           </AnimatePresence>
-          {threats.length > 16 && (
-            <p className="text-[10px] text-[var(--muted-foreground)] pl-2 pt-1">
-              +{threats.length - 16} more threats
-            </p>
-          )}
         </div>
       )}
 
@@ -127,23 +165,40 @@ export function ThreatPanel({ threats, threatCount, safeCount }: ThreatPanelProp
   );
 }
 
-function ThreatRow({ threat, index }: { threat: ThreatCard; index: number }) {
+function ThreatGroupRow({ group, index }: { group: ThreatGroup; index: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.02 }}
-      className="flex items-center gap-2 text-xs py-1 px-2 rounded-md bg-[var(--muted)]/50 hover:bg-[var(--muted)] transition-colors"
+      className="space-y-1"
     >
-      <span className="font-mono font-bold text-sm min-w-[2rem] text-center text-[var(--foreground)]">
-        {cardToDisplay(threat.cardIndex)}
-      </span>
-      <span className={cn("font-bold text-[10px] min-w-[2rem]", urgencyColor(threat.urgency))}>
-        {urgencyLabel(threat.urgency)}
-      </span>
-      <span className="text-[var(--muted-foreground)] truncate flex-1">
-        {threat.reasons[0]}
-      </span>
+      {/* Header: reason + urgency */}
+      <div className="flex items-center justify-between">
+        <span className={cn("text-xs font-medium", urgencyColor(group.urgency))}>
+          {group.reason}
+        </span>
+        <span className={cn("text-[10px] font-bold tabular-nums", urgencyColor(group.urgency))}>
+          {urgencyLabel(group.urgency)}
+        </span>
+      </div>
+      {/* Card chips */}
+      <div className="flex flex-wrap gap-1">
+        {group.cards.map((card, i) => (
+          <motion.span
+            key={card}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.02 }}
+            className={cn(
+              "text-xs font-mono font-bold px-1.5 py-0.5 rounded",
+              urgencyChipBg(group.urgency),
+            )}
+          >
+            {cardToDisplay(card)}
+          </motion.span>
+        ))}
+      </div>
     </motion.div>
   );
 }

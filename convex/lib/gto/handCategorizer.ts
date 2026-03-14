@@ -14,7 +14,7 @@
  */
 import type { CardIndex } from "../types/cards";
 import { rankValue, suitValue } from "../primitives/card";
-import { evaluateHand } from "../primitives/handEvaluator";
+import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
 import { detectDraws, type DrawInfo } from "../opponents/engines/drawDetector";
 
 // ═══════════════════════════════════════════════════════
@@ -224,8 +224,21 @@ function categorizePostflop(
   const draws = detectDraws(holeCards, communityCards);
   const tier = madeHand.rank.tier;
 
+  // ── Check if hero's cards actually improve on the board ──
+  // If the board alone makes the same hand (or better), hero doesn't contribute
+  // and should be classified by kicker/draw potential instead.
+  // Compare actual hand ranks, not just tiers, to catch cases like
+  // board straight 5-9 vs hero's higher straight 7-J (same tier, different rank).
+  let heroImprovesBoardHand = true;
+  let boardOnlyTier = -1;
+  if (communityCards.length >= 5) {
+    const boardOnlyHand = evaluateHand(communityCards);
+    boardOnlyTier = boardOnlyHand.rank.tier;
+    heroImprovesBoardHand = compareHandRanks(madeHand.rank, boardOnlyHand.rank) > 0;
+  }
+
   // ── Monster hands: straight+ (tier >= 4) ──
-  if (tier >= 4) {
+  if (tier >= 4 && heroImprovesBoardHand) {
     return {
       category: "sets_plus",
       subCategory: madeHand.rank.name.toLowerCase().replace(/ /g, "_"),
@@ -234,9 +247,53 @@ function categorizePostflop(
     };
   }
 
+  // Board has a monster but hero doesn't improve it — classify by kicker/draws
+  if (tier >= 4 && !heroImprovesBoardHand) {
+    // Hero's cards are irrelevant to the made hand; everyone has the same hand.
+    // Classify based on kicker strength (if it matters) or draw potential.
+    if (highHero > boardRanks[0]) {
+      return {
+        category: "overcards",
+        subCategory: "board_monster_kicker",
+        relativeStrength: 0.2 + highHero * 0.005,
+        description: `Board ${madeHand.rank.name} (${rankName(highHero)} kicker)`,
+      };
+    }
+    return {
+      category: "air",
+      subCategory: "board_monster",
+      relativeStrength: 0.05 + highHero * 0.003,
+      description: `Board ${madeHand.rank.name} (no kicker)`,
+    };
+  }
+
   // ── Three of a kind (set or trips) ──
   if (tier === 3) {
+    // Check hero actually holds one of the trip cards
+    const tripRank = boardRanks.find((r) =>
+      boardRanks.filter((br) => br === r).length >= 2,
+    );
+    const heroHasTrip = tripRank !== undefined && heroRanks.includes(tripRank);
     const isSet = isPocketPair;
+
+    // If board already has trips and hero doesn't contribute, downgrade
+    if (!isSet && !heroHasTrip && boardOnlyTier >= 3) {
+      if (highHero > boardRanks[0]) {
+        return {
+          category: "overcards",
+          subCategory: "board_trips_kicker",
+          relativeStrength: 0.25 + highHero * 0.005,
+          description: `Board trips (${rankName(highHero)} kicker)`,
+        };
+      }
+      return {
+        category: "air",
+        subCategory: "board_trips",
+        relativeStrength: 0.05 + highHero * 0.003,
+        description: "Board trips (no kicker)",
+      };
+    }
+
     return {
       category: "sets_plus",
       subCategory: isSet ? "set" : "trips",
@@ -284,7 +341,9 @@ function categorizePostflop(
   }
 
   // ── No pair (tier 0 = high card) ──
-  return classifyUnpaired(heroRanks, boardRanks, draws);
+  // On river (5 community cards), draws are meaningless — suppress draw categories
+  const isRiver = communityCards.length >= 5;
+  return classifyUnpaired(heroRanks, boardRanks, draws, isRiver);
 }
 
 function classifyOnePair(
@@ -334,7 +393,8 @@ function classifyOnePair(
   const pairedRank = heroRanks.find((r) => boardRanks.includes(r));
   if (pairedRank === undefined) {
     // Board has a pair, hero doesn't contribute — check for draws
-    return classifyUnpaired(heroRanks, boardRanks, draws);
+    const isRiver = communityCards.length >= 5;
+    return classifyUnpaired(heroRanks, boardRanks, draws, isRiver);
   }
 
   const kicker = heroRanks.find((r) => r !== pairedRank) ?? 0;
@@ -378,11 +438,30 @@ function classifyUnpaired(
   heroRanks: number[],
   boardRanks: number[],
   draws: DrawInfo,
+  isRiver = false,
 ): HandCategorization {
   const highHero = Math.max(...heroRanks);
   const lowHero = Math.min(...heroRanks);
   const topBoardRank = boardRanks[0];
   const hasOvercards = highHero > topBoardRank && lowHero > topBoardRank;
+
+  // On the river, draws are meaningless (no cards to come) — skip draw detection
+  // and classify by made hand / kicker strength only
+  if (isRiver) {
+    if (hasOvercards) {
+      return {
+        category: "overcards",
+        relativeStrength: 0.22 + highHero * 0.005,
+        description: `Overcards (${rankName(highHero)} high)`,
+      };
+    }
+    return {
+      category: "air",
+      subCategory: highHero >= 8 ? "one_overcard" : undefined,
+      relativeStrength: 0.02 + highHero * 0.003,
+      description: `Air (${rankName(highHero)} high)`,
+    };
+  }
 
   // Combo draw (flush + straight)
   if (draws.isCombo) {

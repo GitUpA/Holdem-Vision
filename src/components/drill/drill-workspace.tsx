@@ -85,6 +85,18 @@ function isArchetypeAvailable(arch: ArchetypeEntry): boolean {
 
 const HAND_COUNT_OPTIONS = [5, 10, 20];
 
+/** Look up the user-friendly label for an archetype ID */
+function archetypeLabel(id: ArchetypeId): string {
+  return ALL_ARCHETYPES.find((a) => a.id === id)?.label ?? id.replace(/_/g, " ");
+}
+
+/** Category display for an archetype ID */
+function archetypeCategoryLabel(id: ArchetypeId): string {
+  const cat = ALL_ARCHETYPES.find((a) => a.id === id)?.category;
+  if (!cat) return "";
+  return CATEGORY_LABELS[cat].replace(" Archetypes", "");
+}
+
 export type DrillMode = "learn" | "quiz";
 
 // ═══════════════════════════════════════════════════════
@@ -287,12 +299,18 @@ function ActiveDrill({
 
   return (
     <div className="space-y-4">
-      {/* Progress bar */}
-      <div className="space-y-1">
-        <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
-          <span>Hand {Math.min(drill.handsPlayed + 1, drill.handsTarget)} of {drill.handsTarget}</span>
-          <div className="flex items-center gap-2">
-            <span>{drill.progress.optimal}W {drill.progress.acceptable}A {drill.progress.mistake}M {drill.progress.blunder}B</span>
+      {/* Drill header — archetype name + progress */}
+      <div className="space-y-2">
+        {drill.archetypeId && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-[var(--foreground)]">
+                {archetypeLabel(drill.archetypeId)}
+              </h2>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20 font-medium">
+                {archetypeCategoryLabel(drill.archetypeId)}
+              </span>
+            </div>
             <button
               onClick={onOpenGuide}
               className="w-5 h-5 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors"
@@ -301,6 +319,10 @@ function ActiveDrill({
               <span className="text-[9px] font-bold">?</span>
             </button>
           </div>
+        )}
+        <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
+          <span>Hand {Math.min(drill.handsPlayed + 1, drill.handsTarget)} of {drill.handsTarget}</span>
+          <span>{drill.progress.optimal}W {drill.progress.acceptable}A {drill.progress.mistake}M {drill.progress.blunder}B</span>
         </div>
         <div className="h-1.5 rounded-full bg-[var(--muted)]/30 overflow-hidden">
           <motion.div
@@ -312,7 +334,7 @@ function ActiveDrill({
         </div>
       </div>
 
-      {/* Deal info */}
+      {/* Deal info — board texture + position + hand category */}
       {drill.currentDeal && (
         <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
           <span className="px-2 py-0.5 rounded bg-[var(--muted)]/20 border border-[var(--border)]">
@@ -406,6 +428,16 @@ function DrillSummary({
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">Drill Complete</h2>
+        {drill.archetypeId && (
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-sm font-semibold text-[var(--gold)]">
+              {archetypeLabel(drill.archetypeId)}
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)]/70 border border-[var(--gold)]/20">
+              {archetypeCategoryLabel(drill.archetypeId)}
+            </span>
+          </div>
+        )}
         <p className="text-xs text-[var(--muted-foreground)] mt-1">
           {total} hands played — average EV loss: {avgEvLoss.toFixed(1)} BB
         </p>

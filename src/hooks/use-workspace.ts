@@ -29,13 +29,7 @@ import type { OpponentProfile, PlayerAction } from "../../convex/lib/types/oppon
 import type { WeightedRange, OpponentContext } from "../../convex/lib/types/opponents";
 import type { HandRecord } from "../../convex/lib/audit/types";
 import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
-import type {
-  GtoAction,
-  ActionFrequencies,
-  ActionFrequencyBands,
-  ArchetypeAccuracy,
-  AccuracyImpact,
-} from "../../convex/lib/gto/tables/types";
+import type { GtoAction } from "../../convex/lib/gto/tables/types";
 import type { CardHighlight } from "../../convex/lib/types/visuals";
 
 import {
@@ -60,19 +54,13 @@ import { runLenses, getLensInfo, isHeavyLens } from "../../convex/lib/analysis/l
 import { estimateRange } from "../../convex/lib/opponents/rangeEstimator";
 
 // Drill / GTO
-import type { ConstrainedDeal, DrillConstraints } from "../../convex/lib/gto/constrainedDealer";
-import { dealForArchetype } from "../../convex/lib/gto/constrainedDealer";
+import type { ConstrainedDeal } from "../../convex/lib/gto/constrainedDealer";
 import { gtoActionToGameAction } from "../../convex/lib/gto/actionMapping";
 import { scoreAction, type ActionScore } from "../../convex/lib/gto/evScoring";
-import { getTable, lookupFrequencies, getAccuracy } from "../../convex/lib/gto/tables/tableRegistry";
-import { explainArchetype } from "../../convex/lib/gto/archetypeExplainer";
-import { analyzeBoard } from "../../convex/lib/opponents/engines/boardTexture";
 import {
-  estimateBoardAccuracy,
-  scoreBoardTypicality,
-  boardToFeatures,
-  computeTopActionGap,
-} from "../../convex/lib/gto/tables/types";
+  executeDrillPipeline,
+  streetFromCommunityCount,
+} from "../../convex/lib/gto/drillPipeline";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -108,18 +96,9 @@ export interface DrillProgress {
   blunder: number;
 }
 
-export interface SpotSolution {
-  frequencies: ActionFrequencies;
-  optimalAction: GtoAction;
-  optimalFrequency: number;
-  availableActions: GtoAction[];
-  explanation: ExplanationNode;
-  isExactMatch: boolean;
-  resolvedCategory: string;
-  bands?: ActionFrequencyBands;
-  archetypeAccuracy?: ArchetypeAccuracy;
-  accuracyImpact?: AccuracyImpact;
-}
+// SpotSolution is defined in the shared pipeline module — single source of truth
+import type { SpotSolution } from "../../convex/lib/gto/drillPipeline";
+export type { SpotSolution } from "../../convex/lib/gto/drillPipeline";
 
 // ── Deck vision types ──
 
@@ -550,59 +529,6 @@ export function useWorkspace(mode: WorkspaceMode) {
     };
   }, []);
 
-  const computeSolution = useCallback((deal: ConstrainedDeal): SpotSolution | null => {
-    // For postflop principles, use textureArchetypeId for solver lookup
-    const lookupId = deal.archetype.textureArchetypeId ?? deal.archetype.archetypeId;
-    // Derive street from community card count
-    const street = deal.communityCards.length <= 0 ? "preflop" as const
-      : deal.communityCards.length <= 3 ? "flop" as const
-      : deal.communityCards.length === 4 ? "turn" as const
-      : "river" as const;
-
-    const lookup = lookupFrequencies(lookupId, deal.handCategory.category, deal.isInPosition, street);
-    if (!lookup) return null;
-
-    const table = getTable(lookupId, street);
-    let optimalAction: GtoAction = "check";
-    let optimalFrequency = 0;
-    for (const [action, freq] of Object.entries(lookup.frequencies)) {
-      if ((freq ?? 0) > optimalFrequency) {
-        optimalFrequency = freq ?? 0;
-        optimalAction = action as GtoAction;
-      }
-    }
-
-    const availableActions = deal.isInPosition
-      ? (table?.actionsIp ?? [])
-      : (table?.actionsOop ?? []);
-
-    const explanation = explainArchetype(deal.archetype, deal.handCategory, deal.isInPosition, undefined, street);
-
-    let accuracyImpact: AccuracyImpact | undefined;
-    const archetypeAccuracy = getAccuracy(lookupId, street);
-    if (archetypeAccuracy && deal.communityCards.length >= 3) {
-      const boardTexture = analyzeBoard(deal.communityCards as CardIndex[]);
-      const features = boardToFeatures(boardTexture);
-      const typicality = scoreBoardTypicality(lookupId, features);
-      const topGap = computeTopActionGap(lookup.frequencies);
-      const potBB = 7;
-      accuracyImpact = estimateBoardAccuracy(archetypeAccuracy, typicality, potBB, topGap);
-    }
-
-    return {
-      frequencies: lookup.frequencies,
-      optimalAction,
-      optimalFrequency,
-      availableActions,
-      explanation,
-      isExactMatch: lookup.isExact,
-      resolvedCategory: lookup.handCategory,
-      bands: lookup.bands,
-      archetypeAccuracy: lookup.archetypeAccuracy,
-      accuracyImpact,
-    };
-  }, []);
-
   const dealNextDrillHand = useCallback(() => {
     const archId = drillArchetypeRef.current;
     if (!archId || !sessionRef.current) return;
@@ -610,64 +536,25 @@ export function useWorkspace(mode: WorkspaceMode) {
     drillPhaseRef.current = "dealing";
     forceRender();
 
-    const deal = dealForArchetype(
-      { archetypeId: archId } as DrillConstraints,
+    // Execute the canonical pipeline — same code path as tests
+    const result = executeDrillPipeline(
+      archId,
       drillRngRef.current,
+      sessionRef.current,
     );
-    drillDealRef.current = deal;
+
+    drillDealRef.current = result.deal;
     drillCurrentScoreRef.current = null;
-    drillSolutionRef.current = computeSolution(deal);
+    drillSolutionRef.current = result.solution;
 
-    const sess = sessionRef.current;
-    sess.updateConfig({
-      heroSeatIndex: deal.heroSeatIndex,
-      dealerSeatIndex: deal.dealerSeatIndex,
-      numPlayers: deal.numPlayers,
-    });
     // Sync React state so seats/positions/hero derivations update
-    setHeroSeatIndex(deal.heroSeatIndex);
-    setDealerSeatIndex(deal.dealerSeatIndex);
-    setNumPlayers(deal.numPlayers);
-
-    sess.startHand(undefined, deal.cardOverrides, deal.communityCards);
-
-    // For postflop drills, auto-advance hero through earlier streets
-    // until we reach the target street (where the real decision happens).
-    const STREET_ORDER = ["preflop", "flop", "turn", "river"] as const;
-    const targetStreet = deal.communityCards.length <= 0 ? "preflop"
-      : deal.communityCards.length <= 3 ? "flop"
-      : deal.communityCards.length === 4 ? "turn"
-      : "river";
-    const targetIdx = STREET_ORDER.indexOf(targetStreet);
-
-    let safety = 0;
-    while (safety < 20) {
-      safety++;
-      const state = sess.state;
-      if (!state || state.phase === "complete" || state.phase === "showdown") break;
-
-      const currentIdx = STREET_ORDER.indexOf(state.currentStreet);
-      if (currentIdx >= targetIdx) break; // reached target street
-
-      if (state.activePlayerIndex === null) break;
-      const activePlayer = state.players[state.activePlayerIndex];
-      if (activePlayer.seatIndex !== sess.heroSeatIndex) break;
-
-      const legal = currentLegalActions(state);
-      if (!legal) break;
-
-      if (legal.canCheck) {
-        sess.act("check");
-      } else if (legal.canCall) {
-        sess.act("call");
-      } else {
-        break;
-      }
-    }
+    setHeroSeatIndex(result.deal.heroSeatIndex);
+    setDealerSeatIndex(result.deal.dealerSeatIndex);
+    setNumPlayers(result.deal.numPlayers);
 
     drillPhaseRef.current = "ready";
     forceRender();
-  }, [forceRender, computeSolution]);
+  }, [forceRender]);
 
   // ═══════════════════════════════════════════════════════
   // ACTIONS
@@ -749,10 +636,7 @@ export function useWorkspace(mode: WorkspaceMode) {
       const { actionType, amount } = gtoActionToGameAction(gtoAction, legal, state.pot.total);
       sess.act(actionType, amount);
 
-      const drillStreet = deal.communityCards.length <= 0 ? "preflop" as const
-        : deal.communityCards.length <= 3 ? "flop" as const
-        : deal.communityCards.length === 4 ? "turn" as const
-        : "river" as const;
+      const drillStreet = streetFromCommunityCount(deal.communityCards.length);
       const score = scoreAction(
         deal.archetype,
         deal.handCategory,
