@@ -10,7 +10,7 @@ import type { ContextFactors } from "./modifiedGtoTypes";
 export type { ContextFactors } from "./modifiedGtoTypes";
 import type { CardIndex, Position } from "../../types/cards";
 import type { SituationKey } from "../../types/opponents";
-import { analyzeBoard, type BoardTexture } from "./boardTexture";
+import { analyzeBoard } from "./boardTexture";
 import { detectDraws, type DrawInfo } from "./drawDetector";
 import { evaluateHand } from "../../primitives/handEvaluator";
 import { preflopHandScore } from "../autoPlay";

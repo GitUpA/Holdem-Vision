@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ExplanationNode } from "../../../convex/lib/types/analysis";
+import { Term } from "../ui/term";
 
 const SENTIMENT_COLORS: Record<string, string> = {
   positive: "text-[var(--equity-win)]",
@@ -21,12 +22,12 @@ const SENTIMENT_DOT: Record<string, string> = {
 };
 
 /** Visual badges for semantic tags — only high-signal tags get rendered. */
-const TAG_BADGES: Record<string, { label: string; color: string }> = {
-  "bluff":       { label: "BLUFF",   color: "bg-red-500/20 text-red-300 border-red-500/30" },
-  "draw-aware":  { label: "DRAW",    color: "bg-teal-500/20 text-teal-300 border-teal-500/30" },
-  "mdf":         { label: "MDF",     color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
-  "fold-equity": { label: "FOLD EQ", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-  "position":    { label: "POS",     color: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
+const TAG_BADGES: Record<string, { label: string; color: string; knowledgeId?: string }> = {
+  "bluff":       { label: "BLUFF",   color: "bg-red-500/20 text-red-300 border-red-500/30", knowledgeId: "concept:semi_bluff" },
+  "draw-aware":  { label: "DRAW",    color: "bg-teal-500/20 text-teal-300 border-teal-500/30", knowledgeId: "term:flush_draw" },
+  "mdf":         { label: "MDF",     color: "bg-blue-500/20 text-blue-300 border-blue-500/30", knowledgeId: "term:mdf" },
+  "fold-equity": { label: "FOLD EQ", color: "bg-amber-500/20 text-amber-300 border-amber-500/30", knowledgeId: "term:fold_equity" },
+  "position":    { label: "POS",     color: "bg-purple-500/20 text-purple-300 border-purple-500/30", knowledgeId: "concept:position" },
   "sizing":      { label: "SIZING",  color: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30" },
 };
 
@@ -92,9 +93,8 @@ export function ExplanationTree({
               {node.tags.map((tag) => {
                 const badge = TAG_BADGES[tag];
                 if (!badge) return null;
-                return (
+                const badgeEl = (
                   <span
-                    key={tag}
                     className={cn(
                       "text-[9px] font-bold tracking-wider px-1 py-px rounded border leading-none",
                       badge.color,
@@ -102,6 +102,13 @@ export function ExplanationTree({
                   >
                     {badge.label}
                   </span>
+                );
+                return badge.knowledgeId ? (
+                  <Term key={tag} id={badge.knowledgeId} position="bottom">
+                    {badgeEl}
+                  </Term>
+                ) : (
+                  <span key={tag}>{badgeEl}</span>
                 );
               })}
             </span>

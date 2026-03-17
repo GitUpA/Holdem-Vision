@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { UnifiedSeatConfig } from "@/hooks/use-hand-manager";
@@ -7,6 +8,7 @@ import type { AutoPlayDecision } from "../../../convex/lib/opponents/autoPlay";
 import { rankOf, suitOf } from "../../../convex/lib/primitives/card";
 import type { CardIndex } from "../../../convex/lib/types/cards";
 import { formatBB } from "@/lib/format";
+import { Term } from "../ui/term";
 
 interface PlayerListProps {
   seats: UnifiedSeatConfig[];
@@ -15,6 +17,10 @@ interface PlayerListProps {
   bigBlind?: number;
   activePlayerSeat?: number | null;
   decisions?: ReadonlyMap<number, AutoPlayDecision>;
+  /** Set all villain seats to a preset profile */
+  onSetAllProfiles?: (profileId: string) => void;
+  /** Randomize all villain profiles */
+  onRandomizeProfiles?: () => void;
 }
 
 const POSITION_COLORS: Record<string, string> = {
@@ -71,6 +77,14 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   sitting_out: { label: "SIT", cls: "text-gray-600" },
 };
 
+const PROFILE_PRESETS = [
+  { id: "gto", label: "All GTO" },
+  { id: "tag", label: "All TAG" },
+  { id: "lag", label: "All LAG" },
+  { id: "nit", label: "All NIT" },
+  { id: "fish", label: "All FISH" },
+] as const;
+
 export function PlayerList({
   seats,
   selectedSeat,
@@ -78,13 +92,65 @@ export function PlayerList({
   bigBlind = 2,
   activePlayerSeat,
   decisions,
+  onSetAllProfiles,
+  onRandomizeProfiles,
 }: PlayerListProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
-      <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
+      <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)]">
           Players
         </h3>
+        {(onSetAllProfiles || onRandomizeProfiles) && (
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="text-[10px] px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)]/40 transition-colors font-medium"
+              title="Set all villain profiles"
+            >
+              Profiles ▾
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 rounded-lg border border-[var(--border)] bg-[var(--card)] shadow-lg shadow-black/30 py-1 min-w-[120px]">
+                {onRandomizeProfiles && (
+                  <button
+                    onClick={() => { onRandomizeProfiles(); setMenuOpen(false); }}
+                    className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:bg-[var(--muted)]/40 transition-colors"
+                  >
+                    Randomize
+                  </button>
+                )}
+                {onRandomizeProfiles && onSetAllProfiles && (
+                  <div className="border-t border-[var(--border)]/50 my-0.5" />
+                )}
+                {onSetAllProfiles && PROFILE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => { onSetAllProfiles(preset.id); setMenuOpen(false); }}
+                    className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:bg-[var(--muted)]/40 transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div className="divide-y divide-[var(--border)]">
         {seats.map((seat, i) => {
@@ -112,14 +178,16 @@ export function PlayerList({
               )}
             >
               {/* Position badge */}
-              <span
-                className={cn(
-                  "text-[10px] font-bold px-1.5 py-0.5 rounded border min-w-[36px] text-center",
-                  posColor,
-                )}
-              >
-                {posShort}
-              </span>
+              <Term id="term:positions" position="bottom">
+                <span
+                  className={cn(
+                    "text-[10px] font-bold px-1.5 py-0.5 rounded border min-w-[36px] text-center",
+                    posColor,
+                  )}
+                >
+                  {posShort}
+                </span>
+              </Term>
 
               {/* Label */}
               <span className={cn(

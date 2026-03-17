@@ -63,6 +63,16 @@ pnpm test:watch    # watch mode
 - 1 unified decision engine (`modified-gto`): GTO solver base + profile-specific frequency modifiers (NIT/FISH/TAG/LAG/GTO).
 - `/vision` is public (no auth required). Drill mode lives at `/vision?mode=drill` (no separate `/drill` route).
 
+## Knowledge Base (`convex/lib/knowledge/`)
+
+**All user-facing educational content lives here.** Never hardcode explanatory text in UI components.
+
+- Central source of truth for: term definitions, concept explanations, feature descriptions, archetype teaching, profile descriptions, strategy primers.
+- Each entry has 3 tiers: `short` (tooltip/badge), `medium` (info bubble/inline), `full` (drawer/panel).
+- Lookup via `getKnowledge(id)` — UI components pull content by key, never own it.
+- Categories: `term` (poker vocab), `concept` (strategy), `feature` (app functionality), `archetype` (spot types), `profile` (player types).
+- When adding new UI that explains anything to the user → add a knowledge entry first, then reference it.
+
 ## Lint Notes
 
 - 15 React Compiler warnings (refs during render, setState in effect) are known and accepted.

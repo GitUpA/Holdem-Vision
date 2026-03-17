@@ -44,10 +44,12 @@ import type { CardIndex } from "../../../convex/lib/types/cards";
 // Drill components
 import { ScoreDisplay } from "../drill/score-display";
 import { DrillGuideDrawer } from "../drill/drill-guide-drawer";
+import { ArchetypeTutorialDrawer } from "../drill/archetype-tutorial-drawer";
 
 
 // Drill archetype data
-import type { ArchetypeId, ArchetypeCategory } from "../../../convex/lib/gto/archetypeClassifier";
+import type { ArchetypeId, ArchetypeCategory, ArchetypeClassification } from "../../../convex/lib/gto/archetypeClassifier";
+import { classifyArchetype, contextFromGameState } from "../../../convex/lib/gto/archetypeClassifier";
 import { hasTable, hasAnyTableForStreet } from "../../../convex/lib/gto/tables/tableRegistry";
 
 // ═══════════════════════════════════════════════════════
@@ -213,6 +215,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
   const ws = useWorkspace(mode);
   const [guideOpen, setGuideOpen] = useState(false);
   const [drillGuideOpen, setDrillGuideOpen] = useState(false);
+  const [tutorialArchetype, setTutorialArchetype] = useState<ArchetypeId | null>(null);
   const [replayRecord, setReplayRecord] = useState<HandRecord | null>(null);
   const [drillQuizMode, setDrillQuizMode] = useState<DrillMode>(drillParams?.mode ?? "quiz");
 
@@ -415,10 +418,11 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                 <>
                   {ws.drillPhase === "idle" && (
                     <ArchetypeSelector
-                      onStart={ws.startDrill}
+                      onStart={(id, count) => { setTutorialArchetype(null); ws.startDrill(id, count); }}
                       drillMode={drillQuizMode}
                       onModeChange={setDrillQuizMode}
                       onOpenGuide={() => setDrillGuideOpen(true)}
+                      onArchetypeSelect={setTutorialArchetype}
                     />
                   )}
 
@@ -440,11 +444,13 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                 bigBlind={ws.blinds.big}
                 activePlayerSeat={ws.activePlayerSeat}
                 decisions={ws.lastDecisions}
+                onSetAllProfiles={mode.opponents.randomizable ? ws.setAllProfiles : undefined}
+                onRandomizeProfiles={mode.opponents.randomizable ? ws.randomizeProfiles : undefined}
               />
 
               <>
               {/* ── Opponent detail panel ── */}
-              <PanelWrapper enabled={mode.opponents.editable || isDrillActive} hint={isDrillActive ? undefined : "Switch to Vision mode to edit opponents"}>
+              <PanelWrapper enabled={mode.opponents.editable || isDrillActive}>
                 <AnimatePresence>
                   {selectedSeat && !selectedSeat.isHero && (
                     <motion.div
@@ -470,8 +476,8 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                 </AnimatePresence>
               </PanelWrapper>
 
-              {/* ── Game setup panel (vision mode, before deal) ── */}
-              {!isDrillActive && (
+              {/* ── Game setup panel (vision mode only) ── */}
+              {modeId !== "drill" && (
               <PanelWrapper enabled={mode.setup.enabled} hint="Switch to Vision mode for hand setup">
                 {!ws.isHandActive && !ws.isHandOver && (
                   <GameSetupPanel
@@ -485,8 +491,8 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
               </PanelWrapper>
               )}
 
-              {/* ── Hand-over result (vision post-hand) ── */}
-              {!isDrillActive && (
+              {/* ── Hand-over result (vision mode only) ── */}
+              {modeId !== "drill" && (
               <PanelWrapper enabled={mode.postHand.dealNext || mode.postHand.revealAll} hint="Finish hand to see results">
                 {!ws.isHandActive && ws.isHandOver && (
                   <HandOverPanel
@@ -519,7 +525,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                         </span>
                       ))}
                     </div>
-                    {!isDrillActive && (
+                    {modeId !== "drill" && (
                     <>
                     <div className="h-4 w-px bg-[var(--border)]" />
                     <PanelWrapper enabled={mode.setup.enabled}>
@@ -587,6 +593,9 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                 drillSolution={showDrillSolution && ws.drillSolution ? ws.drillSolution : undefined}
                 drillScore={ws.drillCurrentScore ?? undefined}
                 isDrill={isDrillActive}
+                gameState={ws.gameState}
+                heroSeatIndex={ws.heroSeatIndex}
+                onArchetypeClick={setTutorialArchetype}
               />
 
               {/* ── Drill: Score feedback + next hand ── */}
@@ -599,7 +608,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
               )}
 
               {/* ── Card selector (52-card grid) ── */}
-              <PanelWrapper enabled={mode.cards.heroEditable || mode.cards.communityEditable || isDrillActive} hint={isDrillActive ? undefined : "Switch to Vision mode to edit cards"}>
+              <PanelWrapper enabled={mode.cards.heroEditable || mode.cards.communityEditable || isDrillActive}>
                 <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3">
                   <CardSelector
                     cards={ws.deckVisionCards}
@@ -628,7 +637,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
               transition={{ delay: 0.2 }}
               className="space-y-4"
             >
-              <PanelWrapper enabled={mode.analysis.enabled} hint="Switch to Vision mode for analysis">
+              <PanelWrapper enabled={mode.analysis.enabled}>
                 {/* Analysis header */}
                 <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
                   <div className="flex items-center justify-between gap-2 px-3 py-2.5">
@@ -636,15 +645,6 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                       Analysis
                     </h2>
                     <div className="flex items-center gap-1.5">
-                      <PanelWrapper enabled={mode.opponents.randomizable}>
-                        <button
-                          onClick={ws.randomizeProfiles}
-                          className="text-[10px] px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)]/40 transition-colors font-medium"
-                          title="Randomize all villain profiles"
-                        >
-                          Randomize
-                        </button>
-                      </PanelWrapper>
                       <button
                         onClick={() => setGuideOpen(true)}
                         className="w-6 h-6 rounded-full border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)]/40 transition-colors flex items-center justify-center text-[10px] font-bold shrink-0"
@@ -688,6 +688,13 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
       {/* Guide drawers */}
       <GuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
       <DrillGuideDrawer open={drillGuideOpen} onClose={() => setDrillGuideOpen(false)} />
+      <ArchetypeTutorialDrawer
+        open={!!tutorialArchetype}
+        archetypeId={tutorialArchetype}
+        label={tutorialArchetype ? archetypeLabel(tutorialArchetype) : undefined}
+        category={tutorialArchetype ? ALL_ARCHETYPES.find((a) => a.id === tutorialArchetype)?.category : undefined}
+        onClose={() => setTutorialArchetype(null)}
+      />
     </div>
   );
 }
@@ -697,11 +704,14 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
 // ═══════════════════════════════════════════════════════
 
 /** Coaching panel — unified with drill solution in drill mode */
-function CoachingSection({ results, drillSolution, drillScore, isDrill }: {
+function CoachingSection({ results, drillSolution, drillScore, isDrill, gameState, heroSeatIndex, onArchetypeClick }: {
   results: Map<string, import("../../../convex/lib/types/analysis").AnalysisResult>;
   drillSolution?: import("@/hooks/use-workspace").SpotSolution;
   drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
   isDrill?: boolean;
+  gameState?: import("../../../convex/lib/state/game-state").GameState | null;
+  heroSeatIndex?: number;
+  onArchetypeClick?: (id: ArchetypeId) => void;
 }) {
   const coachingResult = results.get("coaching");
   if (!coachingResult || coachingResult.visuals.length === 0) return null;
@@ -712,6 +722,11 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill }: {
     consensus?: CoachingValue["consensus"];
   };
   if (!advices || advices.length === 0) return null;
+
+  // Classify the current spot (vision mode only)
+  const archetype: ArchetypeClassification | null = !isDrill && gameState && heroSeatIndex !== undefined
+    ? classifyArchetype(contextFromGameState(gameState, heroSeatIndex))
+    : null;
 
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
@@ -727,6 +742,9 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill }: {
           drillSolution={drillSolution}
           drillScore={drillScore}
           autoExpandGto={isDrill}
+          archetype={archetype}
+          onArchetypeClick={onArchetypeClick}
+          archetypeLabel={archetypeLabel}
         />
       </div>
     </div>
@@ -931,11 +949,13 @@ function ArchetypeSelector({
   drillMode,
   onModeChange,
   onOpenGuide,
+  onArchetypeSelect,
 }: {
   onStart: (id: ArchetypeId, count?: number) => void;
   drillMode: DrillMode;
   onModeChange: (mode: DrillMode) => void;
   onOpenGuide: () => void;
+  onArchetypeSelect?: (id: ArchetypeId) => void;
 }) {
   const [selected, setSelected] = useState<ArchetypeId | null>(null);
   const [handCount, setHandCount] = useState(10);
@@ -967,7 +987,7 @@ function ArchetypeSelector({
               const available = isArchetypeAvailable(arch);
               const isSelected = selected === arch.id;
               return (
-                <button key={arch.id} onClick={() => available && setSelected(arch.id)} disabled={!available}
+                <button key={arch.id} onClick={() => { if (available) { setSelected(arch.id); onArchetypeSelect?.(arch.id); } }} disabled={!available}
                   className={`text-left px-3 py-2 rounded-lg border text-xs transition-all
                     ${isSelected ? "border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]"
                       : available ? "border-[var(--border)] text-[var(--foreground)] hover:border-[var(--gold-dim)]"

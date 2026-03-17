@@ -7,6 +7,9 @@ import { ExplanationTree } from "./explanation-tree";
 import { SolutionDisplay } from "../drill/solution-display";
 import type { CoachingAdvice, CoachingValue } from "../../../convex/lib/analysis/coachingLens";
 import type { SpotSolution } from "@/hooks/use-workspace";
+import type { ArchetypeClassification, ArchetypeId } from "../../../convex/lib/gto/archetypeClassifier";
+import { getKnowledge } from "../../../convex/lib/knowledge";
+import { Term } from "../ui/term";
 
 // ═══════════════════════════════════════════════════════
 // CONSTANTS
@@ -21,13 +24,11 @@ const ACTION_COLORS: Record<string, { text: string; bg: string; border: string }
   all_in: { text: "text-red-400",   bg: "bg-red-500/20",   border: "border-red-500/40" },
 };
 
-const PROFILE_META: Record<string, { short: string; desc: string }> = {
-  nit:  { short: "NIT",  desc: "Ultra-tight, premium only" },
-  fish: { short: "FISH", desc: "Loose-passive, calls too much" },
-  tag:  { short: "TAG",  desc: "Tight-aggressive, solid play" },
-  lag:  { short: "LAG",  desc: "Loose-aggressive, high pressure" },
-  gto:  { short: "GTO",  desc: "Game-theory optimal, balanced" },
-};
+function getProfileMeta(profileId: string): { short: string; desc: string } {
+  const entry = getKnowledge(`profile:${profileId}`);
+  if (entry) return { short: entry.name, desc: entry.short };
+  return { short: profileId.toUpperCase(), desc: profileId };
+}
 
 // ═══════════════════════════════════════════════════════
 // COACHING PANEL
@@ -42,6 +43,12 @@ interface CoachingPanelProps {
   drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
   /** Auto-expand the GTO row (drill mode) */
   autoExpandGto?: boolean;
+  /** Classified archetype for the current spot (vision mode) */
+  archetype?: ArchetypeClassification | null;
+  /** Callback when user clicks the archetype badge */
+  onArchetypeClick?: (id: ArchetypeId) => void;
+  /** Label resolver for archetype IDs */
+  archetypeLabel?: (id: ArchetypeId) => string;
 }
 
 /** GTO first — it's the reference point other profiles compare against */
@@ -49,7 +56,7 @@ const PROFILE_ORDER: Record<string, number> = {
   gto: 0, tag: 1, lag: 2, nit: 3, fish: 4,
 };
 
-export function CoachingPanel({ advices, consensus, drillSolution, drillScore, autoExpandGto }: CoachingPanelProps) {
+export function CoachingPanel({ advices, consensus, drillSolution, drillScore, autoExpandGto, archetype, onArchetypeClick, archetypeLabel: labelFn }: CoachingPanelProps) {
   const [expandedProfile, setExpandedProfile] = useState<string | null>(
     autoExpandGto ? "gto" : null,
   );
@@ -69,6 +76,15 @@ export function CoachingPanel({ advices, consensus, drillSolution, drillScore, a
 
   return (
     <div className="space-y-2">
+      {/* Archetype Badge */}
+      {archetype && (
+        <ArchetypeBadge
+          archetype={archetype}
+          onClick={onArchetypeClick}
+          labelFn={labelFn}
+        />
+      )}
+
       {/* Consensus Banner */}
       {consensus ? (
         <ConsensusBanner consensus={consensus} total={advices.length} />
@@ -160,7 +176,7 @@ function ProfileRow({
   drillSolution?: SpotSolution;
   drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
 }) {
-  const meta = PROFILE_META[advice.profileId];
+  const meta = getProfileMeta(advice.profileId);
   const actionColor = ACTION_COLORS[advice.actionType] ?? ACTION_COLORS.check;
 
   return (
@@ -183,9 +199,9 @@ function ProfileRow({
         )}
       >
         {/* Profile badge */}
-        <span className="text-[10px] font-bold text-[var(--foreground)] w-8 shrink-0">
-          {meta?.short ?? advice.profileName}
-        </span>
+        <Term id={`profile:${advice.profileId}`} position="bottom" className="text-[10px] font-bold text-[var(--foreground)] w-8 shrink-0">
+          {meta.short}
+        </Term>
 
         {/* Engine badge (shown for non-standard engines, e.g. lookup-gto solver) */}
         {advice.engineId !== "modified-gto" && advice.engineId !== "error" && (
@@ -215,7 +231,7 @@ function ProfileRow({
 
         {/* Description (truncated) */}
         <span className="text-[10px] text-[var(--muted-foreground)] truncate flex-1 min-w-0">
-          {meta?.desc ?? advice.profileName}
+          {meta.desc}
         </span>
 
         {/* Expand chevron */}
@@ -269,6 +285,61 @@ function ProfileRow({
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// ARCHETYPE BADGE
+// ═══════════════════════════════════════════════════════
+
+const CATEGORY_SHORT: Record<string, string> = {
+  preflop: "Preflop",
+  flop_texture: "Flop Texture",
+  postflop_principle: "Postflop",
+};
+
+function ArchetypeBadge({
+  archetype,
+  onClick,
+  labelFn,
+}: {
+  archetype: ArchetypeClassification;
+  onClick?: (id: ArchetypeId) => void;
+  labelFn?: (id: ArchetypeId) => string;
+}) {
+  const label = labelFn?.(archetype.archetypeId) ?? archetype.archetypeId.replace(/_/g, " ");
+  const catLabel = CATEGORY_SHORT[archetype.category] ?? archetype.category;
+
+  // On turn/river, show texture archetype alongside principle
+  const hasTexture = archetype.textureArchetypeId && archetype.textureArchetypeId !== archetype.archetypeId;
+  const textureLabel = hasTexture && labelFn
+    ? labelFn(archetype.textureArchetypeId!)
+    : hasTexture
+      ? archetype.textureArchetypeId!.replace(/_/g, " ")
+      : null;
+
+  const lowConfidence = archetype.confidence < 0.7;
+
+  return (
+    <button
+      onClick={() => onClick?.(archetype.archetypeId)}
+      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--gold)]/[0.06] border border-[var(--gold)]/15 hover:bg-[var(--gold)]/[0.12] hover:border-[var(--gold)]/25 transition-colors text-left w-full group"
+    >
+      <span className="text-[10px] font-bold text-[var(--gold)]">{label}</span>
+      {textureLabel && (
+        <span className="text-[9px] text-[var(--muted-foreground)]">on {textureLabel}</span>
+      )}
+      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold-dim)] border border-[var(--gold)]/15 font-medium">
+        {catLabel}
+      </span>
+      {lowConfidence && (
+        <span className="text-[9px] text-[var(--muted-foreground)] italic">(likely)</span>
+      )}
+      <span className="flex-1" />
+      <span className="text-[9px] text-[var(--muted-foreground)] opacity-0 group-hover:opacity-100 transition-opacity">
+        Learn more
+      </span>
+    </button>
   );
 }
 

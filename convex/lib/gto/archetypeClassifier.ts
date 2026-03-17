@@ -222,17 +222,25 @@ function classifyPreflop(ctx: ClassificationContext): ArchetypeClassification {
 // ═══════════════════════════════════════════════════════
 
 function classifyPostflop(ctx: ClassificationContext): ArchetypeClassification {
-  // 3-bet pot postflop always takes priority as a principle archetype
+  // Compute flop texture for solver lookup (always available for postflop)
+  const flopCards = ctx.communityCards.length >= 3
+    ? ctx.communityCards.slice(0, 3)
+    : ctx.communityCards;
+  const textureId = flopCards.length >= 3
+    ? classifyFlopTexture(analyzeBoard(flopCards)).archetypeId
+    : undefined;
+
+  // 3-bet pot postflop — principle archetype with texture for solver lookup
   if (ctx.potType === "3bet" || ctx.potType === "4bet") {
-    return make("three_bet_pot_postflop", 0.85);
+    return makeWithTexture("three_bet_pot_postflop", 0.85, textureId);
   }
 
   // Turn and river: classify by postflop principle
   if (ctx.street === "turn") {
-    return classifyTurn(ctx);
+    return classifyTurn(ctx, textureId);
   }
   if (ctx.street === "river") {
-    return classifyRiver(ctx);
+    return classifyRiver(ctx, textureId);
   }
 
   // Flop: classify by texture, overlay c-bet principle
@@ -314,13 +322,7 @@ function classifyFlopTexture(texture: BoardTexture): ArchetypeClassification {
   return make("mid_low_dry_rainbow", 0.5);
 }
 
-function classifyTurn(ctx: ClassificationContext): ArchetypeClassification {
-  // Compute flop texture from first 3 cards for solver lookup
-  const flopTexture = ctx.communityCards.length >= 3
-    ? classifyFlopTexture(analyzeBoard(ctx.communityCards.slice(0, 3)))
-    : undefined;
-  const textureId = flopTexture?.archetypeId;
-
+function classifyTurn(ctx: ClassificationContext, textureId?: ArchetypeId): ArchetypeClassification {
   const turnActions = ctx.actionHistory.filter((a) => a.street === "turn");
   const heroTurnActions = turnActions.filter((a) => a.isHero);
 
@@ -342,18 +344,11 @@ function classifyTurn(ctx: ClassificationContext): ArchetypeClassification {
     return makeWithTexture("turn_barreling", 0.7, textureId, "cbet_sizing_frequency");
   }
 
-  // Fallback to texture
-  const texture = analyzeBoard(ctx.communityCards);
-  return classifyFlopTexture(texture);
+  // Fallback — still pass texture for solver lookup
+  return makeWithTexture("turn_barreling", 0.65, textureId);
 }
 
-function classifyRiver(ctx: ClassificationContext): ArchetypeClassification {
-  // Compute flop texture from first 3 cards for solver lookup
-  const flopTexture = ctx.communityCards.length >= 3
-    ? classifyFlopTexture(analyzeBoard(ctx.communityCards.slice(0, 3)))
-    : undefined;
-  const textureId = flopTexture?.archetypeId;
-
+function classifyRiver(ctx: ClassificationContext, textureId?: ArchetypeId): ArchetypeClassification {
   const riverActions = ctx.actionHistory.filter((a) => a.street === "river");
   const heroRiverActions = riverActions.filter((a) => a.isHero);
 

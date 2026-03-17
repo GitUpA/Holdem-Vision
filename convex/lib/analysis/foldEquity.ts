@@ -7,6 +7,10 @@
  * - The expected value (in BB) of betting vs checking
  * - Whether the bet is +EV
  *
+ * When solver data is available, GTO defense frequencies are used as the base
+ * and the opponent's profile modifier (foldScale) adjusts from there.
+ * Falls back to profile continuePct when no solver data exists.
+ *
  * All amounts are in big blind (BB) increments for universal readability.
  *
  * Pure TypeScript, zero Convex imports.
@@ -36,6 +40,16 @@ export interface FoldEquityScenario {
   result: FoldEquityResult;
 }
 
+/** Solver-informed fold rate context. When provided, overrides the profile heuristic. */
+export interface SolverFoldContext {
+  /** GTO fold frequency for this texture/hand/street (0-1) */
+  gtoFoldFrequency: number;
+  /** Profile's foldScale modifier (>1 = folds more than GTO, <1 = folds less) */
+  foldScale: number;
+  /** Source label for explanation */
+  archetypeLabel: string;
+}
+
 /**
  * Calculate fold equity for a specific bet size.
  *
@@ -45,6 +59,7 @@ export interface FoldEquityScenario {
  * @param potBB - Current pot in big blinds
  * @param street - Current street (affects fold frequency)
  * @param profileName - For explanation text
+ * @param solverCtx - Optional solver-informed fold context (overrides heuristic)
  */
 export function calculateFoldEquity(
   heroEquityVsRange: number,
@@ -53,12 +68,23 @@ export function calculateFoldEquity(
   potBB: number,
   street: "preflop" | "flop" | "turn" | "river",
   profileName: string,
+  solverCtx?: SolverFoldContext,
 ): FoldEquityResult {
   const betBB = potBB * (betSizePct / 100);
 
   // ─── Fold probability ───
-  // Base fold rate: opponent folds (100 - continuePct)% in this situation
-  const baseFoldRate = getBaseFoldRate(params, street);
+  let baseFoldRate: number;
+  let sourceLabel: string;
+
+  if (solverCtx) {
+    // Solver-informed: GTO fold frequency × profile's foldScale modifier
+    baseFoldRate = clamp(solverCtx.gtoFoldFrequency * solverCtx.foldScale, 0, 1);
+    sourceLabel = `solver (${solverCtx.archetypeLabel})`;
+  } else {
+    // Heuristic fallback: profile's continuePct
+    baseFoldRate = getBaseFoldRate(params, street);
+    sourceLabel = "profile heuristic";
+  }
 
   // Adjust for bet size: larger bets get more folds
   const sizeAdjustment = betSizeToFoldAdjustment(betSizePct);
@@ -99,7 +125,9 @@ export function calculateFoldEquity(
     },
     {
       summary: `${profileName} folds ~${foldPct}% of the time`,
-      detail: `Base fold rate: ${(baseFoldRate * 100).toFixed(0)}% (${street}), adjusted for ${betSizePct}% pot bet size.`,
+      detail: solverCtx
+        ? `GTO fold: ${(solverCtx.gtoFoldFrequency * 100).toFixed(0)}% × ${profileName} foldScale ${solverCtx.foldScale.toFixed(1)}x → ${(baseFoldRate * 100).toFixed(0)}% base, adjusted for ${betSizePct}% pot sizing. Source: ${sourceLabel}.`
+        : `Base fold rate: ${(baseFoldRate * 100).toFixed(0)}% (${street}), adjusted for ${betSizePct}% pot bet size. Source: ${sourceLabel}.`,
       sentiment:
         foldProbability > breakEvenFoldPct / 100 ? "positive" : "negative",
       tags: ["fold-rate"],
@@ -156,6 +184,7 @@ export function foldEquityScenarios(
   potBB: number,
   street: "preflop" | "flop" | "turn" | "river",
   profileName: string,
+  solverCtx?: SolverFoldContext,
 ): FoldEquityScenario[] {
   const sizes = [33, 50, 75, 100];
   return sizes.map((betSizePct) => ({
@@ -167,6 +196,7 @@ export function foldEquityScenarios(
       potBB,
       street,
       profileName,
+      solverCtx,
     ),
   }));
 }

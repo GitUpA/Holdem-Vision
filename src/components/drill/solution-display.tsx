@@ -18,6 +18,7 @@ import type { ActionScore } from "../../../convex/lib/gto/evScoring";
 import type { GtoAction } from "../../../convex/lib/gto/tables/types";
 import { gtoActionLabel } from "../../../convex/lib/gto/actionMapping";
 import { InfoTip } from "../ui/tooltip";
+import { TermTip } from "../ui/term";
 
 interface SolutionDisplayProps {
   solution: SpotSolution;
@@ -52,11 +53,7 @@ export function SolutionDisplay({ solution, userAction, score }: SolutionDisplay
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-widest text-[var(--muted-foreground)]">
           GTO Solution
-          <InfoTip
-            text="GTO (Game Theory Optimal) frequencies show how often a solver plays each action in this exact spot. These are the mathematically balanced play frequencies that cannot be exploited."
-            variant="info"
-            position="bottom"
-          />
+          <TermTip id="concept:gto" position="bottom" />
         </span>
         {solution.accuracyImpact && (
           <span className="text-[10px] text-[var(--muted-foreground)]">

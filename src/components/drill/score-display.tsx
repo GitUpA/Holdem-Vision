@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import type { ActionScore, Verdict } from "../../../convex/lib/gto/evScoring";
 import type { GtoAction } from "../../../convex/lib/gto/tables/types";
 import { gtoActionLabel } from "../../../convex/lib/gto/actionMapping";
+import { Term } from "../ui/term";
 
 interface ScoreDisplayProps {
   score: ActionScore;
@@ -42,9 +43,11 @@ export function ScoreDisplay({ score, onNextHand, isLastHand }: ScoreDisplayProp
     >
       {/* Verdict badge + EV loss */}
       <div className="flex items-center justify-between">
-        <div className={`${style.bg} ${style.text} px-3 py-1.5 rounded-lg font-bold text-sm`}>
-          {style.label}
-        </div>
+        <Term id="feature:scoring_verdicts" position="bottom">
+          <div className={`${style.bg} ${style.text} px-3 py-1.5 rounded-lg font-bold text-sm`}>
+            {style.label}
+          </div>
+        </Term>
         {score.evLoss > 0 && (
           <span className="text-xs text-[var(--muted-foreground)]">
             EV loss: <span className="text-red-400 font-medium">{score.evLoss.toFixed(1)} BB</span>

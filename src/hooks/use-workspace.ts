@@ -554,6 +554,7 @@ export function useWorkspace(mode: WorkspaceMode) {
 
     drillPhaseRef.current = "ready";
     forceRender();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setNumPlayers defined later in hook; stable setState wrapper called at invocation time
   }, [forceRender]);
 
   // ═══════════════════════════════════════════════════════
@@ -797,6 +798,13 @@ export function useWorkspace(mode: WorkspaceMode) {
     session.randomizeProfiles();
   }, [session]);
 
+  const setAllProfiles = useCallback(
+    (profileId: string) => {
+      session.setAllProfiles(profileId);
+    },
+    [session],
+  );
+
   const setNumPlayers = useCallback(
     (n: number) => {
       const clamped = Math.min(Math.max(n, 2), 10);
@@ -887,6 +895,7 @@ export function useWorkspace(mode: WorkspaceMode) {
     seats,
     assignProfile,
     randomizeProfiles,
+    setAllProfiles,
     selectedSeat,
     setSelectedSeat,
 

@@ -207,9 +207,7 @@ export class HandSession {
     for (let i = 0; i < this._numPlayers; i++) {
       if (i === this._heroSeatIndex) continue;
       if (!this._seatProfiles.has(i)) {
-        const rng = this._random ?? Math.random;
-        const randomId = PRESET_IDS[Math.floor(rng() * PRESET_IDS.length)];
-        this._seatProfiles.set(i, PRESET_PROFILES[randomId]);
+        this._seatProfiles.set(i, PRESET_PROFILES["gto"]);
       }
     }
 
@@ -408,6 +406,19 @@ export class HandSession {
     this.callbacks.onStateChange?.();
   }
 
+  /** Set all villain seats to the same profile preset. */
+  setAllProfiles(profileId: string): void {
+    const profile = PRESET_PROFILES[profileId];
+    if (!profile) return;
+    const next = new Map(this._seatProfiles);
+    for (let i = 0; i < this._numPlayers; i++) {
+      if (i === this._heroSeatIndex) continue;
+      next.set(i, profile);
+    }
+    this._seatProfiles = next;
+    this.callbacks.onStateChange?.();
+  }
+
   // ═══════════════════════════════════════════════════════
   // CONFIG UPDATES (between hands only)
   // ═══════════════════════════════════════════════════════
@@ -491,7 +502,11 @@ export class HandSession {
       safety++;
 
       if (s.phase === "complete" || s.phase === "showdown") break;
-      if (s.activePlayerIndex === null) break;
+      if (s.activePlayerIndex === null) {
+        // No one to act, but hand isn't over — state machine should have
+        // handled this (runOutBoard). If we reach here, something is stuck.
+        break;
+      }
 
       const activePlayer = s.players[s.activePlayerIndex];
 

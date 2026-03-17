@@ -1,9 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getKnowledge } from "../../../convex/lib/knowledge";
 
 interface DrillGuideDrawerProps {
   open: boolean;
@@ -85,7 +86,7 @@ const StarIcon = (
   </SvgIcon>
 );
 
-// ── Section data ──
+// ── Section data (content from knowledge base, icons from component) ──
 
 interface GuideSection {
   id: string;
@@ -96,109 +97,53 @@ interface GuideSection {
   tip?: string;
 }
 
-const GETTING_STARTED: GuideSection[] = [
-  {
-    id: "what-is-drill",
-    icon: TargetIcon,
-    title: "What is Drill Mode?",
-    description: "Practice GTO (Game Theory Optimal) decisions against solver-computed frequency tables. Each drill deals you hands matching a specific board archetype and asks you to choose the correct action.",
-    steps: [
-      "Select an archetype (board type) from the grid",
-      "Choose how many hands to practice (5, 10, or 20)",
-      "Pick Learn mode (answers shown) or Quiz mode (test yourself)",
-      "Press Start Drill to begin",
-    ],
-    tip: "Start with Learn mode on a familiar archetype to build intuition before switching to Quiz mode.",
-  },
-  {
-    id: "learn-vs-quiz",
-    icon: BookIcon,
-    title: "Learn vs Quiz Mode",
-    description: "Two ways to train, depending on what you need.",
-    steps: [
-      "Learn mode: GTO frequencies and explanations are always visible. Study what the solver recommends and why before choosing your action.",
-      "Quiz mode: The solution is hidden until after you act. Pick your action first, then see how it compares to GTO.",
-      "Switch freely between modes \u2014 your progress carries over within a drill session.",
-    ],
-    tip: "Use Learn mode to study a new archetype, then switch to Quiz mode once you feel comfortable.",
-  },
-];
-
-const UNDERSTANDING_RESULTS: GuideSection[] = [
-  {
-    id: "frequency-bars",
-    icon: BarChartIcon,
-    title: "Reading Frequency Bars",
-    description: "The colored bars show how often GTO takes each action in this spot.",
-    steps: [
-      "Each bar represents an action (fold, check, call, bet sizes, raise sizes)",
-      "The percentage is how often the solver chose that action across all hands in this category",
-      "Band ranges (e.g. 49-61%) show variance across solved boards \u2014 wider bands mean the spot is more board-dependent",
-      "The highlighted action is the most frequent (optimal) choice",
-    ],
-    tip: "Don\u2019t think of GTO as \u201calways do X.\u201d It\u2019s a mixed strategy \u2014 the solver sometimes checks and sometimes bets with the same hand.",
-  },
-  {
-    id: "accuracy",
-    icon: ShieldIcon,
-    title: "Accuracy & Confidence",
-    description: "Each drill spot shows how precise the solver data is, measured in BB (big blinds).",
-    steps: [
-      "\u201cWithin X BB\u201d tells you the maximum EV difference between our data and a perfect solver",
-      "Very High accuracy (< 0.1 BB) means the frequencies are essentially exact",
-      "High accuracy (< 0.2 BB) is still excellent for learning",
-      "Moderate accuracy (< 0.5 BB) means the spot has more variance \u2014 focus on the general pattern, not exact percentages",
-    ],
-    tip: "Even at \u201cmoderate\u201d accuracy, the error is smaller than the EV you lose from most common mistakes.",
-  },
-  {
-    id: "verdicts",
-    icon: ScaleIcon,
-    title: "Scoring Verdicts",
-    description: "After each hand, your action is graded against the GTO solution.",
-    steps: [
-      "Optimal: You chose a high-frequency GTO action. No EV lost.",
-      "Acceptable: Your action has some solver support but isn\u2019t the primary play. Small EV loss.",
-      "Mistake: The solver rarely takes this action here. Moderate EV loss.",
-      "Blunder: The solver essentially never does this. Significant EV lost.",
-    ],
-    tip: "Acceptable is fine in practice! GTO uses mixed strategies, so multiple actions can be correct. Focus on avoiding Mistakes and Blunders.",
-  },
-];
-
-const ARCHETYPE_TIPS: GuideSection[] = [
-  {
-    id: "archetypes",
-    icon: BrainIcon,
-    title: "Understanding Archetypes",
-    description: "Archetypes are categories of board textures that share similar strategic properties.",
-    steps: [
-      "Dry boards (e.g. A-7-2 rainbow): Favor the preflop raiser. High c-bet frequency, small sizing.",
-      "Wet boards (e.g. J-T-8 two-tone): More checking, bigger bets when betting. Draws change everything.",
-      "Paired boards: Less intuitive \u2014 the pair reduces combos and shifts ranges in subtle ways.",
-      "Monotone boards: Flush draws dominate. Position matters more than usual.",
-    ],
-    tip: "Drill each archetype separately. The key insight is that GTO strategy changes dramatically based on board texture.",
-  },
-  {
-    id: "preflop",
-    icon: StarIcon,
-    title: "Preflop Archetypes",
-    description: "Preflop drills cover opening ranges, 3-bet defense, blind play, and more.",
-    steps: [
-      "RFI Opening: Which hands to raise first in from each position",
-      "BB Defense: How wide to defend your big blind vs a raise",
-      "3-Bet Pots: When to 3-bet and how to respond to 3-bets",
-      "Blind vs Blind: Unique dynamics when only the blinds are left",
-    ],
-    tip: "Preflop is the foundation. If your preflop ranges are off, every postflop decision starts from a disadvantage.",
-  },
-];
+/** Map knowledge entry sections to GuideSection with icons */
+function buildSections(
+  mapping: { knowledgeId: string; sectionId: string; icon: ReactNode }[],
+): GuideSection[] {
+  return mapping.map(({ knowledgeId, sectionId, icon }) => {
+    const entry = getKnowledge(knowledgeId);
+    const section = entry?.sections?.find((s) => s.id === sectionId);
+    if (!section) {
+      return { id: sectionId, icon, title: sectionId, description: "" };
+    }
+    return {
+      id: section.id,
+      icon,
+      title: section.title,
+      description: section.description,
+      steps: section.steps,
+      tip: section.tip,
+    };
+  });
+}
 
 const ALL_TABS = [
-  { key: "start", label: "Getting Started", sections: GETTING_STARTED },
-  { key: "results", label: "Understanding Results", sections: UNDERSTANDING_RESULTS },
-  { key: "archetypes", label: "Archetypes", sections: ARCHETYPE_TIPS },
+  {
+    key: "start",
+    label: "Getting Started",
+    build: () => buildSections([
+      { knowledgeId: "feature:drill_mode", sectionId: "what-is-drill", icon: TargetIcon },
+      { knowledgeId: "feature:drill_mode", sectionId: "learn-vs-quiz", icon: BookIcon },
+    ]),
+  },
+  {
+    key: "results",
+    label: "Understanding Results",
+    build: () => buildSections([
+      { knowledgeId: "feature:frequency_bars", sectionId: "frequency-bars", icon: BarChartIcon },
+      { knowledgeId: "feature:accuracy_confidence", sectionId: "accuracy", icon: ShieldIcon },
+      { knowledgeId: "feature:scoring_verdicts", sectionId: "verdicts", icon: ScaleIcon },
+    ]),
+  },
+  {
+    key: "archetypes",
+    label: "Archetypes",
+    build: () => buildSections([
+      { knowledgeId: "concept:board_archetypes", sectionId: "archetypes", icon: BrainIcon },
+      { knowledgeId: "concept:preflop_archetypes", sectionId: "preflop", icon: StarIcon },
+    ]),
+  },
 ] as const;
 
 // ── Tip box icon ──
@@ -220,6 +165,7 @@ export function DrillGuideDrawer({ open, onClose }: DrillGuideDrawerProps) {
   const [expandedSection, setExpandedSection] = useState<string | null>("what-is-drill");
 
   const currentTab = ALL_TABS.find((t) => t.key === activeTab) ?? ALL_TABS[0];
+  const sections = useMemo(() => currentTab.build(), [currentTab]);
 
   return (
     <AnimatePresence>
@@ -278,7 +224,7 @@ export function DrillGuideDrawer({ open, onClose }: DrillGuideDrawerProps) {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-              {currentTab.sections.map((section) => {
+              {sections.map((section) => {
                 const isExpanded = expandedSection === section.id;
                 return (
                   <div

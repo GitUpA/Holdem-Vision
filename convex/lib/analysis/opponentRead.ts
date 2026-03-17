@@ -27,7 +27,11 @@ import { resolveProfile } from "../opponents/profileResolver";
 import { comboToCards, rangePct } from "../opponents/combos";
 import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
 import { cardToDisplay } from "../primitives/card";
-import { foldEquityScenarios } from "./foldEquity";
+import { foldEquityScenarios, type SolverFoldContext } from "./foldEquity";
+import { classifyArchetype, contextFromGameState } from "../gto/archetypeClassifier";
+import { lookupFrequencies, hasTable } from "../gto/tables";
+import { getModifierMap } from "../opponents/engines/modifierProfiles";
+import type { GameState } from "../state/game-state";
 
 export interface OpponentReadValue {
   /** Per-opponent breakdown */
@@ -122,12 +126,19 @@ export const opponentReadLens: AnalysisLens = {
             ? "preflop.facing_raise"
             : "postflop.facing_bet";
         const params = resolved[situationKey];
+
+        // Try solver-informed fold equity
+        const solverCtx = context.gameState
+          ? buildSolverFoldContext(context.gameState, opp.seatIndex, profile.id, situationKey)
+          : undefined;
+
         foldEq = foldEquityScenarios(
           equityAgainst.win,
           params,
           potBB,
           context.street as "preflop" | "flop" | "turn" | "river",
           profile.name,
+          solverCtx,
         );
       }
 
@@ -171,6 +182,64 @@ export const opponentReadLens: AnalysisLens = {
     };
   },
 };
+
+// ─── Solver-informed fold context ───
+
+/**
+ * Build solver-informed fold context for an opponent.
+ *
+ * Looks up the GTO fold frequency for this board texture + street,
+ * then applies the opponent profile's foldScale modifier.
+ *
+ * Returns undefined if no solver data is available (falls back to heuristic).
+ */
+function buildSolverFoldContext(
+  gameState: GameState,
+  villainSeatIndex: number,
+  profileId: string,
+  situationKey: SituationKey,
+): SolverFoldContext | undefined {
+  if (gameState.communityCards.length < 3) return undefined; // preflop — no texture
+
+  // Classify the board texture
+  const classCtx = contextFromGameState(gameState, villainSeatIndex);
+  const archetype = classifyArchetype(classCtx);
+  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
+  const street = gameState.currentStreet;
+
+  if (!hasTable(lookupArchetypeId, street)) return undefined;
+
+  // Look up GTO frequencies for a "generic" hand facing a bet.
+  // We use the OOP perspective (villain facing hero's bet) — check + fold frequencies.
+  // The "fold" frequency in solver data is implicit: 1 - sum(check, call, bet, raise).
+  // But solver tables have: check, bet_small, bet_medium, bet_large.
+  // When facing a bet, "check" maps to "call" (via remap), and no "fold" is stored.
+  // GTO fold frequency = 1 - sum of all action frequencies for this category.
+  //
+  // Use a representative category — "middle_pair" is a common marginal spot
+  // that captures typical fold/continue frequencies.
+  const lookup = lookupFrequencies(lookupArchetypeId, "middle_pair", false, street);
+  if (!lookup) return undefined;
+
+  // Sum all action frequencies — GTO fold = 1 - total
+  const totalActionFreq = Object.values(lookup.frequencies)
+    .reduce((sum, f) => sum + (f ?? 0), 0);
+  const gtoFoldFrequency = Math.max(0, 1 - totalActionFreq);
+
+  // Get profile's foldScale for this situation
+  const modifierMap = getModifierMap(profileId);
+  const modifier = modifierMap[situationKey];
+  const foldScale = modifier?.base.foldScale ?? 1.0;
+
+  // Archetype label for explanation
+  const archetypeLabel = lookupArchetypeId.replace(/_/g, " ");
+
+  return {
+    gtoFoldFrequency,
+    foldScale,
+    archetypeLabel,
+  };
+}
 
 // ─── Equity vs specific range ───
 

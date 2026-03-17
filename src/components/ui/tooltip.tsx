@@ -3,8 +3,8 @@
 /**
  * Tooltip — a lightweight, reusable tooltip component.
  *
- * Pure CSS + React state. No external dependencies beyond React.
- * Supports positioning (top, bottom, left, right) and optional delay.
+ * Uses a portal to render at document.body level, avoiding overflow clipping
+ * from parent containers. Position is calculated from the trigger's bounding rect.
  *
  * Usage:
  *   <Tooltip content="Explanation text here">
@@ -13,7 +13,8 @@
  *
  *   <InfoTip text="What this section means" />
  */
-import { useState, useRef, useCallback, type ReactNode } from "react";
+import { useState, useRef, useCallback, useLayoutEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 // ═══════════════════════════════════════════════════════
@@ -37,19 +38,7 @@ interface TooltipProps {
   className?: string;
 }
 
-const POSITION_CLASSES: Record<TooltipPosition, string> = {
-  top: "bottom-full left-1/2 -translate-x-1/2 mb-1.5",
-  bottom: "top-full left-1/2 -translate-x-1/2 mt-1.5",
-  left: "right-full top-1/2 -translate-y-1/2 mr-1.5",
-  right: "left-full top-1/2 -translate-y-1/2 ml-1.5",
-};
-
-const ARROW_CLASSES: Record<TooltipPosition, string> = {
-  top: "top-full left-1/2 -translate-x-1/2 border-t-[var(--card-foreground)]/90 border-x-transparent border-b-transparent",
-  bottom: "bottom-full left-1/2 -translate-x-1/2 border-b-[var(--card-foreground)]/90 border-x-transparent border-t-transparent",
-  left: "left-full top-1/2 -translate-y-1/2 border-l-[var(--card-foreground)]/90 border-y-transparent border-r-transparent",
-  right: "right-full top-1/2 -translate-y-1/2 border-r-[var(--card-foreground)]/90 border-y-transparent border-l-transparent",
-};
+const GAP = 6; // px between trigger and tooltip
 
 export function Tooltip({
   content,
@@ -60,7 +49,10 @@ export function Tooltip({
   className,
 }: TooltipProps) {
   const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
 
   const show = useCallback(() => {
     timeoutRef.current = setTimeout(() => setVisible(true), delay);
@@ -69,41 +61,84 @@ export function Tooltip({
   const hide = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setVisible(false);
+    setCoords(null);
   }, []);
+
+  // Calculate position after tooltip is rendered so we know its size
+  useLayoutEffect(() => {
+    if (!visible || !triggerRef.current || !tooltipRef.current) return;
+
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const tooltipRect = tooltipRef.current.getBoundingClientRect();
+
+    let top = 0;
+    let left = 0;
+
+    switch (position) {
+      case "top":
+        top = triggerRect.top - tooltipRect.height - GAP;
+        left = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
+        break;
+      case "bottom":
+        top = triggerRect.bottom + GAP;
+        left = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
+        break;
+      case "left":
+        top = triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
+        left = triggerRect.left - tooltipRect.width - GAP;
+        break;
+      case "right":
+        top = triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
+        left = triggerRect.right + GAP;
+        break;
+    }
+
+    // Clamp to viewport edges with 8px padding
+    const pad = 8;
+    left = Math.max(pad, Math.min(left, window.innerWidth - tooltipRect.width - pad));
+    top = Math.max(pad, Math.min(top, window.innerHeight - tooltipRect.height - pad));
+
+    setCoords({ top, left });
+  }, [visible, position]);
 
   return (
     <span
-      className={cn("relative inline-flex", className)}
+      ref={triggerRef}
+      className={cn("inline-flex", className)}
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
       onBlur={hide}
     >
       {children}
-      {visible && (
-        <span
-          role="tooltip"
-          className={cn(
-            "absolute z-50 px-2.5 py-1.5 rounded-md",
-            "bg-[var(--card)] border border-[var(--border)]",
-            "text-[10px] leading-relaxed text-[var(--foreground)]/90",
-            "shadow-lg shadow-black/30",
-            "pointer-events-none",
-            "animate-in fade-in-0 zoom-in-95 duration-150",
-            POSITION_CLASSES[position],
-          )}
-          style={{ maxWidth, width: "max-content" }}
-        >
-          {content}
-          {/* Arrow */}
+      {visible &&
+        createPortal(
           <span
+            ref={tooltipRef}
+            role="tooltip"
             className={cn(
-              "absolute w-0 h-0 border-4",
-              ARROW_CLASSES[position],
+              "fixed z-[9999] px-2.5 py-1.5 rounded-md",
+              "bg-[var(--card)] border border-[var(--border)]",
+              "text-[10px] leading-relaxed text-[var(--foreground)]/90",
+              "shadow-lg shadow-black/30",
+              "pointer-events-none",
+              // Only animate once positioned to avoid flash at (0,0)
+              coords
+                ? "opacity-100 scale-100"
+                : "opacity-0 scale-95",
+              "transition-[opacity,transform] duration-150",
             )}
-          />
-        </span>
-      )}
+            style={{
+              maxWidth,
+              width: "max-content",
+              top: coords?.top ?? -9999,
+              left: coords?.left ?? -9999,
+            }}
+          >
+            {content}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }

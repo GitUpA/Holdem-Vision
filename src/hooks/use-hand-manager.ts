@@ -457,6 +457,13 @@ export function useHandManager(initialPlayers = 6) {
     session.randomizeProfiles();
   }, [session]);
 
+  const setAllProfiles = useCallback(
+    (profileId: string) => {
+      session.setAllProfiles(profileId);
+    },
+    [session],
+  );
+
   const setNumPlayers = useCallback(
     (n: number) => {
       const clamped = Math.min(Math.max(n, 2), 10);
@@ -550,6 +557,7 @@ export function useHandManager(initialPlayers = 6) {
     seats,
     assignProfile,
     randomizeProfiles,
+    setAllProfiles,
     selectedSeat,
     setSelectedSeat,
 

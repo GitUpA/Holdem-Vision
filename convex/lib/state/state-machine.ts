@@ -34,6 +34,7 @@ import {
   allPlayersAllIn,
   nextStreet,
   activePlayerCount,
+  playersInHand,
 } from "../rules/streets";
 
 // ═══════════════════════════════════════════════════════
@@ -459,7 +460,11 @@ export function advanceStreet(state: GameState): StateTransitionResult {
   const firstAct = firstToAct(state, next);
   state.activePlayerIndex = firstAct;
 
-  // If only one active player left (rest all-in), auto-advance
+  // If no one can act (all players are all-in or only one active player
+  // with the rest all-in), run out the remaining community cards
+  if (firstAct === null && playersInHand(state) >= 2) {
+    return runOutBoard(state);
+  }
   if (activePlayerCount(state) <= 1 && allPlayersAllIn(state)) {
     return runOutBoard(state);
   }

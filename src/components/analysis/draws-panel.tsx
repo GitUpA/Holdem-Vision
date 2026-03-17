@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Term } from "../ui/term";
 
 interface DrawInfo {
   type: string;
@@ -25,6 +26,16 @@ const DRAW_ICONS: Record<string, string> = {
   backdoor_flush: "♣",
   backdoor_straight: "···",
   straight_draw: "↔",
+};
+
+const DRAW_KNOWLEDGE: Record<string, string> = {
+  flush_draw: "term:flush_draw",
+  oesd: "term:oesd",
+  gutshot: "term:gutshot",
+  straight_draw: "term:straight_draw",
+  backdoor_flush: "term:backdoor_draw",
+  backdoor_straight: "term:backdoor_draw",
+  combo: "term:combo_draw",
 };
 
 const DRAW_COLORS: Record<string, string> = {
@@ -82,7 +93,13 @@ export function DrawsPanel({
               {DRAW_ICONS[draw.type] ?? "?"}
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-[var(--foreground)]">{draw.description}</p>
+              {DRAW_KNOWLEDGE[draw.type] ? (
+                <Term id={DRAW_KNOWLEDGE[draw.type]} position="bottom">
+                  <p className="text-sm text-[var(--foreground)]">{draw.description}</p>
+                </Term>
+              ) : (
+                <p className="text-sm text-[var(--foreground)]">{draw.description}</p>
+              )}
             </div>
             {draw.probability != null ? (
               <span className={cn(
