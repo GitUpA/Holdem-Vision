@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ExplanationTree } from "./explanation-tree";
 import { SolutionDisplay } from "../drill/solution-display";
-import type { CoachingAdvice, CoachingValue } from "../../../convex/lib/analysis/coachingLens";
+import type { CoachingAdvice } from "../../../convex/lib/analysis/coachingLens";
 import type { SpotSolution } from "@/hooks/use-workspace";
 import type { ArchetypeClassification, ArchetypeId } from "../../../convex/lib/gto/archetypeClassifier";
 import { getKnowledge } from "../../../convex/lib/knowledge";
@@ -36,7 +36,6 @@ function getProfileMeta(profileId: string): { short: string; desc: string } {
 
 interface CoachingPanelProps {
   advices: CoachingAdvice[];
-  consensus?: CoachingValue["consensus"];
   /** In drill mode, pass the drill solution to embed in the GTO row */
   drillSolution?: SpotSolution;
   /** In drill mode, pass the user's score */
@@ -56,7 +55,7 @@ const PROFILE_ORDER: Record<string, number> = {
   gto: 0, tag: 1, lag: 2, nit: 3, fish: 4,
 };
 
-export function CoachingPanel({ advices, consensus, drillSolution, drillScore, autoExpandGto, archetype, onArchetypeClick, archetypeLabel: labelFn }: CoachingPanelProps) {
+export function CoachingPanel({ advices, drillSolution, drillScore, autoExpandGto, archetype, onArchetypeClick, archetypeLabel: labelFn }: CoachingPanelProps) {
   const [expandedProfile, setExpandedProfile] = useState<string | null>(
     autoExpandGto ? "gto" : null,
   );
@@ -85,15 +84,6 @@ export function CoachingPanel({ advices, consensus, drillSolution, drillScore, a
         />
       )}
 
-      {/* Consensus Banner */}
-      {consensus ? (
-        <ConsensusBanner consensus={consensus} total={advices.length} />
-      ) : (
-        <div className="text-[10px] text-[var(--muted-foreground)] italic">
-          No consensus — profiles disagree
-        </div>
-      )}
-
       {/* Profile Rows */}
       <div className="space-y-0 divide-y divide-[var(--border)]/50">
         {sorted.map((advice, i) => (
@@ -101,7 +91,7 @@ export function CoachingPanel({ advices, consensus, drillSolution, drillScore, a
             key={advice.profileId}
             advice={advice}
             index={i}
-            isAgreeing={consensus?.agreeing.includes(advice.profileName) ?? false}
+            isAgreeing={false}
             isExpanded={expandedProfile === advice.profileId}
             onToggle={() =>
               setExpandedProfile(
@@ -114,44 +104,6 @@ export function CoachingPanel({ advices, consensus, drillSolution, drillScore, a
         ))}
       </div>
     </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// CONSENSUS BANNER
-// ═══════════════════════════════════════════════════════
-
-function ConsensusBanner({
-  consensus,
-  total,
-}: {
-  consensus: NonNullable<CoachingValue["consensus"]>;
-  total: number;
-}) {
-  const colors = ACTION_COLORS[consensus.actionType] ?? ACTION_COLORS.check;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className={cn(
-        "flex items-center gap-3 px-3 py-1.5 rounded-lg border",
-        colors.bg,
-        colors.border,
-      )}
-    >
-      <span className={cn("text-xs font-bold uppercase", colors.text)}>
-        {consensus.actionType.replace("_", " ")}
-      </span>
-      <span className="text-[10px]">
-        <span className="font-bold text-[var(--gold)]">
-          {consensus.agreeing.length}
-        </span>
-        <span className="text-[var(--muted-foreground)]">
-          {" "}of {total} agree
-        </span>
-      </span>
-    </motion.div>
   );
 }
 

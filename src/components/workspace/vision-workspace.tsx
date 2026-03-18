@@ -17,7 +17,7 @@ import { CardSelector, type SelectionMode } from "../cards/card-selector";
 import { VisualRenderer } from "../analysis/visual-renderer";
 import { ExplanationTree } from "../analysis/explanation-tree";
 import { CoachingPanel } from "../analysis/coaching-panel";
-import type { CoachingAdvice, CoachingValue } from "../../../convex/lib/analysis/coachingLens";
+import type { CoachingAdvice } from "../../../convex/lib/analysis/coachingLens";
 import { PlayerList } from "../table/player-list";
 import { TableControls } from "../table/table-controls";
 import { OpponentDetail } from "../table/opponent-detail";
@@ -576,9 +576,8 @@ export function VisionWorkspace() {
               if (!coachingResult || coachingResult.visuals.length === 0) return null;
               const coachingVisual = coachingResult.visuals.find((v) => v.type === "coaching");
               if (!coachingVisual) return null;
-              const { advices, consensus } = coachingVisual.data as {
+              const { advices } = coachingVisual.data as {
                 advices: CoachingAdvice[];
-                consensus?: CoachingValue["consensus"];
               };
               if (!advices || advices.length === 0) return null;
               return (
@@ -589,7 +588,7 @@ export function VisionWorkspace() {
                     </h3>
                   </div>
                   <div className="px-4 py-3">
-                    <CoachingPanel advices={advices} consensus={consensus} />
+                    <CoachingPanel advices={advices} />
                   </div>
                 </div>
               );

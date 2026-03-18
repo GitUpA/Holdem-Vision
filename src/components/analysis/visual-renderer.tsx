@@ -11,7 +11,7 @@ import { OutsDisplay } from "./outs-display";
 import { DrawsPanel } from "./draws-panel";
 import { CoachingPanel } from "./coaching-panel";
 import type { RangeHighlight } from "../../../convex/lib/types/visuals";
-import type { CoachingAdvice, CoachingValue } from "../../../convex/lib/analysis/coachingLens";
+import type { CoachingAdvice } from "../../../convex/lib/analysis/coachingLens";
 import type { Street } from "../../../convex/lib/types/cards";
 
 interface VisualRendererProps {
@@ -190,13 +190,11 @@ export function VisualRenderer({ results, street }: VisualRendererProps) {
       case "coaching": {
         const cData = visual.data as {
           advices: CoachingAdvice[];
-          consensus?: CoachingValue["consensus"];
         };
         components.push(
           <CoachingPanel
             key={key}
             advices={cData.advices}
-            consensus={cData.consensus}
           />,
         );
         break;
