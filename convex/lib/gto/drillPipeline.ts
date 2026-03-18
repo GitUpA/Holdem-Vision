@@ -73,6 +73,8 @@ export interface SpotSolution {
   archetypeAccuracy?: ArchetypeAccuracy;
   /** Board-specific accuracy impact — the "within X BB" number */
   accuracyImpact?: AccuracyImpact;
+  /** Preflop confidence based on solver scenario sample count */
+  preflopConfidence?: import("./tables").PreflopConfidence;
 }
 
 /**

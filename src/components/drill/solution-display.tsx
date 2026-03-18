@@ -55,15 +55,7 @@ export function SolutionDisplay({ solution, userAction, score }: SolutionDisplay
           GTO Solution
           <TermTip id="concept:gto" position="bottom" />
         </span>
-        {solution.accuracyImpact && (
-          <span className="text-[10px] text-[var(--muted-foreground)]">
-            Within{" "}
-            <span className="text-[var(--foreground)] font-medium">
-              {solution.accuracyImpact.maxEvImpactBB.toFixed(2)} BB
-            </span>
-            {" "}of exact solver
-          </span>
-        )}
+        <ConfidenceBadge solution={solution} />
       </div>
 
       {/* Frequency bar chart with bands */}
@@ -150,10 +142,8 @@ export function SolutionDisplay({ solution, userAction, score }: SolutionDisplay
       {/* Teaching explanation */}
       <ExplanationSection solution={solution} />
 
-      {/* Accuracy details (expandable) */}
-      {solution.accuracyImpact && (
-        <AccuracyDetails solution={solution} />
-      )}
+      {/* Data confidence (expandable) */}
+      <ConfidenceDetails solution={solution} />
     </motion.div>
   );
 }
@@ -232,22 +222,69 @@ function ExplanationSection({ solution }: { solution: SpotSolution }) {
 }
 
 // ═══════════════════════════════════════════════════════
-// ACCURACY DETAILS (expandable)
+// DATA CONFIDENCE — unified display for preflop + postflop
 // ═══════════════════════════════════════════════════════
 
-function AccuracyDetails({ solution }: { solution: SpotSolution }) {
+const CONFIDENCE_COLORS: Record<string, string> = {
+  reliable: "text-green-400",
+  good: "text-yellow-400",
+  approximate: "text-orange-400",
+};
+
+/** Inline badge shown in the header */
+function ConfidenceBadge({ solution }: { solution: SpotSolution }) {
   const impact = solution.accuracyImpact;
-  if (!impact) return null;
+  const preflop = solution.preflopConfidence;
+
+  if (impact) {
+    return (
+      <span className="text-[10px] text-[var(--muted-foreground)]">
+        Within{" "}
+        <span className="text-[var(--foreground)] font-medium">
+          {impact.maxEvImpactBB.toFixed(2)} BB
+        </span>
+        {" "}of exact solver
+      </span>
+    );
+  }
+
+  if (preflop) {
+    return (
+      <span className="text-[10px] text-[var(--muted-foreground)]" title={preflop.detail}>
+        <span className={CONFIDENCE_COLORS[preflop.level] ?? ""}>
+          {preflop.label}
+        </span>
+        {" \u00b7 "}{preflop.sampleCount} scenarios
+      </span>
+    );
+  }
+
+  return null;
+}
+
+/** Expandable details section */
+function ConfidenceDetails({ solution }: { solution: SpotSolution }) {
+  const impact = solution.accuracyImpact;
+  const preflop = solution.preflopConfidence;
+
+  if (!impact && !preflop) return null;
+
+  const summaryText = impact
+    ? `Accuracy: ${impact.label} (${Math.round(impact.accuracy * 100)}%)${impact.couldFlipOptimal ? " \u00b7 Close spot" : ""}`
+    : `Data confidence: ${preflop!.label}`;
+
+  const detailContent = impact
+    ? impact.practicalMeaning
+    : preflop!.detail;
 
   return (
     <details className="border-t border-[var(--border)]/50 pt-2">
       <summary className="text-[10px] text-[var(--muted-foreground)] cursor-pointer hover:text-[var(--foreground)] transition-colors">
-        Accuracy: {impact.label} ({Math.round(impact.accuracy * 100)}%)
-        {impact.couldFlipOptimal && " · Close spot"}
+        {summaryText}
       </summary>
       <div className="mt-1.5 space-y-1 text-[10px] text-[var(--muted-foreground)]">
-        <p>{impact.practicalMeaning}</p>
-        {solution.archetypeAccuracy && (
+        <p>{detailContent}</p>
+        {impact && solution.archetypeAccuracy && (
           <p>
             Based on {solution.archetypeAccuracy.boardCount} solved boards
             {solution.bands && Object.keys(solution.bands).length > 0 && " with frequency bands"}

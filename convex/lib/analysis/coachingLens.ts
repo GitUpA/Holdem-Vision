@@ -29,7 +29,11 @@ import { seededRandom } from "../primitives/deck";
 import {
   lookupFrequencies,
   hasTable,
+  lookupPreflopHandClass,
+  handClassToActionFrequencies,
+  getPreflopConfidence,
 } from "../gto/tables";
+import { comboToHandClass, cardsToCombo } from "../opponents/combos";
 import type { ActionFrequencies, ActionFrequencyBands, GtoAction } from "../gto/tables/types";
 import type { ArchetypeAccuracy } from "../gto/tables/types";
 import type { AccuracyImpact } from "../gto/tables/types";
@@ -59,6 +63,8 @@ export interface CoachingSolverData {
   bands?: ActionFrequencyBands;
   archetypeAccuracy?: ArchetypeAccuracy;
   accuracyImpact?: AccuracyImpact;
+  /** Preflop confidence based on sample count */
+  preflopConfidence?: import("../gto/tables").PreflopConfidence;
 }
 
 export interface CoachingAdvice {
@@ -236,10 +242,59 @@ function tryGtoSolverLookup(
   // Classify archetype from the game state
   const classCtx = contextFromGameState(gameState, heroSeat);
   const archetype = classifyArchetype(classCtx);
-
-  // For turn/river, use textureArchetypeId for solver lookup (flop texture)
-  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
   const street = gameState.currentStreet;
+
+  // Preflop: try per-hand-class lookup first (169 grid from PokerBench)
+  if (street === "preflop") {
+    const combo = cardsToCombo(heroCards[0], heroCards[1]);
+    const handClass = comboToHandClass(combo);
+    const position = gameState.players[heroSeat].position;
+    // Find the opener position for position-aware lookup
+    const openerPos = findPreflopOpenerFromState(gameState, heroSeat);
+    const hcLookup = lookupPreflopHandClass(archetype.archetypeId, position, handClass, openerPos);
+
+    if (hcLookup) {
+      const handCat = categorizeHand(heroCards, gameState.communityCards);
+      const frequencies = handClassToActionFrequencies(hcLookup, archetype.archetypeId);
+      const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition, undefined, street);
+      const remappedFreqs = remapFrequenciesToLegal(frequencies, legal);
+
+      let remappedOptimalAction = "check";
+      let remappedOptimalFreq = 0;
+      for (const [action, freq] of Object.entries(remappedFreqs)) {
+        if ((freq ?? 0) > remappedOptimalFreq) {
+          remappedOptimalFreq = freq ?? 0;
+          remappedOptimalAction = action;
+        }
+      }
+
+      const gameAction = gtoActionToGameAction(remappedOptimalAction as GtoAction, legal, gameState.pot.total);
+      const solverData: CoachingSolverData = {
+        frequencies: remappedFreqs,
+        optimalAction: remappedOptimalAction as GtoAction,
+        optimalFrequency: remappedOptimalFreq,
+        availableActions: Object.keys(remappedFreqs).filter(
+          (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
+        ) as GtoAction[],
+        isExactMatch: true,
+        resolvedCategory: handCat.category,
+        preflopConfidence: getPreflopConfidence(hcLookup),
+      };
+
+      return {
+        profileName: "GTO",
+        profileId: "gto",
+        engineId: "modified-gto",
+        actionType: gameAction.actionType,
+        amount: gameAction.amount,
+        explanation,
+        solverData,
+      };
+    }
+  }
+
+  // Postflop (or preflop fallback): use solver table by hand category
+  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
 
   // Need sufficient confidence and a registered table
   if (archetype.confidence < 0.6 || !hasTable(lookupArchetypeId, street)) {
@@ -311,6 +366,18 @@ function tryGtoSolverLookup(
     explanation,
     solverData,
   };
+}
+
+/** Find the first preflop raiser's position (the opener) from action history. */
+function findPreflopOpenerFromState(state: GameState, heroSeat: number): string | undefined {
+  for (const action of state.actionHistory) {
+    if (action.street !== "preflop") break;
+    if (action.seatIndex === heroSeat) continue;
+    if (action.actionType === "raise" || action.actionType === "bet") {
+      return action.position;
+    }
+  }
+  return undefined;
 }
 
 function detectConsensus(

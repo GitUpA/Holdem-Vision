@@ -200,16 +200,19 @@ function classifyPreflop(ctx: ClassificationContext): ArchetypeClassification {
     return make("blind_vs_blind", 0.85);
   }
 
-  // BB defense: hero is BB facing a single raise
-  if (ctx.heroPosition === "bb" && raises.length === 1 && !heroRaises.length) {
+  // Facing a single raise (hero hasn't raised): BB defense / cold-call spot
+  const villainRaises = raises.filter((a) => !a.isHero);
+  if (villainRaises.length === 1 && heroRaises.length === 0) {
     return make("bb_defense_vs_rfi", 0.9);
   }
 
-  // RFI: hero is first to raise (or first to act with no raises yet)
-  const foldOrCheckOnly = preflopActions
-    .filter((a) => a.isHero)
-    .every((a) => a.actionType === "fold" || a.actionType === "check");
-  if (raises.length <= 1 && (heroRaises.length === 1 || foldOrCheckOnly)) {
+  // RFI: no villain raises yet — hero is opening or first to act
+  if (villainRaises.length === 0) {
+    return make("rfi_opening", 0.85);
+  }
+
+  // Hero already raised once, no re-raises — still RFI territory
+  if (raises.length === 1 && heroRaises.length === 1) {
     return make("rfi_opening", 0.85);
   }
 

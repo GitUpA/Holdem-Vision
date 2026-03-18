@@ -34,7 +34,10 @@ import {
 import {
   lookupFrequencies,
   hasTable,
+  lookupPreflopHandClass,
+  handClassToActionFrequencies,
 } from "../../gto/tables";
+import { comboToHandClass, cardsToCombo } from "../../opponents/combos";
 
 // Shared context analysis
 import { computeContextFactors, type ContextFactors } from "./contextAnalysis";
@@ -246,14 +249,32 @@ function getGtoBaseFrequencies(
   ctx: DecisionContext,
   _factors: ContextFactors,
 ): GtoBaseResult {
-  // Try solver lookup
   if (ctx.holeCards && ctx.holeCards.length >= 2) {
     const classCtx = contextFromGameState(ctx.state, ctx.seatIndex);
     const archetype = classifyArchetype(classCtx);
-
-    // For turn/river, use textureArchetypeId for solver lookup
-    const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
     const street = ctx.state.currentStreet;
+
+    // Preflop: try per-hand-class lookup first (169 grid from PokerBench)
+    if (street === "preflop") {
+      const combo = cardsToCombo(ctx.holeCards[0], ctx.holeCards[1]);
+      const handClass = comboToHandClass(combo);
+      const position = ctx.state.players[ctx.seatIndex].position;
+      const openerPos = findPreflopOpener(ctx.state, ctx.seatIndex);
+      const hcLookup = lookupPreflopHandClass(archetype.archetypeId, position, handClass, openerPos);
+
+      if (hcLookup) {
+        const handCat = categorizeHand(ctx.holeCards, ctx.state.communityCards);
+        return {
+          frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
+          source: "solver",
+          archetype,
+          handCat,
+        };
+      }
+    }
+
+    // Postflop (or preflop fallback): try solver table lookup by hand category
+    const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
 
     if (archetype.confidence >= CONFIDENCE_THRESHOLD && hasTable(lookupArchetypeId, street)) {
       const handCat = categorizeHand(ctx.holeCards, ctx.state.communityCards);
@@ -276,12 +297,26 @@ function getGtoBaseFrequencies(
   }
 
   // Heuristic fallback: use GTO profile's BehavioralParams converted to frequencies
-  // We use the GTO preset's params for the current situation as the heuristic base
   const gtoFreqs = paramsToFrequencies(ctx.params, ctx.legal);
   return {
     frequencies: gtoFreqs,
     source: "heuristic",
   };
+}
+
+/** Find the first preflop raiser's position (the opener) from action history. */
+function findPreflopOpener(
+  state: import("../../state/game-state").GameState,
+  heroSeatIndex: number,
+): string | undefined {
+  for (const action of state.actionHistory) {
+    if (action.street !== "preflop") break;
+    if (action.seatIndex === heroSeatIndex) continue;
+    if (action.actionType === "raise" || action.actionType === "bet") {
+      return action.position;
+    }
+  }
+  return undefined;
 }
 
 // ═══════════════════════════════════════════════════════

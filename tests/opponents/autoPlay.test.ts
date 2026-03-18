@@ -352,21 +352,24 @@ describe("bluff frequency in sampleActionFromParams", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("chooseActionFromProfile", () => {
-  it("nit folds most of the time preflop", () => {
-    const { state } = initializeHand(createTestConfig({ seed: 42 }));
-    const activeSeat = state.activePlayerIndex!;
-    const legal = currentLegalActions(state)!;
-    const random = seededRandom(1);
+  it("nit folds most of the time preflop across multiple deals", () => {
+    // Test across multiple deal seeds to account for solver hand-class data
+    // (strong hands like AA correctly don't fold even as NIT)
+    let totalFolds = 0;
+    const totalTrials = 100;
 
-    // Run 100 trials and count folds
-    let folds = 0;
-    for (let i = 0; i < 100; i++) {
+    for (let seed = 0; seed < totalTrials; seed++) {
+      const { state } = initializeHand(createTestConfig({ seed }));
+      const activeSeat = state.activePlayerIndex!;
+      const legal = currentLegalActions(state)!;
+      const random = seededRandom(seed + 1000);
+
       const decision = chooseActionFromProfile(state, activeSeat, NIT_PROFILE, legal, undefined, random);
-      if (decision.actionType === "fold") folds++;
+      if (decision.actionType === "fold") totalFolds++;
     }
 
-    // NIT modifier increases fold frequency — should fold majority of the time
-    expect(folds).toBeGreaterThan(40);
+    // NIT should fold a majority of random hands — at least 40%
+    expect(totalFolds).toBeGreaterThan(40);
   });
 
   it("fish continues most of the time", () => {

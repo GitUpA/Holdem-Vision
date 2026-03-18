@@ -92,23 +92,23 @@ const DRILL_GUIDE: KnowledgeEntry[] = [
     name: "Accuracy & Confidence",
     short: "How precise the solver data is",
     medium:
-      "Each drill spot shows accuracy in BB (big blinds). Very High (< 0.1 BB) is essentially exact; Moderate (< 0.5 BB) means focus on patterns, not exact percentages.",
+      "Postflop shows accuracy in BB (big blinds) from solved boards. Preflop shows confidence based on how many solver scenarios back the recommendation. Both tell you how much to trust the exact percentages.",
     full:
-      "Each drill spot shows how precise the solver data is, measured in BB (big blinds). \u201cWithin X BB\u201d tells you the maximum EV difference between our data and a perfect solver. Very High accuracy (< 0.1 BB) means the frequencies are essentially exact. High accuracy (< 0.2 BB) is still excellent for learning. Moderate accuracy (< 0.5 BB) means the spot has more variance \u2014 focus on the general pattern, not exact percentages. Even at \u201cmoderate\u201d accuracy, the error is smaller than the EV you lose from most common mistakes.",
+      "HoldemVision shows how confident you can be in the displayed frequencies. Postflop: \u201cWithin X BB\u201d tells you the maximum difference between our data and a perfect solver, measured in big blinds. Very High (< 0.1 BB) is essentially exact. High (< 0.2 BB) is excellent for learning. Moderate (< 0.5 BB) means focus on the general pattern, not exact percentages. Preflop: \u201cReliable\u201d (30+ scenarios) means the percentages closely match solver recommendations. \u201cGood estimate\u201d (10-29 scenarios) is solid but exact percentages could shift a few points. \u201cRough guide\u201d (under 10 scenarios) means the direction (fold vs play) is right but exact percentages are approximate. In both cases, even at moderate confidence, the guidance is far better than guessing.",
     related: ["feature:frequency_bars", "feature:scoring_verdicts"],
     sections: [
       {
         id: "accuracy",
         title: "Accuracy & Confidence",
         description:
-          "Each drill spot shows how precise the solver data is, measured in BB (big blinds).",
+          "How much to trust the percentages shown in the GTO solution.",
         steps: [
-          "\u201cWithin X BB\u201d tells you the maximum EV difference between our data and a perfect solver",
-          "Very High accuracy (< 0.1 BB) means the frequencies are essentially exact",
-          "High accuracy (< 0.2 BB) is still excellent for learning",
-          "Moderate accuracy (< 0.5 BB) means the spot has more variance \u2014 focus on the general pattern, not exact percentages",
+          "Postflop: \u201cWithin X BB\u201d shows the maximum error vs a perfect solver. Under 0.2 BB is excellent.",
+          "Preflop \u201cReliable\u201d (30+ scenarios): the percentages closely match what a solver would say.",
+          "Preflop \u201cGood estimate\u201d (10-29 scenarios): solid guidance, but exact numbers could shift a few points.",
+          "Preflop \u201cRough guide\u201d (under 10 scenarios): the fold-or-play direction is right, but exact percentages are approximate.",
         ],
-        tip: "Even at \u201cmoderate\u201d accuracy, the error is smaller than the EV you lose from most common mistakes.",
+        tip: "Even at the lowest confidence level, the recommendation is far more accurate than guessing. Focus on the big picture: should you fold or play?",
       },
     ],
   },

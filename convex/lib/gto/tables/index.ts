@@ -77,3 +77,17 @@ for (const table of ALL_PREFLOP_TABLES) {
 
 // Solver-derived flop texture tables (193 boards, 8 archetypes)
 import "./solverData";
+
+// Preflop per-hand-class tables (PokerBench 60k solver-optimal decisions)
+import "./preflopHandClassData";
+
+export {
+  lookupPreflopHandClass,
+  hasPreflopHandClassData,
+  handClassToActionFrequencies,
+  getPreflopConfidence,
+  type HandClassFrequency,
+  type PreflopHandClassTable,
+  type PreflopConfidence,
+  type ConfidenceLevel,
+} from "./preflopHandClass";

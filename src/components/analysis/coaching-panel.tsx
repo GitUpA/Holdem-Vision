@@ -362,5 +362,6 @@ function solverDataToSpotSolution(
     bands: data.bands,
     archetypeAccuracy: data.archetypeAccuracy,
     accuracyImpact: data.accuracyImpact,
+    preflopConfidence: data.preflopConfidence,
   };
 }
