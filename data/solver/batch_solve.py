@@ -402,10 +402,29 @@ def run_all_solves():
 # ═══════════════════════════════════════════════════════
 
 RANK_VAL = {'2':0,'3':1,'4':2,'5':3,'6':4,'7':5,'8':6,'9':7,'T':8,'J':9,'Q':10,'K':11,'A':12}
+VAL_RANK = {v: k for k, v in RANK_VAL.items()}
 
 def parse_hand(hand_str):
     """Parse 'AcKd' -> (rank1, suit1, rank2, suit2)."""
     return (RANK_VAL[hand_str[0]], hand_str[1], RANK_VAL[hand_str[2]], hand_str[3])
+
+
+def combo_to_hand_class(hand_str):
+    """Convert specific combo ('AcKd') to hand class ('AKo'). Matches TS comboToHandClass()."""
+    r1_val = RANK_VAL.get(hand_str[0], 0)
+    s1 = hand_str[1]
+    r2_val = RANK_VAL.get(hand_str[2], 0)
+    s2 = hand_str[3]
+
+    high = VAL_RANK[max(r1_val, r2_val)]
+    low = VAL_RANK[min(r1_val, r2_val)]
+
+    if r1_val == r2_val:
+        return f"{high}{low}"  # Pair: "AA"
+    elif s1 == s2:
+        return f"{high}{low}s"  # Suited: "AKs"
+    else:
+        return f"{high}{low}o"  # Offsuit: "AKo"
 
 def categorize_hand(hand_str, board_cards):
     """Categorize a hand relative to the board."""
@@ -514,18 +533,20 @@ def normalize_action(action_str):
 
 
 def parse_solver_output(filepath, board_cards):
-    """Parse a single solver output into categorized frequencies."""
+    """Parse a single solver output into categorized + hand-class frequencies."""
     with open(filepath) as f:
         data = json.load(f)
 
-    result = {"oop": {}, "ip": {}}
+    result = {"oop": {}, "ip": {}, "oop_hand_class": {}, "ip_hand_class": {}}
 
     # Root node is OOP's action
     oop_actions = data.get('actions', [])
     oop_strategy = data.get('strategy', {}).get('strategy', {})
 
     if oop_strategy:
-        result['oop'] = aggregate_by_category(oop_strategy, oop_actions, board_cards)
+        cat_data, hc_data = aggregate_by_category(oop_strategy, oop_actions, board_cards)
+        result['oop'] = cat_data
+        result['oop_hand_class'] = hc_data
 
     # IP acts after OOP checks
     check_node = data.get('childrens', {}).get('CHECK', {})
@@ -533,34 +554,55 @@ def parse_solver_output(filepath, board_cards):
         ip_actions = check_node.get('actions', [])
         ip_strategy = check_node.get('strategy', {}).get('strategy', {})
         if ip_strategy:
-            result['ip'] = aggregate_by_category(ip_strategy, ip_actions, board_cards)
+            cat_data, hc_data = aggregate_by_category(ip_strategy, ip_actions, board_cards)
+            result['ip'] = cat_data
+            result['ip_hand_class'] = hc_data
 
     return result
 
 
 def aggregate_by_category(strategy, actions, board_cards):
-    """Aggregate per-combo strategy into hand category frequencies."""
+    """Aggregate per-combo strategy into hand category AND hand class frequencies."""
     categories = {}
+    hand_classes = {}
 
     norm_actions = [normalize_action(a) for a in actions]
+    unique_actions = sorted(set(norm_actions))
 
     for hand, probs in strategy.items():
         cat = categorize_hand(hand, board_cards)
+        hc = combo_to_hand_class(hand)
+
+        # Per-category aggregation (existing)
         if cat not in categories:
-            categories[cat] = {'totals': {a: 0.0 for a in set(norm_actions)}, 'count': 0}
+            categories[cat] = {'totals': {a: 0.0 for a in unique_actions}, 'count': 0}
         for i, p in enumerate(probs):
             na = norm_actions[i]
             categories[cat]['totals'][na] = categories[cat]['totals'].get(na, 0) + p
         categories[cat]['count'] += 1
 
-    # Convert to averages
-    result = {}
+        # Per-hand-class aggregation (new)
+        if hc not in hand_classes:
+            hand_classes[hc] = {'totals': {a: 0.0 for a in unique_actions}, 'count': 0}
+        for i, p in enumerate(probs):
+            na = norm_actions[i]
+            hand_classes[hc]['totals'][na] = hand_classes[hc]['totals'].get(na, 0) + p
+        hand_classes[hc]['count'] += 1
+
+    # Convert categories to averages
+    cat_result = {}
     for cat, data in categories.items():
         if data['count'] > 0:
-            result[cat] = {a: v / data['count'] for a, v in data['totals'].items()}
-            result[cat]['_count'] = data['count']
+            cat_result[cat] = {a: v / data['count'] for a, v in data['totals'].items()}
+            cat_result[cat]['_count'] = data['count']
 
-    return result
+    # Convert hand classes to averages
+    hc_result = {}
+    for hc, data in hand_classes.items():
+        if data['count'] > 0:
+            hc_result[hc] = {a: round(v / data['count'], 4) for a, v in data['totals'].items()}
+
+    return cat_result, hc_result
 
 
 def parse_all_outputs():
@@ -577,6 +619,8 @@ def parse_all_outputs():
         # Collect all board results
         all_ip = {}   # hand_cat -> {action: [values across boards]}
         all_oop = {}
+        all_ip_hc = {}   # hand_class -> {action: [values across boards]}
+        all_oop_hc = {}
         parsed = 0
 
         for entry in entries:
@@ -588,6 +632,7 @@ def parse_all_outputs():
                 result = parse_solver_output(output_path, entry['board'])
                 parsed += 1
 
+                # Collect per-category data (existing)
                 for cat, freqs in result.get('ip', {}).items():
                     if cat not in all_ip:
                         all_ip[cat] = {}
@@ -607,6 +652,23 @@ def parse_all_outputs():
                         if action not in all_oop[cat]:
                             all_oop[cat][action] = []
                         all_oop[cat][action].append(val)
+
+                # Collect per-hand-class data (new)
+                for hc, freqs in result.get('ip_hand_class', {}).items():
+                    if hc not in all_ip_hc:
+                        all_ip_hc[hc] = {}
+                    for action, val in freqs.items():
+                        if action not in all_ip_hc[hc]:
+                            all_ip_hc[hc][action] = []
+                        all_ip_hc[hc][action].append(val)
+
+                for hc, freqs in result.get('oop_hand_class', {}).items():
+                    if hc not in all_oop_hc:
+                        all_oop_hc[hc] = {}
+                    for action, val in freqs.items():
+                        if action not in all_oop_hc[hc]:
+                            all_oop_hc[hc][action] = []
+                        all_oop_hc[hc][action].append(val)
 
             except Exception as e:
                 print(f"  Error parsing {entry['name']}: {e}")
@@ -654,6 +716,8 @@ def parse_all_outputs():
         oop_avg = average_freqs(all_oop)
         ip_bands = compute_band_stats(all_ip)
         oop_bands = compute_band_stats(all_oop)
+        ip_hc_avg = average_freqs(all_ip_hc)
+        oop_hc_avg = average_freqs(all_oop_hc)
 
         # Compute archetype-level accuracy
         all_std_devs = []
@@ -687,6 +751,9 @@ def parse_all_outputs():
             # Pre-computed band stats for quick reference
             "ip_bands": ip_bands,
             "oop_bands": oop_bands,
+            # Per-hand-class frequencies (169 grid, averaged across boards)
+            "ip_hand_class": ip_hc_avg,
+            "oop_hand_class": oop_hc_avg,
             # Archetype accuracy summary
             "accuracy": {
                 "avgStdDev": round(avg_std, 4),

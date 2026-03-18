@@ -36,6 +36,8 @@ import {
   hasTable,
   lookupPreflopHandClass,
   handClassToActionFrequencies,
+  lookupPostflopHandClass,
+  postflopHandClassToActionFrequencies,
 } from "../../gto/tables";
 import { comboToHandClass, cardsToCombo } from "../../opponents/combos";
 
@@ -278,11 +280,15 @@ function getGtoBaseFrequencies(
 
     if (archetype.confidence >= CONFIDENCE_THRESHOLD && hasTable(lookupArchetypeId, street)) {
       const handCat = categorizeHand(ctx.holeCards, ctx.state.communityCards);
+      // Pass hand class for per-hand-class solver lookup (more granular than category)
+      const postflopCombo = cardsToCombo(ctx.holeCards[0], ctx.holeCards[1]);
+      const postflopHandClass = comboToHandClass(postflopCombo);
       const lookup = lookupFrequencies(
         lookupArchetypeId,
         handCat.category,
         classCtx.isInPosition,
         street,
+        postflopHandClass,
       );
 
       if (lookup) {
@@ -293,6 +299,30 @@ function getGtoBaseFrequencies(
           handCat,
         };
       }
+    }
+  }
+
+  // PokerBench postflop fallback: per-hand-class from 500k aggregated data
+  if (ctx.holeCards && ctx.holeCards.length >= 2 && ctx.state.currentStreet !== "preflop") {
+    const combo = cardsToCombo(ctx.holeCards[0], ctx.holeCards[1]);
+    const handClass = comboToHandClass(combo);
+    const classCtx2 = contextFromGameState(ctx.state, ctx.seatIndex);
+    const archetype2 = classifyArchetype(classCtx2);
+    const textureId = archetype2.textureArchetypeId ?? archetype2.archetypeId;
+
+    const pbLookup = lookupPostflopHandClass(
+      textureId,
+      handClass,
+      classCtx2.isInPosition,
+      ctx.state.currentStreet,
+    );
+    if (pbLookup) {
+      return {
+        frequencies: postflopHandClassToActionFrequencies(pbLookup),
+        source: "solver",
+        archetype: archetype2,
+        handCat: categorizeHand(ctx.holeCards, ctx.state.communityCards),
+      };
     }
   }
 

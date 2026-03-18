@@ -56,6 +56,10 @@ export interface FrequencyTable {
   commonMistakes: string[];
   /** Data provenance */
   source: string;
+  /** Per-hand-class IP frequencies — hand class (e.g., "AKs") → action frequencies. More granular than category-level. */
+  ipHandClassFrequencies?: Record<string, ActionFrequencies>;
+  /** Per-hand-class OOP frequencies */
+  oopHandClassFrequencies?: Record<string, ActionFrequencies>;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -658,6 +662,9 @@ export interface SolverOutput {
   oop_frequencies: Record<string, Record<string, number>>;
   actions_ip: string[];
   actions_oop: string[];
+  /** Per-hand-class frequencies (169 grid, averaged across boards) */
+  ip_hand_class?: Record<string, Record<string, number>>;
+  oop_hand_class?: Record<string, Record<string, number>>;
 }
 
 /** Map solver hand categories to our HandCategory type */
@@ -720,7 +727,32 @@ export function solverOutputToTable(
     keyPrinciple: metadata.keyPrinciple,
     commonMistakes: metadata.commonMistakes,
     source: `TexasSolver (${raw.boardsAnalyzed} boards)`,
+    ipHandClassFrequencies: raw.ip_hand_class
+      ? mapHandClassFrequencies(raw.ip_hand_class)
+      : undefined,
+    oopHandClassFrequencies: raw.oop_hand_class
+      ? mapHandClassFrequencies(raw.oop_hand_class)
+      : undefined,
   };
+}
+
+function mapHandClassFrequencies(
+  raw: Record<string, Record<string, number>>,
+): Record<string, ActionFrequencies> {
+  const result: Record<string, ActionFrequencies> = {};
+  for (const [handClass, freqs] of Object.entries(raw)) {
+    const mapped: ActionFrequencies = {};
+    for (const [action, prob] of Object.entries(freqs)) {
+      const gtoAction = SOLVER_ACTION_MAP[action];
+      if (gtoAction && prob > 0.0001) {
+        mapped[gtoAction] = prob;
+      }
+    }
+    if (Object.keys(mapped).length > 0) {
+      result[handClass] = mapped;
+    }
+  }
+  return result;
 }
 
 function mapPositionFrequencies(

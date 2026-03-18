@@ -113,6 +113,17 @@ const DRILL_GUIDE: KnowledgeEntry[] = [
     ],
   },
   {
+    id: "feature:close_spot",
+    category: "feature",
+    name: "Close Spot",
+    short: "Multiple actions are correct — GTO mixes between them",
+    medium:
+      "A close spot means the solver recommends two or more actions at similar frequencies. There is no single \"right\" answer — GTO intentionally mixes to stay unpredictable. Both actions are reasonable.",
+    full:
+      "When you see \"Close spot\" in the GTO solution, it means the top two actions are both played frequently by the solver. For example, the solver might check 52% and bet 48% with this exact hand. Neither action is wrong — GTO uses a mixed strategy to remain balanced and unexploitable. In practice, you can choose either action and not lose significant EV. Focus on understanding why the solver mixes here (usually because both checking and betting have merit depending on what happens next). In quiz mode, both actions will be scored as Optimal or Acceptable.",
+    related: ["concept:mixed_strategy", "concept:gto", "feature:scoring_verdicts"],
+  },
+  {
     id: "feature:scoring_verdicts",
     category: "feature",
     name: "Scoring Verdicts",

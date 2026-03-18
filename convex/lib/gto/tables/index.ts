@@ -81,6 +81,9 @@ import "./solverData";
 // Preflop per-hand-class tables (PokerBench 60k solver-optimal decisions)
 import "./preflopHandClassData";
 
+// Postflop per-hand-class tables (PokerBench 500k solver-optimal decisions)
+import "./postflopHandClassData";
+
 export {
   lookupPreflopHandClass,
   hasPreflopHandClassData,
@@ -91,3 +94,11 @@ export {
   type PreflopConfidence,
   type ConfidenceLevel,
 } from "./preflopHandClass";
+
+export {
+  lookupPostflopHandClass,
+  hasPostflopHandClassData,
+  postflopHandClassToActionFrequencies,
+  type PostflopHandClassFrequency,
+  type PostflopHandClassTable,
+} from "./postflopHandClass";

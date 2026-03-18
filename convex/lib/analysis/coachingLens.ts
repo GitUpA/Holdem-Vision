@@ -32,6 +32,8 @@ import {
   lookupPreflopHandClass,
   handClassToActionFrequencies,
   getPreflopConfidence,
+  lookupPostflopHandClass,
+  postflopHandClassToActionFrequencies,
 } from "../gto/tables";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
 import type { ActionFrequencies, ActionFrequencyBands, GtoAction } from "../gto/tables/types";
@@ -298,18 +300,62 @@ function tryGtoSolverLookup(
 
   // Need sufficient confidence and a registered table
   if (archetype.confidence < 0.6 || !hasTable(lookupArchetypeId, street)) {
+    // Try PokerBench postflop fallback before giving up
+    if (street !== "preflop" && heroCards.length >= 2) {
+      const pbCombo = cardsToCombo(heroCards[0], heroCards[1]);
+      const pbHandClass = comboToHandClass(pbCombo);
+      const pbLookup = lookupPostflopHandClass(lookupArchetypeId, pbHandClass, classCtx.isInPosition, street);
+      if (pbLookup) {
+        const handCat = categorizeHand(heroCards, gameState.communityCards);
+        const frequencies = postflopHandClassToActionFrequencies(pbLookup);
+        const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition, undefined, street);
+        const remappedFreqs = remapFrequenciesToLegal(frequencies, legal);
+
+        let optAction = "check";
+        let optFreq = 0;
+        for (const [action, freq] of Object.entries(remappedFreqs)) {
+          if ((freq ?? 0) > optFreq) {
+            optFreq = freq ?? 0;
+            optAction = action;
+          }
+        }
+
+        const gameAction = gtoActionToGameAction(optAction as GtoAction, legal, gameState.pot.total);
+        return {
+          profileName: "GTO",
+          profileId: "gto",
+          engineId: "modified-gto",
+          actionType: gameAction.actionType,
+          amount: gameAction.amount,
+          explanation,
+          solverData: {
+            frequencies: remappedFreqs,
+            optimalAction: optAction as GtoAction,
+            optimalFrequency: optFreq,
+            availableActions: Object.keys(remappedFreqs).filter(
+              (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
+            ) as GtoAction[],
+            isExactMatch: false,
+            resolvedCategory: handCat.category,
+          },
+        };
+      }
+    }
     return null;
   }
 
   // Categorize the hero's hand
   const handCat = categorizeHand(heroCards, gameState.communityCards);
 
-  // Look up GTO frequencies
+  // Look up GTO frequencies (with per-hand-class granularity when available)
+  const postflopCombo = cardsToCombo(heroCards[0], heroCards[1]);
+  const postflopHandClass = comboToHandClass(postflopCombo);
   const lookup = lookupFrequencies(
     lookupArchetypeId,
     handCat.category,
     classCtx.isInPosition,
     street,
+    postflopHandClass,
   );
   if (!lookup) return null;
 

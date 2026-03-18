@@ -43,6 +43,11 @@ export function SolutionDisplay({ solution, userAction, score }: SolutionDisplay
 
   const maxFreq = freqEntries.length > 0 ? Math.max(...freqEntries.map(([, v]) => v)) : 1;
 
+  // Detect mixed strategy — top two actions are both significant
+  const isMixed = freqEntries.length >= 2
+    && freqEntries[1][1] >= 0.25
+    && (freqEntries[0][1] - freqEntries[1][1]) < 0.20;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -57,6 +62,16 @@ export function SolutionDisplay({ solution, userAction, score }: SolutionDisplay
         </span>
         <ConfidenceBadge solution={solution} />
       </div>
+
+      {/* Mixed strategy indicator */}
+      {isMixed && (
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[var(--gold)]/[0.05] border border-[var(--gold)]/15 text-[10px] text-[var(--gold-dim)]">
+          <span className="font-medium">Close spot</span>
+          <span className="text-[var(--muted-foreground)]">
+            — multiple actions are correct here. GTO mixes between them.
+          </span>
+        </div>
+      )}
 
       {/* Frequency bar chart with bands */}
       <div className="space-y-1.5">

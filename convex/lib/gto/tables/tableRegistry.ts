@@ -133,6 +133,7 @@ export function lookupFrequencies(
   handCategory: HandCategory,
   isInPosition: boolean,
   street: Street = "flop",
+  handClass?: string,
 ): FrequencyLookup | null {
   const key = makeKey(archetypeId, street);
   const table = tables.get(key);
@@ -146,7 +147,26 @@ export function lookupFrequencies(
   const posBands = bands ? (isInPosition ? bands.ip : bands.oop) : undefined;
   const accuracy = accuracyData.get(key);
 
-  // Try exact match first
+  // Try per-hand-class lookup first (most granular)
+  if (handClass) {
+    const hcFreqs = isInPosition
+      ? table.ipHandClassFrequencies
+      : table.oopHandClassFrequencies;
+    const hcMatch = hcFreqs?.[handClass];
+    if (hcMatch) {
+      return {
+        frequencies: hcMatch,
+        actions,
+        handCategory,
+        archetypeId,
+        isExact: true,
+        bands: posBands?.[handCategory],
+        archetypeAccuracy: accuracy,
+      };
+    }
+  }
+
+  // Try exact category match
   const exact = posFreqs[handCategory];
   if (exact) {
     return {

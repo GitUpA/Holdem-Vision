@@ -56,5 +56,5 @@ convex/_generated
 /data/solver/javasolver/
 /data/solver/manifest*.json
 
-# external datasets
-/data/pokerbench/
+# external datasets — raw CSVs/JSONs excluded, scripts + parsed tables committed
+/data/pokerbench/dataset/
