@@ -37,6 +37,12 @@ export default function RootLayout({
                 >
                   Play
                 </Link>
+                <Link
+                  href="/progress"
+                  className="text-sm px-3 py-1 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+                >
+                  Progress
+                </Link>
               </nav>
             </div>
             <div className="flex items-center gap-3">
