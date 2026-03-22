@@ -24,6 +24,7 @@ import { DrillGuideDrawer } from "./drill-guide-drawer";
 import { NarrativeBoardContext } from "./narrative-board-context";
 import { NarrativePrompt } from "./narrative-prompt";
 import { NarrativeFeedbackDisplay } from "./narrative-feedback";
+import { buildNarrativeSummary } from "../../../convex/lib/gto/narrativeSummary";
 
 // ═══════════════════════════════════════════════════════
 // ARCHETYPE DEFINITIONS
@@ -508,6 +509,43 @@ function DrillSummary({
           </div>
         </div>
       )}
+
+      {/* Narrative insights */}
+      {total > 0 && (() => {
+        const summary = buildNarrativeSummary(
+          scores,
+          [], // narrative choices tracking to be wired in future
+          drill.archetypeId ?? undefined,
+        );
+        return (
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase tracking-widest text-[var(--muted-foreground)]">
+              Insights
+            </span>
+            {summary.insights.map((insight, i) => (
+              <div
+                key={i}
+                className={`border-l-2 pl-3 py-1 ${
+                  insight.type === "strength"
+                    ? "border-green-500/50"
+                    : insight.type === "weakness"
+                    ? "border-orange-500/50"
+                    : "border-[var(--border)]"
+                }`}
+              >
+                <p className="text-xs text-[var(--foreground)] leading-relaxed">
+                  {insight.summary}
+                </p>
+                {insight.principle && (
+                  <p className="text-[10px] text-[var(--muted-foreground)] italic mt-0.5">
+                    {insight.principle}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* New drill button */}
       <button
