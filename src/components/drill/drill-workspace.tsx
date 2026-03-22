@@ -21,6 +21,7 @@ import { DrillActionPanel } from "./drill-action-panel";
 import { ScoreDisplay } from "./score-display";
 import { SolutionDisplay } from "./solution-display";
 import { DrillGuideDrawer } from "./drill-guide-drawer";
+import { NarrativeBoardContext } from "./narrative-board-context";
 
 // ═══════════════════════════════════════════════════════
 // ARCHETYPE DEFINITIONS
@@ -334,15 +335,15 @@ function ActiveDrill({
         </div>
       </div>
 
-      {/* Deal info — board texture + position + hand category */}
+      {/* Board narrative — sets the scene for the decision */}
       {drill.currentDeal && (
-        <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
-          <span className="px-2 py-0.5 rounded bg-[var(--muted)]/20 border border-[var(--border)]">
-            {drill.currentDeal.archetype.description}
-          </span>
-          <span>{drill.currentDeal.isInPosition ? "IP" : "OOP"}</span>
-          <span>{drill.currentDeal.handCategory.category.replace(/_/g, " ")}</span>
-        </div>
+        <NarrativeBoardContext
+          archetype={drill.currentDeal.archetype}
+          handCategory={drill.currentDeal.handCategory}
+          communityCards={drill.currentDeal.communityCards}
+          isInPosition={drill.currentDeal.isInPosition}
+          drillMode={drillMode}
+        />
       )}
 
       {/* Game state viewer */}
