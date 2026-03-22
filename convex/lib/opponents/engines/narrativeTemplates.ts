@@ -7,7 +7,7 @@
  *
  * Pure TypeScript, zero Convex imports.
  */
-import type { ActionType } from "../../state/game-state";
+import type { ActionType } from "../../state/gameState";
 import type { TraitId } from "./narrativeTypes";
 
 // ═══════════════════════════════════════════════════════

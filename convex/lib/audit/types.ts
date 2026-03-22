@@ -6,7 +6,7 @@
  * to a Convex table (JSON-stringified as a single document).
  */
 import type { CardIndex, Street, Position } from "../types/cards";
-import type { ActionType, CardVisibility } from "../state/game-state";
+import type { ActionType, CardVisibility } from "../state/gameState";
 import type { SituationKey } from "../types/opponents";
 
 // ═══════════════════════════════════════════════════════

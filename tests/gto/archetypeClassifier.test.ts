@@ -8,7 +8,7 @@ import {
   type ClassificationContext,
   type ActionSummary,
 } from "../../convex/lib/gto/archetypeClassifier";
-import { initializeHand, applyAction } from "../../convex/lib/state/state-machine";
+import { initializeHand, applyAction } from "../../convex/lib/state/stateMachine";
 import { createTestConfig } from "../state/helpers";
 import { cardsFromStrings } from "../../convex/lib/primitives/card";
 import type { Position, Street } from "../../convex/lib/types/cards";

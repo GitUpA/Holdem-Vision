@@ -12,7 +12,7 @@
  * Pure TypeScript, zero React imports, zero Convex imports.
  */
 import type { CardIndex } from "../types/cards";
-import type { GameState } from "../state/game-state";
+import type { GameState } from "../state/gameState";
 import type { ExplanationNode } from "../types/analysis";
 import type { ArchetypeId } from "./archetypeClassifier";
 import type {
@@ -27,7 +27,7 @@ import type { HandSessionConfig } from "../session/types";
 
 import { HandSession } from "../session/handSession";
 import { PRESET_PROFILES } from "../opponents/presets";
-import { currentLegalActions } from "../state/state-machine";
+import { currentLegalActions } from "../state/stateMachine";
 import { dealForArchetype } from "./constrainedDealer";
 import { remapFrequenciesToLegal } from "./actionMapping";
 import {

@@ -31,7 +31,7 @@ import { foldEquityScenarios, type SolverFoldContext } from "./foldEquity";
 import { classifyArchetype, contextFromGameState } from "../gto/archetypeClassifier";
 import { lookupFrequencies, hasTable } from "../gto/tables";
 import { getModifierMap } from "../opponents/engines/modifierProfiles";
-import type { GameState } from "../state/game-state";
+import type { GameState } from "../state/gameState";
 
 export interface OpponentReadValue {
   /** Per-opponent breakdown */

@@ -3,7 +3,7 @@
  *
  * Pure TypeScript, zero Convex imports.
  */
-import type { GameState } from "../state/game-state";
+import type { GameState } from "../state/gameState";
 import type { Street } from "../types/cards";
 import type {
   HandEvent,

@@ -15,7 +15,7 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
-import type { ActionType, LegalActions } from "../../state/game-state";
+import type { ActionType, LegalActions } from "../../state/gameState";
 import type { ActionFrequencies, GtoAction } from "../../gto/tables/types";
 import { registerEngine } from "./engineRegistry";
 
@@ -370,7 +370,7 @@ function getGtoBaseFrequencies(
 
 /** Find the first preflop raiser's position (the opener) from action history. */
 function findPreflopOpener(
-  state: import("../../state/game-state").GameState,
+  state: import("../../state/gameState").GameState,
   heroSeatIndex: number,
 ): string | undefined {
   for (const action of state.actionHistory) {

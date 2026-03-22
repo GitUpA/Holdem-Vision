@@ -14,7 +14,7 @@ import {
 } from "../../convex/lib/gto/drillPipeline";
 import { categorizeHand } from "../../convex/lib/gto/handCategorizer";
 import { evaluateHand } from "../../convex/lib/primitives/handEvaluator";
-import { currentLegalActions } from "../../convex/lib/state/state-machine";
+import { currentLegalActions } from "../../convex/lib/state/stateMachine";
 import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
 import type { CardIndex } from "../../convex/lib/types/cards";
 import { seededRandom } from "../../convex/lib/primitives/deck";

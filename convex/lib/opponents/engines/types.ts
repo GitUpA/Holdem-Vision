@@ -9,7 +9,7 @@
  * Engines MUST be stateless, deterministic (given same PRNG seed),
  * and pure (no side effects, no Convex imports).
  */
-import type { GameState, LegalActions, ActionType } from "../../state/game-state";
+import type { GameState, LegalActions, ActionType } from "../../state/gameState";
 import type {
   OpponentProfile,
   SituationKey,

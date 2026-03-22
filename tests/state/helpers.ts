@@ -2,9 +2,9 @@
  * Test helpers for game state tests.
  * Provides factories for creating test hands and running action sequences.
  */
-import type { HandConfig } from "../../convex/lib/state/game-state";
-import type { ActionType } from "../../convex/lib/state/game-state";
-import { initializeHand, applyAction } from "../../convex/lib/state/state-machine";
+import type { HandConfig } from "../../convex/lib/state/gameState";
+import type { ActionType } from "../../convex/lib/state/gameState";
+import { initializeHand, applyAction } from "../../convex/lib/state/stateMachine";
 
 /**
  * Create a standard test hand config.

@@ -8,7 +8,7 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { CardIndex, Position } from "../types/cards";
-import type { CardOverride } from "../state/game-state";
+import type { CardOverride } from "../state/gameState";
 import { createShuffledDeck, deal } from "../primitives/deck";
 import { categorizeHand, type HandCategorization, type HandCategory } from "./handCategorizer";
 import {

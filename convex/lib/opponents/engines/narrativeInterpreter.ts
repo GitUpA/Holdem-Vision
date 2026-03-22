@@ -25,7 +25,7 @@ import type {
   SituationModifier,
   FrequencyModifier,
 } from "./modifiedGtoTypes";
-import type { ActionType } from "../../state/game-state";
+import type { ActionType } from "../../state/gameState";
 import {
   assessHand,
   assessBoard,

@@ -4,7 +4,7 @@ import {
   calculatePots,
   maxWinnable,
 } from "../../convex/lib/rules/pot";
-import type { GameState } from "../../convex/lib/state/game-state";
+import type { GameState } from "../../convex/lib/state/gameState";
 
 // ─── Helper ───
 

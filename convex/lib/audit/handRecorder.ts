@@ -12,7 +12,7 @@
  *   const record = recorder.finalize(gameState);
  *   console.log(recorder.toJSON());
  */
-import type { GameAction, GameState } from "../state/game-state";
+import type { GameAction, GameState } from "../state/gameState";
 import type { ExplanationNode } from "../types/analysis";
 import type { Street } from "../types/cards";
 import type { AnalysisResult } from "../types/analysis";

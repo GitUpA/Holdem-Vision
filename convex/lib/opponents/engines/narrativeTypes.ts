@@ -14,7 +14,7 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { ExplanationNode } from "../../types/analysis";
-import type { ActionType } from "../../state/game-state";
+import type { ActionType } from "../../state/gameState";
 import type { SituationKey } from "../../types/opponents";
 import type { Street } from "../../types/cards";
 

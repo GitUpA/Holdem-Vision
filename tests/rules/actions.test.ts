@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getLegalActions, validateAction } from "../../convex/lib/rules/actions";
-import type { GameState, PlayerState } from "../../convex/lib/state/game-state";
+import type { GameState, PlayerState } from "../../convex/lib/state/gameState";
 import { seatToPositionMap } from "../../convex/lib/primitives/position";
 
 // ─── Helper ───

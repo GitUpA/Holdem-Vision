@@ -17,7 +17,7 @@ import type {
   StateTransitionResult,
   LegalActions,
   ActionType,
-} from "./game-state";
+} from "./gameState";
 import type { AnalysisContext, GameContext, ExplanationNode } from "../types/analysis";
 import type { OpponentProfile, OpponentContext, PlayerAction } from "../types/opponents";
 import { estimateRange } from "../opponents/rangeEstimator";

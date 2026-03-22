@@ -15,7 +15,7 @@ import type {
   StreetDecisionSummary,
   StoryArcReference,
 } from "./narrativeTypes";
-import type { ActionType } from "../../state/game-state";
+import type { ActionType } from "../../state/gameState";
 import type { Street } from "../../types/cards";
 
 // ═══════════════════════════════════════════════════════

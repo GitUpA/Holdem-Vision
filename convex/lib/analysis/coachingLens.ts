@@ -17,12 +17,12 @@ import type {
   ExplanationNode,
 } from "../types/analysis";
 import type { VisualDirectiveType } from "../types/visuals";
-import type { ActionType, GameState, LegalActions } from "../state/game-state";
+import type { ActionType, GameState, LegalActions } from "../state/gameState";
 import type { CardIndex } from "../types/cards";
 import { getEngineOrDefault } from "../opponents/engines/engineRegistry";
 import { buildDecisionContext } from "../opponents/autoPlay";
 import { getAllPresets, PRESET_PROFILES } from "../opponents/presets";
-import { currentLegalActions } from "../state/state-machine";
+import { currentLegalActions } from "../state/stateMachine";
 import { seededRandom } from "../primitives/deck";
 
 // GTO frequency table lookups for coaching the GTO profile with solver data
@@ -543,14 +543,14 @@ function tryEquityFallback(
   if (!result) return null;
 
   // Find the top action
-  let topAction: import("../state/game-state").ActionType = "fold";
+  let topAction: import("../state/gameState").ActionType = "fold";
   let topFreq = 0;
   for (const [action, freq] of Object.entries(result.frequencies)) {
     if ((freq ?? 0) > topFreq) {
       topFreq = freq ?? 0;
       topAction = action === "bet_large" || action === "bet_medium" || action === "bet_small"
         ? "raise"
-        : action as import("../state/game-state").ActionType;
+        : action as import("../state/gameState").ActionType;
     }
   }
 

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { DecisionContext } from "../../../convex/lib/opponents/engines/types";
-import type { GameState, LegalActions } from "../../../convex/lib/state/game-state";
+import type { GameState, LegalActions } from "../../../convex/lib/state/gameState";
 import type { OpponentProfile, BehavioralParams, SituationKey } from "../../../convex/lib/types/opponents";
 import type { ActionFrequencies, GtoAction } from "../../../convex/lib/gto/tables/types";
 import { getEngineOrDefault } from "../../../convex/lib/opponents/engines/engineRegistry";

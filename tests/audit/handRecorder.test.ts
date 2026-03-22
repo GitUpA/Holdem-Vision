@@ -6,13 +6,13 @@ import {
   initializeHand,
   applyAction,
   currentLegalActions,
-} from "../../convex/lib/state/state-machine";
+} from "../../convex/lib/state/stateMachine";
 import {
   chooseActionFromProfile,
 } from "../../convex/lib/opponents/autoPlay";
 import { createTestConfig } from "../state/helpers";
 import { FISH_PROFILE, TAG_PROFILE } from "../../convex/lib/opponents/presets";
-import type { GameState } from "../../convex/lib/state/game-state";
+import type { GameState } from "../../convex/lib/state/gameState";
 import type { AnalysisResult } from "../../convex/lib/types/analysis";
 
 // ─── Helpers ───

@@ -156,11 +156,11 @@ function buildOneLiner(
   interpretation: ReturnType<typeof interpretSituation>,
   mixed: MixedStrategyInfo,
 ): string {
-  const verb = actionVerb(actionType as import("../../state/game-state").ActionType);
+  const verb = actionVerb(actionType as import("../../state/gameState").ActionType);
   const reason = interpretation.contextOverride ?? interpretation.primaryReason;
 
   if (mixed.isMixed) {
-    const altVerb = actionVerb(mixed.secondAction.replace(/_.*/, "") as import("../../state/game-state").ActionType);
+    const altVerb = actionVerb(mixed.secondAction.replace(/_.*/, "") as import("../../state/gameState").ActionType);
     return `${verb} — ${reason.toLowerCase()} (close spot: ${altVerb.toLowerCase()} also works)`;
   }
 
@@ -190,7 +190,7 @@ function buildParagraph(
   parts.push(interpretation.perception.boardAssessment + ".");
 
   // Action + primary reason
-  const verb = actionVerb(action.actionType as import("../../state/game-state").ActionType, "present");
+  const verb = actionVerb(action.actionType as import("../../state/gameState").ActionType, "present");
   const amount = action.amount ? ` ${action.amount}` : "";
   parts.push(`${verb}${amount} — ${interpretation.primaryReason.toLowerCase()}.`);
 
@@ -231,7 +231,7 @@ function buildExplanationTree(
   mixed: MixedStrategyInfo,
 ): ExplanationNode {
   const situationLabel = formatSituation(situationKey);
-  const verb = actionVerb(action.actionType as import("../../state/game-state").ActionType);
+  const verb = actionVerb(action.actionType as import("../../state/gameState").ActionType);
   const amount = action.amount ? ` ${action.amount}` : "";
 
   const children: ExplanationNode[] = [];

@@ -10,7 +10,7 @@ import {
   activePlayerCount,
   playersInHand,
 } from "../../convex/lib/rules/streets";
-import type { GameState, PlayerState } from "../../convex/lib/state/game-state";
+import type { GameState, PlayerState } from "../../convex/lib/state/gameState";
 import { seatToPositionMap } from "../../convex/lib/primitives/position";
 
 // ─── Helpers ───

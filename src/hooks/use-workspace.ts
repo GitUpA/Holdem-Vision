@@ -24,7 +24,7 @@ import type {
   ActionType,
   PlayerState,
   CardVisibility,
-} from "../../convex/lib/state/game-state";
+} from "../../convex/lib/state/gameState";
 import type { OpponentProfile, PlayerAction } from "../../convex/lib/types/opponents";
 import type { WeightedRange, OpponentContext } from "../../convex/lib/types/opponents";
 import type { HandRecord } from "../../convex/lib/audit/types";
@@ -35,12 +35,12 @@ import type { CardHighlight } from "../../convex/lib/types/visuals";
 import {
   currentLegalActions,
   gameContextFromState,
-} from "../../convex/lib/state/state-machine";
+} from "../../convex/lib/state/stateMachine";
 import {
   applyCardOverrides,
   applyCommunityOverride,
   setCardVisibility,
-} from "../../convex/lib/state/card-overrides";
+} from "../../convex/lib/state/cardOverrides";
 import {
   positionForSeat,
   positionDisplayName,

@@ -11,7 +11,7 @@
  *
  * Folded players' chips go into existing pots but they can't win.
  */
-import type { GameState, PotState, SidePot } from "../state/game-state";
+import type { GameState, PotState, SidePot } from "../state/gameState";
 
 interface Contribution {
   seatIndex: number;

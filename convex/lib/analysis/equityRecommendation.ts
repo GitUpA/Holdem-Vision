@@ -13,7 +13,7 @@
 import type { CardIndex, Position, Street } from "../types/cards";
 import type { PlayerAction, OpponentProfile, WeightedRange } from "../types/opponents";
 import type { ExplanationNode } from "../types/analysis";
-import type { LegalActions } from "../state/game-state";
+import type { LegalActions } from "../state/gameState";
 import type { ActionFrequencies } from "../gto/tables/types";
 import { estimateRange } from "../opponents/rangeEstimator";
 import { equityVsRange } from "./opponentRead";

@@ -53,4 +53,4 @@ export type {
   LegalActions,
   StateTransitionResult,
   HandConfig,
-} from "../state/game-state";
+} from "../state/gameState";

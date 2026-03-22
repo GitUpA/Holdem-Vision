@@ -16,10 +16,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { ArchetypeId, ArchetypeCategory } from "../../../convex/lib/gto/archetypeClassifier";
 import { hasTable, hasAnyTableForStreet } from "../../../convex/lib/gto/tables/tableRegistry";
 import { useDrillSession, type OnSessionComplete } from "@/hooks/use-drill-session";
-import { useConvexAuth } from "convex/react";
-// NOTE: useMutation + api imports enabled after `npx convex dev` regenerates types
-// import { useMutation } from "convex/react";
-// import { api } from "../../../convex/_generated/api";
+import { useConvexAuth, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { HandStateViewer } from "../replay/hand-state-viewer";
 import { DrillActionPanel } from "./drill-action-panel";
 import { ScoreDisplay } from "./score-display";
@@ -113,26 +111,57 @@ export type DrillMode = "learn" | "quiz";
 
 export function DrillWorkspace() {
   const { isAuthenticated } = useConvexAuth();
+  const saveSessionMut = useMutation(api.training.saveSession);
+  const saveResultMut = useMutation(api.training.saveResult);
+  const updateSkillsMut = useMutation(api.skills.updateAfterDrill);
 
-  // Persistence callback — saves to Convex when session completes.
-  // NOTE: Convex mutations will be wired after `npx convex dev` regenerates types.
-  // For now, the callback structure is in place but mutations are no-ops.
   const handleSessionComplete: OnSessionComplete = useCallback(
     ({ archetypeId, scores, handsPlayed, startTime }) => {
       if (!isAuthenticated) return;
 
-      const _duration = Date.now() - startTime;
-      const _optimal = scores.filter((s) => s.verdict === "optimal").length;
-      const _acceptable = scores.filter((s) => s.verdict === "acceptable").length;
-      const _accuracy = handsPlayed > 0 ? (_optimal + _acceptable) / handsPlayed : 0;
+      const duration = Date.now() - startTime;
+      const optimal = scores.filter((s) => s.verdict === "optimal").length;
+      const acceptable = scores.filter((s) => s.verdict === "acceptable").length;
+      const mistake = scores.filter((s) => s.verdict === "mistake").length;
+      const blunder = scores.filter((s) => s.verdict === "blunder").length;
+      const accuracy = handsPlayed > 0 ? (optimal + acceptable) / handsPlayed : 0;
+      const avgEvLoss = handsPlayed > 0
+        ? scores.reduce((s, sc) => s + sc.evLoss, 0) / handsPlayed
+        : 0;
 
-      // TODO: Wire Convex mutations after `npx convex dev`:
-      // saveSession({ archetypeId, handsPlayed, accuracy, avgEvLoss, verdicts, duration })
-      // saveResult({ ... }) for each score
-      // updateSkills({ results: scores.map(s => ({ archetypeId, verdict: s.verdict })) })
-      console.log(`[Training] Session complete: ${archetypeId}, ${handsPlayed} hands, ${(_accuracy * 100).toFixed(0)}% accuracy`);
+      // Save session aggregate (fire-and-forget)
+      saveSessionMut({
+        archetypeId,
+        handsPlayed,
+        accuracy,
+        avgEvLoss,
+        verdicts: JSON.stringify({ optimal, acceptable, mistake, blunder }),
+        duration,
+      }).catch(() => {});
+
+      // Save individual results
+      for (const score of scores) {
+        saveResultMut({
+          archetypeId,
+          handCategory: score.handCategory.category,
+          street: score.archetype.category === "preflop" ? "preflop" : "flop",
+          isInPosition: false,
+          userAction: score.userAction,
+          optimalAction: score.optimalAction,
+          verdict: score.verdict,
+          evLoss: score.evLoss,
+        }).catch(() => {});
+      }
+
+      // Update skill progress
+      updateSkillsMut({
+        results: scores.map((s) => ({
+          archetypeId,
+          verdict: s.verdict,
+        })),
+      }).catch(() => {});
     },
-    [isAuthenticated],
+    [isAuthenticated, saveSessionMut, saveResultMut, updateSkillsMut],
   );
 
   const drill = useDrillSession(handleSessionComplete);

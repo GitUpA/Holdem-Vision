@@ -9,7 +9,7 @@
  * - Short all-in does NOT reopen action (lastAggressorIndex unchanged).
  */
 import type { Street } from "../types/cards";
-import type { GameState, PlayerState } from "../state/game-state";
+import type { GameState, PlayerState } from "../state/gameState";
 
 /**
  * Get the next street in sequence. Returns null after river.

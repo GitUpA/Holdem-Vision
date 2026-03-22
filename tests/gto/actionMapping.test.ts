@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { gtoActionToGameAction, gtoActionLabel } from "../../convex/lib/gto/actionMapping";
-import type { LegalActions } from "../../convex/lib/state/game-state";
+import type { LegalActions } from "../../convex/lib/state/gameState";
 import type { GtoAction } from "../../convex/lib/gto/tables/types";
 
 // ─── Helpers ───

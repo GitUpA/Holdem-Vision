@@ -12,7 +12,7 @@ import type {
   ActionType,
   CardVisibility,
   CardOverride,
-} from "../state/game-state";
+} from "../state/gameState";
 import type { OpponentProfile } from "../types/opponents";
 import type { AnalysisResult } from "../types/analysis";
 import type { HandRecord, SeatSetupEntry } from "../audit/types";
@@ -22,7 +22,7 @@ import {
   initializeHand,
   applyAction,
   currentLegalActions,
-} from "../state/state-machine";
+} from "../state/stateMachine";
 import {
   chooseActionFromProfile,
   type AutoPlayDecision,

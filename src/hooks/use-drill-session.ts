@@ -16,8 +16,8 @@
  * hides until after the user acts. This is a UI concern, not a hook concern.
  */
 import { useState, useCallback, useRef } from "react";
-import type { GameState } from "../../convex/lib/state/game-state";
-import { currentLegalActions } from "../../convex/lib/state/state-machine";
+import type { GameState } from "../../convex/lib/state/gameState";
+import { currentLegalActions } from "../../convex/lib/state/stateMachine";
 import { HandSession } from "../../convex/lib/session/handSession";
 import { PRESET_PROFILES } from "../../convex/lib/opponents/presets";
 import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";

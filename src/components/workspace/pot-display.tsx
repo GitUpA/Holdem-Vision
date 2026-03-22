@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import type { PotState } from "../../../convex/lib/state/game-state";
+import type { PotState } from "../../../convex/lib/state/gameState";
 import type { BlindStructure } from "../../../convex/lib/types/game";
 
 interface PotDisplayProps {

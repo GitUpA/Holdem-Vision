@@ -709,7 +709,7 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
   drillSolution?: import("@/hooks/use-workspace").SpotSolution;
   drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
   isDrill?: boolean;
-  gameState?: import("../../../convex/lib/state/game-state").GameState | null;
+  gameState?: import("../../../convex/lib/state/gameState").GameState | null;
   heroSeatIndex?: number;
   onArchetypeClick?: (id: ArchetypeId) => void;
 }) {

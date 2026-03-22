@@ -6,8 +6,8 @@ import {
   validateCardOverrides,
   validateCommunityOverride,
   allUsedCards,
-} from "../../convex/lib/state/card-overrides";
-import { initializeHand } from "../../convex/lib/state/state-machine";
+} from "../../convex/lib/state/cardOverrides";
+import { initializeHand } from "../../convex/lib/state/stateMachine";
 import { createTestConfig, createHeadsUpConfig } from "./helpers";
 import type { CardIndex } from "../../convex/lib/types/cards";
 

@@ -9,7 +9,7 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { CardIndex, Street, Position } from "../types/cards";
-import type { GameState, GameAction } from "../state/game-state";
+import type { GameState, GameAction } from "../state/gameState";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
 
 // ═══════════════════════════════════════════════════════

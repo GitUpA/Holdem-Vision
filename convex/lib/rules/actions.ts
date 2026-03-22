@@ -11,7 +11,7 @@
  *   Can't raise if stack < call + minRaise (only call or all-in)
  * - minRaiseSize tracks last raise increment (not total). Resets to BB each street.
  */
-import type { GameState, LegalActions, ActionType } from "../state/game-state";
+import type { GameState, LegalActions, ActionType } from "../state/gameState";
 
 export interface ActionValidation {
   valid: boolean;

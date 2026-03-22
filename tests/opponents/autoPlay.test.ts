@@ -5,10 +5,10 @@ import {
   chooseBetSize,
   chooseActionFromProfile,
 } from "../../convex/lib/opponents/autoPlay";
-import { initializeHand, applyAction, currentLegalActions } from "../../convex/lib/state/state-machine";
+import { initializeHand, applyAction, currentLegalActions } from "../../convex/lib/state/stateMachine";
 import { createTestConfig, createHeadsUpConfig } from "../state/helpers";
 import { NIT_PROFILE, FISH_PROFILE, TAG_PROFILE, LAG_PROFILE } from "../../convex/lib/opponents/presets";
-import type { LegalActions } from "../../convex/lib/state/game-state";
+import type { LegalActions } from "../../convex/lib/state/gameState";
 import type { BehavioralParams } from "../../convex/lib/types/opponents";
 import { seededRandom } from "../../convex/lib/primitives/deck";
 

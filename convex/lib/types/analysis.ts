@@ -5,7 +5,7 @@
 import type { CardIndex, Street, Position } from "./cards";
 import type { OpponentContext } from "./opponents";
 import type { VisualDirective, CardHighlight, RangeHighlight } from "./visuals";
-import type { GameState } from "../state/game-state";
+import type { GameState } from "../state/gameState";
 
 // ═══════════════════════════════════════════════════════
 // ANALYSIS CONTEXT — the standardized input to everything

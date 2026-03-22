@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import type { CardIndex, Street, Position } from "../../convex/lib/types/cards";
 import type { AnalysisContext, AnalysisResult, GameContext, ExplanationNode } from "../../convex/lib/types/analysis";
 import type { OpponentContext, WeightedRange, OpponentProfile } from "../../convex/lib/types/opponents";
-import type { GameState } from "../../convex/lib/state/game-state";
+import type { GameState } from "../../convex/lib/state/gameState";
 import { runLenses, getLensInfo, isHeavyLens } from "../../convex/lib/analysis/lensRegistry";
 import { estimateRange } from "../../convex/lib/opponents/rangeEstimator";
 

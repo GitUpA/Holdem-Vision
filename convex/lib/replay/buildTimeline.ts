@@ -9,9 +9,9 @@
  */
 import type { HandRecord } from "../audit/types";
 import type { ReplayTimeline, ReplaySnapshot } from "./types";
-import type { HandConfig as GameHandConfig, CardOverride } from "../state/game-state";
+import type { HandConfig as GameHandConfig, CardOverride } from "../state/gameState";
 import type { Street } from "../types/cards";
-import { initializeHand, applyAction } from "../state/state-machine";
+import { initializeHand, applyAction } from "../state/stateMachine";
 
 /**
  * Build a replay timeline from a completed HandRecord.

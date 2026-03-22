@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { modifiedGtoEngine } from "../../../convex/lib/opponents/engines/modifiedGtoEngine";
-import { initializeHand, currentLegalActions } from "../../../convex/lib/state/state-machine";
+import { initializeHand, currentLegalActions } from "../../../convex/lib/state/stateMachine";
 import { createHeadsUpConfig } from "../../state/helpers";
 import {
   NIT_PROFILE,

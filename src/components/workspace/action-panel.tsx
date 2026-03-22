@@ -3,8 +3,8 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { LegalActions, ActionType } from "../../../convex/lib/state/game-state";
-import type { PotState } from "../../../convex/lib/state/game-state";
+import type { LegalActions, ActionType } from "../../../convex/lib/state/gameState";
+import type { PotState } from "../../../convex/lib/state/gameState";
 import type { BlindStructure } from "../../../convex/lib/types/game";
 import type { GtoAction } from "../../../convex/lib/gto/tables/types";
 import { gtoActionLabel } from "../../../convex/lib/gto/actionMapping";

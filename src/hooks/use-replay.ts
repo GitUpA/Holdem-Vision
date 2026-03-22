@@ -3,7 +3,7 @@
  */
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import type { HandRecord } from "../../convex/lib/audit/types";
-import type { GameState } from "../../convex/lib/state/game-state";
+import type { GameState } from "../../convex/lib/state/gameState";
 import type { Street } from "../../convex/lib/types/cards";
 import { buildTimeline } from "../../convex/lib/replay/buildTimeline";
 import type { ReplayTimeline, ReplaySnapshot } from "../../convex/lib/replay/types";

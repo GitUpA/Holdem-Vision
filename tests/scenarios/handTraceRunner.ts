@@ -13,13 +13,13 @@
 import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
 import type { ActionFrequencies } from "../../convex/lib/gto/tables/types";
 import type { Street } from "../../convex/lib/types/cards";
-import type { GameState, ActionType, GamePhase } from "../../convex/lib/state/game-state";
+import type { GameState, ActionType, GamePhase } from "../../convex/lib/state/gameState";
 import type { OpponentProfile } from "../../convex/lib/types/opponents";
 import { createDrillSession, computeSolution } from "../../convex/lib/gto/drillPipeline";
 import { dealForArchetype, type DrillConstraints } from "../../convex/lib/gto/constrainedDealer";
 import { analyzeBoard } from "../../convex/lib/opponents/engines/boardTexture";
 import { chooseActionFromProfile } from "../../convex/lib/opponents/autoPlay";
-import { currentLegalActions, applyAction } from "../../convex/lib/state/state-machine";
+import { currentLegalActions, applyAction } from "../../convex/lib/state/stateMachine";
 import { PRESET_PROFILES } from "../../convex/lib/opponents/presets";
 import { cardToString } from "../../convex/lib/primitives/card";
 import { positionForSeat } from "../../convex/lib/primitives/position";

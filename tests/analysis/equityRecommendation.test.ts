@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { equityBasedRecommendation } from "../../convex/lib/analysis/equityRecommendation";
 import { PRESET_PROFILES } from "../../convex/lib/opponents/presets";
 import { cardFromString } from "../../convex/lib/primitives/card";
-import type { LegalActions } from "../../convex/lib/state/game-state";
+import type { LegalActions } from "../../convex/lib/state/gameState";
 
 // ── Helpers ──
 

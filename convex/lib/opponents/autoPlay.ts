@@ -11,7 +11,7 @@
  * The main entry point (chooseActionFromProfile) is a thin dispatcher.
  * Actual decision logic lives in engine implementations (engines/).
  */
-import type { GameState, LegalActions, ActionType } from "../state/game-state";
+import type { GameState, LegalActions, ActionType } from "../state/gameState";
 import type {
   SituationKey,
   BehavioralParams,

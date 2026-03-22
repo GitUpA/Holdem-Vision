@@ -5,11 +5,11 @@ import {
   gameContextFromState,
   analysisContextFromState,
   currentLegalActions,
-} from "../../convex/lib/state/state-machine";
-import type { AnalysisBridgeConfig } from "../../convex/lib/state/state-machine";
+} from "../../convex/lib/state/stateMachine";
+import type { AnalysisBridgeConfig } from "../../convex/lib/state/stateMachine";
 import { createTestConfig, createHeadsUpConfig, runActions } from "./helpers";
 import { TAG_PROFILE, NIT_PROFILE, PRESET_PROFILES } from "../../convex/lib/opponents/presets";
-import { applyCardOverrides } from "../../convex/lib/state/card-overrides";
+import { applyCardOverrides } from "../../convex/lib/state/cardOverrides";
 
 // ═══════════════════════════════════════════════════════
 // initializeHand

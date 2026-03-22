@@ -8,7 +8,7 @@
  * - Reconstructing a known hand (all cards specified)
  */
 import type { CardIndex } from "../types/cards";
-import type { GameState, CardOverride, CardVisibility } from "./game-state";
+import type { GameState, CardOverride, CardVisibility } from "./gameState";
 
 // ═══════════════════════════════════════════════════════
 // VALIDATION
