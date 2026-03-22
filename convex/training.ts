@@ -120,10 +120,12 @@ export const getSessionStats = query({
       .unique();
     if (!user) throw new Error("User not found");
 
+    // Bounded: aggregate over last 200 sessions max to avoid unbounded reads
     const sessions = await ctx.db
       .query("drillSessions")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .collect();
+      .order("desc")
+      .take(200);
 
     if (sessions.length === 0) {
       return {
