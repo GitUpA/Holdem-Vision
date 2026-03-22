@@ -23,6 +23,7 @@ import { SolutionDisplay } from "./solution-display";
 import { DrillGuideDrawer } from "./drill-guide-drawer";
 import { NarrativeBoardContext } from "./narrative-board-context";
 import { NarrativePrompt } from "./narrative-prompt";
+import { NarrativeFeedbackDisplay } from "./narrative-feedback";
 
 // ═══════════════════════════════════════════════════════
 // ARCHETYPE DEFINITIONS
@@ -383,6 +384,18 @@ function ActiveDrill({
         <DrillActionPanel
           availableActions={drill.solution.availableActions}
           onAct={drill.act}
+        />
+      )}
+
+      {/* Post-action: narrative feedback (quiz mode) */}
+      {drill.phase === "acted" && drillMode === "quiz" && drill.currentScore && drill.solution && (
+        <NarrativeFeedbackDisplay
+          userAction={drill.currentScore.userAction}
+          narrativeChoice={drill.narrativeChoice}
+          optimalAction={drill.solution.optimalAction}
+          optimalFrequency={drill.solution.optimalFrequency}
+          frequencies={drill.solution.frequencies}
+          archetypeId={drill.archetypeId ?? undefined}
         />
       )}
 
