@@ -60,7 +60,10 @@ export interface StudentView {
   coaching: {
     profileName: string;
     action: string;
+    amount?: number;
     narrativeOneLiner?: string;
+    /** Solver's preferred GtoAction (when available for GTO profile) */
+    solverOptimalAction?: string;
   }[];
   /** GTO solution frequencies (what the user sees in learn mode) */
   frequencies: ActionFrequencies;
@@ -208,7 +211,9 @@ export function runLearnerSession(
         coaching = cv.advices.map((a) => ({
           profileName: a.profileName,
           action: a.actionType,
+          amount: a.amount,
           narrativeOneLiner: a.narrative?.oneLiner,
+          solverOptimalAction: a.solverData?.optimalAction,
         }));
       }
     } catch {
@@ -369,21 +374,35 @@ export function coachingStudent(view: StudentView): StudentDecision {
   const gtoAdvice = view.coaching.find((c) => c.profileName === "GTO");
   let action = view.availableActions[0];
   if (gtoAdvice) {
-    // Map coaching action to available GtoAction
-    const coachAction = gtoAdvice.action;
-    if (view.availableActions.includes(coachAction as GtoAction)) {
-      action = coachAction as GtoAction;
+    // Prefer solver optimal action (exact GtoAction) when available
+    if (gtoAdvice.solverOptimalAction && view.availableActions.includes(gtoAdvice.solverOptimalAction as GtoAction)) {
+      action = gtoAdvice.solverOptimalAction as GtoAction;
     } else {
-      // Try matching by family (bet → bet_medium, raise → raise_large)
-      const family = coachAction.replace(/_.*/, "");
-      const match = view.availableActions.find((a) => a.startsWith(family));
-      if (match) action = match;
+      // Fall back to mapping game action to GtoAction
+      const coachAction = gtoAdvice.action;
+      if (view.availableActions.includes(coachAction as GtoAction)) {
+        action = coachAction as GtoAction;
+      } else {
+        // Map by family with sizing preference: bet → bet_medium (most common GTO sizing)
+        const family = coachAction.replace(/_.*/, "");
+        if (family === "bet") {
+          action = view.availableActions.includes("bet_medium" as GtoAction) ? "bet_medium"
+            : view.availableActions.includes("bet_small" as GtoAction) ? "bet_small"
+            : (view.availableActions.find((a) => a.startsWith("bet")) ?? view.availableActions[0]);
+        } else if (family === "raise") {
+          action = view.availableActions.includes("raise_large" as GtoAction) ? "raise_large"
+            : (view.availableActions.find((a) => a.startsWith("raise")) ?? view.availableActions[0]);
+        } else {
+          const match = view.availableActions.find((a) => a.startsWith(family));
+          if (match) action = match;
+        }
+      }
     }
   }
   return {
     action,
     narrativeChoice: null,
-    reasoning: `Followed GTO coaching: ${action}`,
+    reasoning: `Followed GTO coaching: ${action}${gtoAdvice?.solverOptimalAction ? ` (solver: ${gtoAdvice.solverOptimalAction})` : ""}`,
   };
 }
 
@@ -408,48 +427,81 @@ export function narrativeStudent(view: StudentView): StudentDecision {
 }
 
 /**
- * Learning student — starts random, then uses feedback to improve.
- * Maintains internal state across hands.
+ * Learning student — uses narrative + coaching + feedback memory.
+ * Starts with narrative prompts, learns from mistakes via feedback,
+ * cross-references coaching for validation.
  */
 export function createLearningStudent(): (view: StudentView) => StudentDecision {
-  const actionMemory = new Map<string, GtoAction>(); // handCategory → best action seen
+  const actionMemory = new Map<string, GtoAction>(); // spot key → best action
+  let lastKey = "";
 
   return (view: StudentView) => {
     const key = `${view.archetypeId}:${view.handCategory}:${view.isInPosition}`;
 
-    // Check if we learned from previous feedback
-    if (view.previousFeedback) {
-      const prevKey = key; // simplified — uses current hand's key
+    // Learn from previous feedback — remember the OPTIMAL action
+    if (view.previousFeedback && lastKey) {
       if (view.previousFeedback.verdict === "optimal" || view.previousFeedback.verdict === "acceptable") {
-        actionMemory.set(prevKey, view.previousFeedback.userAction);
-      } else if (view.previousFeedback.optimalAction) {
-        actionMemory.set(prevKey, view.previousFeedback.optimalAction as GtoAction);
+        actionMemory.set(lastKey, view.previousFeedback.userAction);
+      } else {
+        // We got it wrong — remember the correct answer
+        actionMemory.set(lastKey, view.previousFeedback.optimalAction as GtoAction);
       }
     }
+    lastKey = key;
 
-    // If we've seen this spot before, use what we learned
+    // If we've seen this exact spot, use what we learned
     const remembered = actionMemory.get(key);
     if (remembered && view.availableActions.includes(remembered)) {
       return {
         action: remembered,
         narrativeChoice: view.narrativePrompt.gtoNarrative,
-        reasoning: `Remembered from feedback: ${remembered}`,
+        reasoning: `Remembered: ${remembered}`,
       };
     }
 
-    // First time seeing this spot — use narrative prompt
-    const prompt = view.narrativePrompt;
-    const bestNarrative = prompt.options[0];
+    // First time — triangulate narrative + coaching + context
     let action = view.availableActions[0];
-    if (bestNarrative) {
-      const mapped = bestNarrative.mappedActions.find((a) => view.availableActions.includes(a));
-      if (mapped) action = mapped;
+    let reasoning = "";
+
+    // 1. Check GTO coaching solver action (most precise signal)
+    const gtoAdvice = view.coaching.find((c) => c.profileName === "GTO");
+    if (gtoAdvice?.solverOptimalAction && view.availableActions.includes(gtoAdvice.solverOptimalAction as GtoAction)) {
+      action = gtoAdvice.solverOptimalAction as GtoAction;
+      reasoning = `Coaching solver: ${action}`;
+    }
+    // 2. Fall back to narrative prompt
+    else {
+      const bestNarrative = view.narrativePrompt.options[0];
+      if (bestNarrative) {
+        const mapped = bestNarrative.mappedActions.find((a) => view.availableActions.includes(a));
+        if (mapped) {
+          action = mapped;
+          reasoning = `Narrative: "${bestNarrative.label}" → ${action}`;
+        }
+      }
+    }
+
+    // 3. Coaching consensus override — if 4+ profiles agree on a direction, trust it
+    const coachActions = view.coaching.map((c) => c.action);
+    const actionCounts = new Map<string, number>();
+    for (const a of coachActions) {
+      actionCounts.set(a, (actionCounts.get(a) ?? 0) + 1);
+    }
+    const consensus = [...actionCounts.entries()].find(([, count]) => count >= 4);
+    if (consensus) {
+      const consensusFamily = consensus[0].replace(/_.*/, "");
+      const currentFamily = action.replace(/_.*/, "");
+      // If consensus disagrees with our choice direction, reconsider
+      if (consensusFamily !== currentFamily && consensusFamily === "fold" && view.availableActions.includes("fold" as GtoAction)) {
+        action = "fold";
+        reasoning = `Coaching consensus override: 4+ say fold`;
+      }
     }
 
     return {
       action,
-      narrativeChoice: bestNarrative?.id ?? null,
-      reasoning: `First time: narrative "${bestNarrative?.label}" → ${action}`,
+      narrativeChoice: view.narrativePrompt.options[0]?.id ?? null,
+      reasoning,
     };
   };
 }
