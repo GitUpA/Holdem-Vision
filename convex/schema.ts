@@ -68,6 +68,52 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // ─── Training Results (one per completed drill hand) ───
+  trainingResults: defineTable({
+    userId: v.id("users"),
+    archetypeId: v.string(),
+    handCategory: v.string(),
+    street: v.string(),
+    isInPosition: v.boolean(),
+    userAction: v.string(),
+    optimalAction: v.string(),
+    verdict: v.string(),
+    evLoss: v.number(),
+    narrativeChoice: v.optional(v.string()),
+    narrativeAlignment: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_archetype", ["userId", "archetypeId"])
+    .index("by_user_date", ["userId", "createdAt"]),
+
+  // ─── Skill Progress (one per user) ───
+  skillProgress: defineTable({
+    userId: v.id("users"),
+    /** JSON-stringified Record<SkillId, SkillProgress> */
+    progress: v.string(),
+    totalHands: v.number(),
+    totalSessions: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // ─── Drill Sessions (one per completed multi-hand session) ───
+  drillSessions: defineTable({
+    userId: v.id("users"),
+    archetypeId: v.string(),
+    handsPlayed: v.number(),
+    accuracy: v.number(),
+    avgEvLoss: v.number(),
+    verdicts: v.string(),
+    narrativeAlignmentRate: v.optional(v.number()),
+    insights: v.optional(v.string()),
+    duration: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_archetype", ["userId", "archetypeId"])
+    .index("by_user_date", ["userId", "createdAt"]),
+
   // ─── Scenario Library (classic spots + user-created) ───
   scenarios: defineTable({
     title: v.string(),

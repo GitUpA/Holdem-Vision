@@ -11,11 +11,15 @@
  * during "ready" and "acted" phases. The UI decides what to reveal based
  * on drill mode (learn vs quiz).
  */
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ArchetypeId, ArchetypeCategory } from "../../../convex/lib/gto/archetypeClassifier";
 import { hasTable, hasAnyTableForStreet } from "../../../convex/lib/gto/tables/tableRegistry";
-import { useDrillSession } from "@/hooks/use-drill-session";
+import { useDrillSession, type OnSessionComplete } from "@/hooks/use-drill-session";
+import { useConvexAuth } from "convex/react";
+// NOTE: useMutation + api imports enabled after `npx convex dev` regenerates types
+// import { useMutation } from "convex/react";
+// import { api } from "../../../convex/_generated/api";
 import { HandStateViewer } from "../replay/hand-state-viewer";
 import { DrillActionPanel } from "./drill-action-panel";
 import { ScoreDisplay } from "./score-display";
@@ -108,7 +112,30 @@ export type DrillMode = "learn" | "quiz";
 // ═══════════════════════════════════════════════════════
 
 export function DrillWorkspace() {
-  const drill = useDrillSession();
+  const { isAuthenticated } = useConvexAuth();
+
+  // Persistence callback — saves to Convex when session completes.
+  // NOTE: Convex mutations will be wired after `npx convex dev` regenerates types.
+  // For now, the callback structure is in place but mutations are no-ops.
+  const handleSessionComplete: OnSessionComplete = useCallback(
+    ({ archetypeId, scores, handsPlayed, startTime }) => {
+      if (!isAuthenticated) return;
+
+      const _duration = Date.now() - startTime;
+      const _optimal = scores.filter((s) => s.verdict === "optimal").length;
+      const _acceptable = scores.filter((s) => s.verdict === "acceptable").length;
+      const _accuracy = handsPlayed > 0 ? (_optimal + _acceptable) / handsPlayed : 0;
+
+      // TODO: Wire Convex mutations after `npx convex dev`:
+      // saveSession({ archetypeId, handsPlayed, accuracy, avgEvLoss, verdicts, duration })
+      // saveResult({ ... }) for each score
+      // updateSkills({ results: scores.map(s => ({ archetypeId, verdict: s.verdict })) })
+      console.log(`[Training] Session complete: ${archetypeId}, ${handsPlayed} hands, ${(_accuracy * 100).toFixed(0)}% accuracy`);
+    },
+    [isAuthenticated],
+  );
+
+  const drill = useDrillSession(handleSessionComplete);
   const [drillMode, setDrillMode] = useState<DrillMode>("quiz");
   const [guideOpen, setGuideOpen] = useState(false);
 

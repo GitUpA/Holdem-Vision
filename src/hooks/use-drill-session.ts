@@ -76,6 +76,14 @@ export interface DrillSessionActions {
   setNarrativeChoice: (id: NarrativeIntentId) => void;
 }
 
+/** Callback invoked when a drill session completes (all hands played). */
+export type OnSessionComplete = (data: {
+  archetypeId: ArchetypeId;
+  scores: ActionScore[];
+  handsPlayed: number;
+  startTime: number;
+}) => void;
+
 // ═══════════════════════════════════════════════════════
 // HOOK
 // ═══════════════════════════════════════════════════════
@@ -83,7 +91,9 @@ export interface DrillSessionActions {
 const DEFAULT_BLINDS = { small: 1, big: 2 };
 const DEFAULT_STACK_BB = 100;
 
-export function useDrillSession(): DrillSessionState & DrillSessionActions {
+export function useDrillSession(
+  onSessionComplete?: OnSessionComplete,
+): DrillSessionState & DrillSessionActions {
   const [, forceUpdate] = useState(0);
   const rerender = useCallback(() => forceUpdate((n) => n + 1), []);
 
@@ -99,6 +109,7 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
   const solutionRef = useRef<SpotSolution | null>(null);
   const rngRef = useRef(() => Math.random());
   const narrativeChoiceRef = useRef<NarrativeIntentId | null>(null);
+  const startTimeRef = useRef(0);
 
   // ── Derived state ──
 
@@ -145,6 +156,7 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
       handsTargetRef.current = handsTarget;
       handsPlayedRef.current = 0;
       scoresRef.current = [];
+      startTimeRef.current = Date.now();
       currentScoreRef.current = null;
       solutionRef.current = null;
 
@@ -210,6 +222,15 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
       // Check if drill is done
       if (handsPlayedRef.current >= handsTargetRef.current) {
         phaseRef.current = "summary";
+        // Fire completion callback (for persistence)
+        if (onSessionComplete && archetypeRef.current) {
+          onSessionComplete({
+            archetypeId: archetypeRef.current,
+            scores: scoresRef.current,
+            handsPlayed: handsPlayedRef.current,
+            startTime: startTimeRef.current,
+          });
+        }
       } else {
         phaseRef.current = "acted";
       }
