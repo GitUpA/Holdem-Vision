@@ -64,14 +64,14 @@ export function interpretSituation(
 
   // Build primary and secondary reasons
   const primaryReason = dominantTrait
-    ? getPrimaryReason(dominantTrait.id, action)
+    ? getPrimaryReason(dominantTrait.id, action, { handStrength: factors.handStrength })
     : action === "fold" ? "Decides to fold" : "Decides to continue";
 
   const secondaryReasons = buildSecondaryReasons(activeTraits, factors);
 
   // Check for context overrides ("normally X, but Y")
   const contextOverride = buildContextOverrideNarrative(
-    traits, baseModifier, effectiveModifier, factors, action,
+    traits, baseModifier, effectiveModifier, factors, action, previousArc,
   );
 
   // Build story arc connection
@@ -211,6 +211,7 @@ function buildContextOverrideNarrative(
   effectiveModifier: FrequencyModifier,
   factors: ContextFactors,
   action: ActionType,
+  previousArc?: StoryArcReference,
 ): string | undefined {
   const foldDelta = Math.abs(baseModifier.base.foldScale - effectiveModifier.foldScale);
   const aggrDelta = Math.abs(baseModifier.base.aggressionScale - effectiveModifier.aggressionScale);
@@ -231,6 +232,14 @@ function buildContextOverrideNarrative(
     }
     if (factors.potOdds > 0 && factors.potOdds < 0.2) {
       return "Normally would fold, but the price is too good to pass up";
+    }
+    // Count how many previous streets had overrides (cautious profile continuing)
+    const previousOverrideCount = countPreviousOverrides(previousArc);
+    if (previousOverrideCount >= 2) {
+      return "Committed to this hand — seeing it through";
+    }
+    if (previousOverrideCount >= 1) {
+      return "Continuing to press — the hand is worth it";
     }
     return "Context overrides the usual caution here";
   }
@@ -317,4 +326,13 @@ function buildStoryArc(
 
 function hasTrait(traits: NarrativeTrait[], id: string): boolean {
   return traits.some(t => t.id === id && t.strength > 0.25);
+}
+
+/**
+ * Count how many previous streets had the profile continuing (non-fold actions).
+ * Used to evolve override language across streets.
+ */
+function countPreviousOverrides(previousArc?: StoryArcReference): number {
+  if (!previousArc || previousArc.previousActions.length === 0) return 0;
+  return previousArc.previousActions.filter(a => a.action !== "fold").length;
 }

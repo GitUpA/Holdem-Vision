@@ -179,50 +179,167 @@ export function buildContextOverrides(
 // PRIMARY REASON TEMPLATES
 // ═══════════════════════════════════════════════════════
 
-/** The dominant trait's influence on fold/continue decisions. */
-const TRAIT_FOLD_REASONS: Partial<Record<TraitId, { folds: string; continues: string }>> = {
+/** Action-specific reason text for each trait. */
+interface TraitActionReasons {
+  folds: string;
+  checks: string;
+  calls: string;
+  bets: string;
+  raises: string;
+}
+
+/** The dominant trait's influence on action decisions. */
+const TRAIT_ACTION_REASONS: Partial<Record<TraitId, TraitActionReasons>> = {
   cautious: {
     folds: "Not confident enough to continue — only plays strong hands",
-    continues: "The hand is strong enough to overcome natural caution",
+    checks: "Checks to avoid committing more chips",
+    calls: "The hand is strong enough to overcome natural caution",
+    bets: "Bets for value — confident enough to commit chips",
+    raises: "The hand is strong enough to raise despite cautious nature",
   },
   sticky: {
     folds: "Even a loose player has to give up sometimes",
-    continues: "Reluctant to fold — always looking for a reason to stay in",
+    checks: "Checks but stays in the hand — not going anywhere",
+    calls: "Reluctant to fold — always looking for a reason to stay in",
+    bets: "Bets to build the pot — invested in this hand",
+    raises: "Raises to protect the investment — too deep to back down",
   },
   aggressive: {
     folds: "Sometimes even aggressive players have to slow down",
-    continues: "Sees an opportunity to apply pressure",
+    checks: "Checks back — waiting for a better spot to attack",
+    calls: "Calls to set up aggression on a later street",
+    bets: "Sees an opportunity to apply pressure",
+    raises: "Raises to seize control — aggression is the default",
   },
   passive: {
     folds: "Prefers to avoid confrontation",
-    continues: "Comfortable calling — no need to escalate",
+    checks: "Checks to keep the pot small",
+    calls: "Comfortable calling — no need to escalate",
+    bets: "Bets when the hand demands it, despite passive nature",
+    raises: "Raises reluctantly — the hand is too strong to just call",
   },
   balanced: {
     folds: "GTO says this hand should fold in this spot",
-    continues: "Balanced strategy includes this hand in the continuing range",
+    checks: "Checking at the correct frequency for balance",
+    calls: "Balanced strategy includes this hand in the calling range",
+    bets: "GTO betting frequency dictates a bet here",
+    raises: "Raising for balance — mixing in the right proportion",
   },
   "hand-reader": {
     folds: "The hand doesn't meet the quality threshold for this situation",
-    continues: "Hand strength justifies continuing in this spot",
+    checks: "Hand strength doesn't warrant building the pot",
+    calls: "Hand strength justifies continuing in this spot",
+    bets: "Hand strength warrants betting for value",
+    raises: "Hand strength demands a raise — too strong to slow-play",
   },
   "price-sensitive": {
     folds: "The price isn't right — too expensive relative to the hand",
-    continues: "Getting a good enough price to see more cards",
+    checks: "No price to pay — happy to see a free card",
+    calls: "Getting a good enough price to see more cards",
+    bets: "Betting to deny opponents a cheap draw",
+    raises: "Raising to charge opponents the maximum price",
+  },
+  "raise-happy": {
+    folds: "Even raise-happy players fold when the math says to",
+    checks: "Checks to disguise strength — setting up a raise",
+    calls: "Calls this time — but prefers raising in most spots",
+    bets: "Opens with a bet — always looking for initiative",
+    raises: "Raises as the default play — wants to control the pot size",
+  },
+  "call-heavy": {
+    folds: "Rare fold — this hand truly has no future",
+    checks: "Checks and plans to call if there's action",
+    calls: "Calls are the comfort zone — sees no reason to raise",
+    bets: "Unusual bet — the hand is too strong to just call",
+    raises: "An unusual raise from a call-heavy profile — a real hand",
+  },
+  positional: {
+    folds: "Out of position with a marginal hand — discretion wins",
+    checks: "Checks to use position on later streets",
+    calls: "Calls to see how the action develops in position",
+    bets: "Uses positional advantage to apply pressure",
+    raises: "Raises to exploit the positional edge",
+  },
+  "fold-equity-exploiter": {
+    folds: "No fold equity available — can't profitably bluff",
+    checks: "Checks — opponents aren't folding enough to bluff",
+    calls: "Calls while waiting for a better spot to apply pressure",
+    bets: "Bets because opponents fold often enough to make it profitable",
+    raises: "Raises to exploit opponents' high fold frequency",
+  },
+  "draw-chaser": {
+    folds: "No draws available — nothing to chase",
+    checks: "Checks to see the next card cheaply",
+    calls: "Calls to chase the draw — needs more cards",
+    bets: "Semi-bluffs with draw equity behind the bet",
+    raises: "Raises with a strong draw — combining fold equity with draw equity",
+  },
+  "texture-reader": {
+    folds: "The board texture doesn't favor continuing",
+    checks: "Reads the board as dangerous — keeps the pot small",
+    calls: "Board texture supports continuing with this hand",
+    bets: "The board texture creates a good spot to bet",
+    raises: "Board texture favors aggression here",
+  },
+  "big-bettor": {
+    folds: "Folds rather than make a small, ineffective bet",
+    checks: "Checks rather than bet small",
+    calls: "Calls to set up a bigger bet later",
+    bets: "Goes big — small bets don't accomplish anything",
+    raises: "Raises large to maximize pressure",
+  },
+  "small-bettor": {
+    folds: "Folds when even a small bet wouldn't help",
+    checks: "Checks to keep options open",
+    calls: "Calls the small price",
+    bets: "Bets small to control the pot",
+    raises: "Raises the minimum — just enough to stay aggressive",
+  },
+  "spr-aware": {
+    folds: "Stack depth says this isn't the spot to commit",
+    checks: "Checks with awareness of remaining stack-to-pot ratio",
+    calls: "SPR justifies continuing — not yet committed",
+    bets: "Stack depth makes this a good commitment point",
+    raises: "Shallow stacks demand commitment — raises for value",
+  },
+  extreme: {
+    folds: "Even extreme players fold with nothing",
+    checks: "Checks as part of a polarized strategy",
+    calls: "Calls — keeping the opponent guessing",
+    bets: "Bets aggressively — maximum deviation from GTO",
+    raises: "Raises big — unpredictable and hard to play against",
   },
 };
 
 export function getPrimaryReason(
   dominantTraitId: TraitId,
   action: ActionType,
+  factors?: { handStrength: number },
 ): string {
-  const reasons = TRAIT_FOLD_REASONS[dominantTraitId];
+  const reasons = TRAIT_ACTION_REASONS[dominantTraitId];
   if (!reasons) {
-    return action === "fold" ? "Decides to fold" : "Decides to continue";
+    // Fallback for any traits not in the map
+    if (action === "fold") return "Decides to fold";
+    if (action === "check") return "Decides to check";
+    if (action === "call") return "Decides to call";
+    if (action === "bet" || action === "raise" || action === "all_in") return "Decides to bet";
+    return "Decides to continue";
   }
 
   if (action === "fold") return reasons.folds;
-  if (action === "check") return reasons.continues;
-  return reasons.continues;
+  if (action === "check") return reasons.checks;
+  if (action === "call") {
+    // For hand-reader trait, use strength-aware text
+    if (dominantTraitId === "hand-reader" && factors) {
+      if (factors.handStrength > 0.6) return "Hand strength justifies continuing in this spot";
+      if (factors.handStrength >= 0.3) return "Marginal hand — proceeding with caution";
+      return "Weak hand — this profile sees something others might miss";
+    }
+    return reasons.calls;
+  }
+  if (action === "bet") return reasons.bets;
+  if (action === "raise" || action === "all_in") return reasons.raises;
+  return reasons.calls;
 }
 
 // ═══════════════════════════════════════════════════════

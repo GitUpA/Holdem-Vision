@@ -71,7 +71,8 @@ export function computeContextFactors(ctx: DecisionContext): ContextFactors {
   }
 
   // ── Board texture ──
-  let boardWetness = 0.5;
+  // Default 0 preflop (no board), 0.5 postflop fallback
+  let boardWetness = isPreflop ? 0 : 0.5;
   if (!isPreflop && ctx.state.communityCards.length >= 3) {
     const texture = analyzeBoard(ctx.state.communityCards);
     boardWetness = texture.wetness;
@@ -91,14 +92,21 @@ export function computeContextFactors(ctx: DecisionContext): ContextFactors {
   const spr = ctx.potSize > 0 ? player.currentStack / ctx.potSize : 20;
 
   // ── Position ──
-  const isInPosition = ctx.situationKey.endsWith(".ip");
+  // Postflop: derived from situationKey suffix (.ip / .oop)
+  // Preflop: BTN and CO are "in position", others are "out of position"
+  let isInPosition = ctx.situationKey.endsWith(".ip");
+  if (isPreflop) {
+    const pos = ctx.state.players[ctx.seatIndex].position;
+    isInPosition = pos === "btn" || pos === "co";
+  }
 
   return {
     handStrength,
     handDescription,
     boardWetness,
-    drawOuts: drawInfo?.totalOuts ?? 0,
-    bestDrawType: drawInfo?.bestDrawType ?? "none",
+    // Draw outs are irrelevant on the river — no more cards to come
+    drawOuts: ctx.state.currentStreet === "river" ? 0 : (drawInfo?.totalOuts ?? 0),
+    bestDrawType: ctx.state.currentStreet === "river" ? "none" : (drawInfo?.bestDrawType ?? "none"),
     potOdds,
     foldEquity,
     spr,

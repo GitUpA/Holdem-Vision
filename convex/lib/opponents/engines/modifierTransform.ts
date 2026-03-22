@@ -176,12 +176,18 @@ export function computeEffectiveModifier(
   // Board texture: wet boards amplify aggression
   const textureBoost = 1 + (factors.boardWetness - 0.5) * context.textureSensitivity * 0.3;
 
+  // Strong hand on river: boost aggression for value betting
+  // When handStrength > 0.9 on the river, any profile should lean toward betting for value
+  const riverValueBoost = (!factors.isPreflop && factors.drawOuts === 0 && factors.handStrength > 0.9)
+    ? 1 + (factors.handStrength - 0.9) * 10  // 0.9 → 1.0x, 0.95 → 1.5x, 1.0 → 2.0x
+    : 1.0;
+
   // ── Apply intensity lerp ──
   return {
     foldScale: lerp(1.0, base.foldScale * combinedFoldAttenuation, intensity),
     aggressionScale: lerp(
       1.0,
-      base.aggressionScale * positionBoost * foldEquityBoost * sprBoost * textureBoost,
+      base.aggressionScale * positionBoost * foldEquityBoost * sprBoost * textureBoost * riverValueBoost,
       intensity,
     ),
     raiseVsCallBias: base.raiseVsCallBias * intensity,
