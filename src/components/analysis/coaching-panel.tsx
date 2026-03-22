@@ -181,9 +181,9 @@ function ProfileRow({
           </span>
         )}
 
-        {/* Description (truncated) */}
+        {/* Narrative one-liner or static description */}
         <span className="text-[10px] text-[var(--muted-foreground)] truncate flex-1 min-w-0">
-          {meta.desc}
+          {advice.narrative?.oneLiner ?? meta.desc}
         </span>
 
         {/* Expand chevron */}
@@ -228,8 +228,23 @@ function ProfileRow({
                   solution={solverDataToSpotSolution(advice.solverData, advice.explanation)}
                 />
               ) : (
-                <div className="ml-8">
-                  <ExplanationTree node={advice.explanation} defaultOpen={true} />
+                <div className="space-y-2">
+                  {/* Narrative paragraph — the character's reasoning in plain language */}
+                  {advice.narrative && (
+                    <div className="px-2 py-1.5 rounded bg-[var(--muted)]/20 border border-[var(--border)]/30">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[9px] font-bold text-[var(--gold-dim)] uppercase tracking-wider">
+                          {advice.narrative.character.label}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[var(--foreground)]/70 leading-relaxed">
+                        {advice.narrative.paragraph}
+                      </p>
+                    </div>
+                  )}
+                  <div className="ml-8">
+                    <ExplanationTree node={advice.explanation} defaultOpen={true} />
+                  </div>
                 </div>
               )}
             </div>

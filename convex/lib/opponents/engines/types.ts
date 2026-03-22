@@ -17,6 +17,7 @@ import type {
 } from "../../types/opponents";
 import type { ExplanationNode } from "../../types/analysis";
 import type { CardIndex } from "../../types/cards";
+import type { NarrativeArcTracker, RenderedNarrative } from "./narrativeTypes";
 
 // ═══════════════════════════════════════════════════════
 // DECISION CONTEXT — immutable snapshot for engine input
@@ -51,6 +52,8 @@ export interface DecisionContext {
   random: () => number;
   /** Map of seatIndex → OpponentProfile for table opponents (for fold equity). */
   opponentProfiles?: Map<number, OpponentProfile>;
+  /** Narrative arc tracker for multi-street story coherence (optional). */
+  narrativeArc?: NarrativeArcTracker;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -71,6 +74,8 @@ export interface EngineDecision {
   engineId: string;
   /** Optional structured reasoning data (engine-specific). */
   reasoning?: Record<string, unknown>;
+  /** Structured narrative for UI display (optional, present when narrative engine is active). */
+  narrative?: RenderedNarrative;
 }
 
 // ═══════════════════════════════════════════════════════

@@ -200,10 +200,15 @@ function classifyPreflop(ctx: ClassificationContext): ArchetypeClassification {
     return make("blind_vs_blind", 0.85);
   }
 
-  // Facing a single raise (hero hasn't raised): BB defense / cold-call spot
+  // Facing a single raise (hero hasn't raised)
   const villainRaises = raises.filter((a) => !a.isHero);
   if (villainRaises.length === 1 && heroRaises.length === 0) {
-    return make("bb_defense_vs_rfi", 0.9);
+    // BB gets the specific BB Defense archetype (discount from posted blind)
+    if (ctx.heroPosition === "bb") {
+      return make("bb_defense_vs_rfi", 0.9);
+    }
+    // Other positions facing a raise: 3-bet pot dynamics (cold-call or 3-bet)
+    return make("three_bet_pots", 0.85);
   }
 
   // RFI: no villain raises yet — hero is opening or first to act

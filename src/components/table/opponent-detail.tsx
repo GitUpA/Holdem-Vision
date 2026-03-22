@@ -349,10 +349,23 @@ function EngineReasoningSection({ decision }: { decision: AutoPlayDecision }) {
         <ReasoningSummaryStrip nodes={decision.explanationNode.children} />
       )}
 
-      {/* Explanation summary */}
-      <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed mb-2">
-        {decision.explanation}
-      </p>
+      {/* Narrative explanation or fallback to plain summary */}
+      {decision.narrative ? (
+        <div className="mb-2 px-2 py-1.5 rounded bg-[var(--muted)]/20 border border-[var(--border)]/30">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-[9px] font-bold text-[var(--gold-dim)] uppercase tracking-wider">
+              {decision.narrative.character.label}
+            </span>
+          </div>
+          <p className="text-[10px] text-[var(--foreground)]/70 leading-relaxed">
+            {decision.narrative.paragraph}
+          </p>
+        </div>
+      ) : (
+        <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed mb-2">
+          {decision.explanation}
+        </p>
+      )}
 
       {/* Expandable reasoning tree */}
       {decision.explanationNode && (

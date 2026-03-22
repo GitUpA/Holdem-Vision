@@ -43,6 +43,8 @@ export interface AutoPlayDecision {
   engineId?: string;
   /** Structured reasoning data from the engine (hand %, pot odds, fold equity, etc.). */
   reasoning?: Record<string, unknown>;
+  /** Narrative explanation — character-coherent story about the decision. */
+  narrative?: import("./engines/narrativeTypes").RenderedNarrative;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -579,5 +581,6 @@ export function chooseActionFromProfile(
     explanationNode: decision.explanation,
     engineId: decision.engineId,
     reasoning: decision.reasoning,
+    narrative: decision.narrative,
   };
 }

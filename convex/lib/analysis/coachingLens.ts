@@ -35,6 +35,7 @@ import {
   lookupPostflopHandClass,
   postflopHandClassToActionFrequencies,
 } from "../gto/tables";
+import { equityBasedRecommendation, type OpponentInput } from "./equityRecommendation";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
 import type { ActionFrequencies, ActionFrequencyBands, GtoAction } from "../gto/tables/types";
 import type { ArchetypeAccuracy } from "../gto/tables/types";
@@ -78,6 +79,8 @@ export interface CoachingAdvice {
   explanation: ExplanationNode;
   /** Raw solver data — present when GTO profile uses lookup tables */
   solverData?: CoachingSolverData;
+  /** Narrative explanation — present when engine produces character-coherent stories */
+  narrative?: import("../opponents/engines/narrativeTypes").RenderedNarrative;
 }
 
 export interface CoachingValue {
@@ -150,6 +153,7 @@ export const coachingLens: AnalysisLens = {
           actionType: decision.actionType,
           amount: decision.amount,
           explanation: decision.explanation,
+          narrative: decision.narrative,
         });
       } catch {
         // If an engine fails, skip this profile gracefully
@@ -341,6 +345,11 @@ function tryGtoSolverLookup(
         };
       }
     }
+
+    // Equity-based fallback: compute recommendation from range estimation + pot odds
+    const equityRec = tryEquityFallback(gameState, heroSeat, heroCards, legal);
+    if (equityRec) return equityRec;
+
     return null;
   }
 
@@ -424,6 +433,96 @@ function findPreflopOpenerFromState(state: GameState, heroSeat: number): string 
     }
   }
   return undefined;
+}
+
+/** Try equity-based recommendation when solver data is unavailable. */
+function tryEquityFallback(
+  gameState: GameState,
+  heroSeat: number,
+  heroCards: CardIndex[],
+  legal: LegalActions,
+): CoachingAdvice | null {
+  // Build opponent inputs from game state
+  const opponents: OpponentInput[] = [];
+  const heroPlayer = gameState.players[heroSeat];
+
+  for (const player of gameState.players) {
+    if (player.seatIndex === heroSeat) continue;
+    if (player.status === "folded" || player.status === "sitting_out") continue;
+
+    // We need a profile — use GTO as default estimation
+    const profile = PRESET_PROFILES["gto"];
+    const actions = gameState.actionHistory
+      .filter((a) => a.seatIndex === player.seatIndex)
+      .map((a) => ({
+        street: a.street as "preflop" | "flop" | "turn" | "river",
+        actionType: a.actionType,
+        amount: a.amount,
+      }));
+
+    opponents.push({
+      profile,
+      actions,
+      position: player.position,
+      knownCards: player.holeCards.length >= 2 ? player.holeCards : undefined,
+    });
+  }
+
+  if (opponents.length === 0) return null;
+
+  // Compute pot and call cost in BB
+  const bigBlind = gameState.blinds.big || 1;
+  const potBB = gameState.pot.total / bigBlind;
+  const callCostBB = legal.canCall
+    ? (gameState.currentBet - heroPlayer.streetCommitted) / bigBlind
+    : 0;
+
+  const isIP = contextFromGameState(gameState, heroSeat).isInPosition;
+
+  const result = equityBasedRecommendation(
+    heroCards,
+    gameState.communityCards,
+    opponents,
+    potBB,
+    callCostBB,
+    gameState.currentStreet,
+    isIP,
+    legal,
+  );
+
+  if (!result) return null;
+
+  // Find the top action
+  let topAction: import("../state/game-state").ActionType = "fold";
+  let topFreq = 0;
+  for (const [action, freq] of Object.entries(result.frequencies)) {
+    if ((freq ?? 0) > topFreq) {
+      topFreq = freq ?? 0;
+      topAction = action === "bet_large" || action === "bet_medium" || action === "bet_small"
+        ? "raise"
+        : action as import("../state/game-state").ActionType;
+    }
+  }
+
+  const remappedFreqs = remapFrequenciesToLegal(result.frequencies, legal);
+
+  return {
+    profileName: "GTO",
+    profileId: "gto",
+    engineId: "equity-engine",
+    actionType: topAction,
+    explanation: result.explanation,
+    solverData: {
+      frequencies: remappedFreqs,
+      optimalAction: Object.entries(remappedFreqs).sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))[0]?.[0] as GtoAction ?? "fold",
+      optimalFrequency: topFreq,
+      availableActions: Object.keys(remappedFreqs).filter(
+        (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
+      ) as GtoAction[],
+      isExactMatch: false,
+      resolvedCategory: "equity-based",
+    },
+  };
 }
 
 function detectConsensus(

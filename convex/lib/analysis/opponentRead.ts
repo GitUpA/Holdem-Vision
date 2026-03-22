@@ -247,7 +247,7 @@ function buildSolverFoldContext(
  * Compute equity of heroCards against a weighted range of opponent holdings.
  * Samples combos from the range proportional to their weight.
  */
-function equityVsRange(
+export function equityVsRange(
   heroCards: CardIndex[],
   communityCards: CardIndex[],
   range: WeightedRange,

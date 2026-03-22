@@ -15,8 +15,6 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
-import { formatSituation } from "./types";
-import type { ExplanationNode } from "../../types/analysis";
 import type { ActionType, LegalActions } from "../../state/game-state";
 import type { ActionFrequencies, GtoAction } from "../../gto/tables/types";
 import { registerEngine } from "./engineRegistry";
@@ -39,6 +37,8 @@ import {
   lookupPostflopHandClass,
   postflopHandClassToActionFrequencies,
 } from "../../gto/tables";
+import { equityBasedRecommendation } from "../../analysis/equityRecommendation";
+import { PRESET_PROFILES } from "../../opponents/presets";
 import { comboToHandClass, cardsToCombo } from "../../opponents/combos";
 
 // Shared context analysis
@@ -48,6 +48,7 @@ import { computeContextFactors, type ContextFactors } from "./contextAnalysis";
 import { identitySituationModifier } from "./modifiedGtoTypes";
 import { applyModifier, computeEffectiveModifier } from "./modifierTransform";
 import { getModifierMap } from "./modifierProfiles";
+import { buildNarrativeExplanation } from "./narrativeEngine";
 
 // Heuristic fallback
 import { paramsToFrequencies } from "../autoPlay";
@@ -72,8 +73,6 @@ export const modifiedGtoEngine: DecisionEngine = {
     "the same engine with different modifier maps.",
 
   decide(ctx: DecisionContext): EngineDecision {
-    const explanationChildren: ExplanationNode[] = [];
-
     // ── 1. Compute context factors ──
     const factors = computeContextFactors(ctx);
 
@@ -96,120 +95,30 @@ export const modifiedGtoEngine: DecisionEngine = {
       ctx.random,
     );
 
-    // ── 6. Build explanation tree ──
+    // ── 6. Build narrative explanation ──
     const effective = computeEffectiveModifier(modifier, factors);
-    const isGtoProfile = modifier.base.intensity < 0.001;
 
-    // GTO base frequencies
-    const freqChildren: ExplanationNode[] = Object.entries(gtoFreqs)
-      .filter(([, v]) => v && v > 0.01)
-      .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
-      .map(([action, freq]) => ({
-        summary: `${action}: ${((freq ?? 0) * 100).toFixed(0)}%`,
-        sentiment: "neutral" as const,
-        tags: ["frequency"],
-      }));
-
-    explanationChildren.push({
-      summary: `GTO base frequencies (${source}):`,
-      children: freqChildren,
-      sentiment: "neutral",
-      tags: ["gto-base"],
+    const narrative = buildNarrativeExplanation({
+      profileId: ctx.profile.id,
+      profileName: ctx.profile.name,
+      situationKey: ctx.situationKey,
+      action: { actionType, amount },
+      factors,
+      baseModifier: modifier,
+      effectiveModifier: effective,
+      gtoFrequencies: gtoFreqs,
+      modifiedFrequencies: modifiedFreqs,
+      gtoSource: source,
+      arc: ctx.narrativeArc,
     });
-
-    // Modifier explanation (skip for GTO profile)
-    if (!isGtoProfile) {
-      const modFreqChildren: ExplanationNode[] = Object.entries(modifiedFreqs)
-        .filter(([, v]) => v && v > 0.01)
-        .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
-        .map(([action, freq]) => ({
-          summary: `${action}: ${((freq ?? 0) * 100).toFixed(0)}%`,
-          sentiment: "neutral" as const,
-          tags: ["frequency"],
-        }));
-
-      explanationChildren.push({
-        summary: `${ctx.profile.name} modifier: fold ×${effective.foldScale.toFixed(2)}, aggr ×${effective.aggressionScale.toFixed(2)}`,
-        detail: modifier.deviationReason,
-        children: modFreqChildren,
-        sentiment: "neutral",
-        tags: ["modifier", ctx.profile.id],
-      });
-    }
-
-    // Context factors
-    const contextChildren: ExplanationNode[] = [];
-    contextChildren.push({
-      summary: `Hand: ${factors.handDescription} (${(factors.handStrength * 100).toFixed(0)}%)`,
-      sentiment: factors.handStrength >= 0.7 ? "positive" : factors.handStrength <= 0.3 ? "negative" : "neutral",
-      tags: ["hand-strength"],
-    });
-
-    if (!factors.isPreflop) {
-      contextChildren.push({
-        summary: `Board wetness: ${(factors.boardWetness * 100).toFixed(0)}%`,
-        sentiment: "neutral",
-        tags: ["board-texture"],
-      });
-    }
-
-    if (factors.drawOuts > 0) {
-      contextChildren.push({
-        summary: `Draws: ${factors.bestDrawType} (${factors.drawOuts} outs)`,
-        sentiment: factors.drawOuts >= 8 ? "positive" : "neutral",
-        tags: ["draw-aware"],
-      });
-    }
-
-    if (factors.potOdds > 0) {
-      contextChildren.push({
-        summary: `Pot odds: ${(factors.potOdds * 100).toFixed(0)}%`,
-        sentiment: factors.handStrength > factors.potOdds ? "positive" : "negative",
-        tags: ["pot-odds"],
-      });
-    }
-
-    if (factors.foldEquity > 0) {
-      contextChildren.push({
-        summary: `Fold equity: ${(factors.foldEquity * 100).toFixed(0)}%`,
-        sentiment: factors.foldEquity >= 0.4 ? "positive" : "neutral",
-        tags: ["fold-equity"],
-      });
-    }
-
-    explanationChildren.push({
-      summary: `Context: ${factors.handDescription}, ${factors.isInPosition ? "IP" : "OOP"}, SPR ${factors.spr.toFixed(1)}`,
-      children: contextChildren,
-      sentiment: "neutral",
-      tags: ["context"],
-    });
-
-    // Decision
-    const actionSentiment = actionType === "fold"
-      ? "negative"
-      : (actionType === "raise" || actionType === "bet")
-        ? "positive"
-        : "neutral" as const;
-
-    explanationChildren.unshift({
-      summary: `Decision: ${actionType}${amount !== undefined ? ` ${amount}` : ""}`,
-      sentiment: actionSentiment,
-      tags: ["decision"],
-    });
-
-    const explanation: ExplanationNode = {
-      summary: `${ctx.profile.name} — ${formatSituation(ctx.situationKey)}: ${actionType}${amount !== undefined ? ` ${amount}` : ""} — ${factors.handDescription}`,
-      sentiment: actionSentiment,
-      children: explanationChildren,
-      tags: ["modified-gto"],
-    };
 
     return {
       actionType,
       amount,
       situationKey: ctx.situationKey,
       engineId: "modified-gto",
-      explanation,
+      explanation: narrative.explanationTree,
+      narrative,
       reasoning: {
         frequencies: modifiedFreqs,
         gtoBaseFrequencies: gtoFreqs,
@@ -323,6 +232,48 @@ function getGtoBaseFrequencies(
         archetype: archetype2,
         handCat: categorizeHand(ctx.holeCards, ctx.state.communityCards),
       };
+    }
+  }
+
+  // Equity-based fallback: compute from range estimation + pot odds
+  if (ctx.holeCards && ctx.holeCards.length >= 2) {
+    const opponents = ctx.state.players
+      .filter((p) => p.seatIndex !== ctx.seatIndex && (p.status === "active" || p.status === "all_in"))
+      .map((p) => ({
+        profile: ctx.opponentProfiles?.get(p.seatIndex) ?? PRESET_PROFILES["gto"],
+        actions: ctx.state.actionHistory
+          .filter((a) => a.seatIndex === p.seatIndex)
+          .map((a) => ({ street: a.street as "preflop" | "flop" | "turn" | "river", actionType: a.actionType, amount: a.amount })),
+        position: p.position,
+        knownCards: p.holeCards.length >= 2 ? p.holeCards : undefined,
+      }));
+
+    if (opponents.length > 0) {
+      const bigBlind = ctx.state.blinds.big || 1;
+      const potBB = ctx.state.pot.total / bigBlind;
+      const hero = ctx.state.players[ctx.seatIndex];
+      const callCostBB = ctx.legal.canCall
+        ? (ctx.state.currentBet - hero.streetCommitted) / bigBlind
+        : 0;
+      const classCtxEq = contextFromGameState(ctx.state, ctx.seatIndex);
+
+      const eqResult = equityBasedRecommendation(
+        ctx.holeCards,
+        ctx.state.communityCards,
+        opponents,
+        potBB,
+        callCostBB,
+        ctx.state.currentStreet,
+        classCtxEq.isInPosition,
+        ctx.legal,
+      );
+
+      if (eqResult) {
+        return {
+          frequencies: eqResult.frequencies,
+          source: "solver", // treat equity engine as better than heuristic
+        };
+      }
     }
   }
 
