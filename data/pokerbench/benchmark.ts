@@ -32,7 +32,7 @@ import {
   lookupFrequencies,
   hasTable,
 } from "../../convex/lib/gto/tables";
-import { categorizeHand } from "../../convex/lib/gto/handCategorizer";
+import { categorizeHand, type HandCategory } from "../../convex/lib/gto/handCategorizer";
 import type { ActionFrequencies } from "../../convex/lib/gto/tables/types";
 import type { Position, Street } from "../../convex/lib/types/cards";
 
@@ -157,6 +157,37 @@ function getActionProb(freq: ActionFrequencies, action: NormalizedAction): numbe
     case "call": return (f.call ?? 0) + (f.check ?? 0);
     case "raise": return (f.bet_small ?? 0) + (f.bet_medium ?? 0) + (f.bet_large ?? 0) + (f.raise ?? 0);
   }
+}
+
+// Weak hand fold calibration (mirrors modifiedGtoEngine.ts)
+const WEAK_CATS = new Set(["air", "weak_draw", "bottom_pair", "overcards", "straight_draw"]);
+const CAT_STRENGTH: Record<string, number> = {
+  sets_plus: 1.0, two_pair: 0.85, premium_pair: 0.82, overpair: 0.78,
+  top_pair_top_kicker: 0.7, top_pair_weak_kicker: 0.6, middle_pair: 0.45,
+  bottom_pair: 0.35, combo_draw: 0.5, flush_draw: 0.4, straight_draw: 0.33,
+  overcards: 0.25, weak_draw: 0.15, air: 0.05,
+};
+
+function calibrateWeakHand(freq: ActionFrequencies, category: string): ActionFrequencies {
+  if (!WEAK_CATS.has(category)) return freq;
+  const currentFold = freq.fold ?? 0;
+  if (currentFold >= 0.6) return freq;
+  const catStrength = CAT_STRENGTH[category] ?? 0.3;
+  const weakness = Math.max(0, 0.35 - catStrength);
+  const boostFactor = weakness * 1.2;
+  if (boostFactor < 0.05) return freq;
+  const result = { ...freq };
+  const foldBoost = boostFactor * (1 - currentFold);
+  result.fold = Math.min(0.95, currentFold + foldBoost);
+  const totalOther = 1 - currentFold;
+  const newTotalOther = 1 - result.fold;
+  if (totalOther > 0.01) {
+    const scale = newTotalOther / totalOther;
+    for (const key of Object.keys(result) as (keyof ActionFrequencies)[]) {
+      if (key !== "fold" && result[key]) result[key] = (result[key] ?? 0) * scale;
+    }
+  }
+  return result;
 }
 
 function frequenciesToAction(freq: ActionFrequencies): NormalizedAction {
@@ -461,9 +492,10 @@ function benchmarkPostflop(filename: string): BenchmarkResult {
       continue;
     }
 
-    const ourAction = frequenciesToAction(lookup.frequencies);
+    const calibratedFreqs = calibrateWeakHand(lookup.frequencies, handCat.category);
+    const ourAction = frequenciesToAction(calibratedFreqs);
     const solverAction = normalizeDecision(row.correctDecision);
-    const solverProb = getActionProb(lookup.frequencies, solverAction);
+    const solverProb = getActionProb(calibratedFreqs, solverAction);
 
     result.total++;
     result.solverProbSum += solverProb;
