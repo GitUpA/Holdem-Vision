@@ -10,34 +10,13 @@
 import { describe, it, expect } from "vitest";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
-import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
+import { ALL_ARCHETYPE_IDS } from "../../convex/lib/gto/archetypeClassifier";
 import { traceHand, formatHandTrace, type HandTrace } from "./handTraceRunner";
 
 const OUTPUT_DIR = join(__dirname, "output");
 const HANDS_PER_ARCHETYPE = 10;
 
-const ALL_ARCHETYPES: ArchetypeId[] = [
-  "rfi_opening",
-  "bb_defense_vs_rfi",
-  "three_bet_pots",
-  "blind_vs_blind",
-  "four_bet_five_bet",
-  "ace_high_dry_rainbow",
-  "kq_high_dry_rainbow",
-  "mid_low_dry_rainbow",
-  "paired_boards",
-  "two_tone_disconnected",
-  "two_tone_connected",
-  "monotone",
-  "rainbow_connected",
-  "cbet_sizing_frequency",
-  "turn_barreling",
-  "river_bluff_catching_mdf",
-  "thin_value_river",
-  "overbet_river",
-  "three_bet_pot_postflop",
-  "exploitative_overrides",
-];
+const ALL_ARCHETYPES = ALL_ARCHETYPE_IDS;
 
 function ensureOutputDir() {
   if (!existsSync(OUTPUT_DIR)) {

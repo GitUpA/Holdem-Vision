@@ -43,6 +43,33 @@ export type ArchetypeId =
 
 export type ArchetypeCategory = "preflop" | "flop_texture" | "postflop_principle";
 
+/** All 20 archetype IDs as a constant array — single source of truth. */
+export const ALL_ARCHETYPE_IDS: ArchetypeId[] = [
+  // Preflop (1-5)
+  "rfi_opening",
+  "bb_defense_vs_rfi",
+  "three_bet_pots",
+  "blind_vs_blind",
+  "four_bet_five_bet",
+  // Flop textures (6-13)
+  "ace_high_dry_rainbow",
+  "kq_high_dry_rainbow",
+  "mid_low_dry_rainbow",
+  "paired_boards",
+  "two_tone_disconnected",
+  "two_tone_connected",
+  "monotone",
+  "rainbow_connected",
+  // Postflop principles (14-20)
+  "cbet_sizing_frequency",
+  "turn_barreling",
+  "river_bluff_catching_mdf",
+  "thin_value_river",
+  "overbet_river",
+  "three_bet_pot_postflop",
+  "exploitative_overrides",
+];
+
 export interface ArchetypeClassification {
   archetypeId: ArchetypeId;
   confidence: number; // 0-1

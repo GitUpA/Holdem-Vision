@@ -53,6 +53,9 @@ import { buildNarrativeExplanation } from "./narrativeEngine";
 // Heuristic fallback
 import { paramsToFrequencies } from "../autoPlay";
 
+// Shared calibration
+import { calibrateWeakHandFrequencies } from "../../gto/weakHandCalibration";
+
 // ═══════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════
@@ -153,83 +156,7 @@ interface GtoBaseResult {
   handCat?: HandCategorization;
 }
 
-// ═══════════════════════════════════════════════════════
-// WEAK HAND FOLD CALIBRATION
-// ═══════════════════════════════════════════════════════
-
-/** Hand categories where the aggregate data under-folds */
-const WEAK_CATEGORIES = new Set([
-  "air", "weak_draw", "bottom_pair", "overcards", "straight_draw",
-]);
-
-/**
- * Calibrate frequencies for weak hand categories.
- *
- * The solver table and PokerBench data aggregate across many boards,
- * averaging hands that should fold on some boards and call on others.
- * For weak hands, this averaging produces "call 40%" when the specific
- * board often warrants "fold 70%+". This calibration boosts fold for
- * weak categories to align with board-specific solver behavior.
- *
- * The calibration is proportional to hand weakness and only fires
- * when the raw data says continue (fold < 60%).
- */
-function calibrateWeakHandFrequencies(
-  frequencies: ActionFrequencies,
-  handCat: HandCategorization | undefined,
-  street: string,
-): ActionFrequencies {
-  if (!handCat || street === "preflop") return frequencies;
-  if (!WEAK_CATEGORIES.has(handCat.category)) return frequencies;
-
-  const currentFold = frequencies.fold ?? 0;
-  // Only calibrate if the data says continue more than fold
-  if (currentFold >= 0.6) return frequencies;
-
-  // Calibration strength based on how weak the hand is
-  // air (0.05) gets strong boost, overcards (0.25) gets mild boost
-  const catStrength = CATEGORY_STRENGTH_MAP[handCat.category] ?? 0.3;
-  const weakness = Math.max(0, 0.35 - catStrength); // 0-0.30 range
-  const boostFactor = weakness * 1.2; // 0-0.36 range (moderate)
-
-  if (boostFactor < 0.05) return frequencies;
-
-  // Boost fold, reduce continue actions proportionally
-  const result = { ...frequencies };
-  const foldBoost = boostFactor * (1 - currentFold); // boost relative to room
-  result.fold = Math.min(0.95, currentFold + foldBoost);
-
-  // Reduce other actions proportionally
-  const totalOther = 1 - currentFold;
-  const newTotalOther = 1 - result.fold;
-  if (totalOther > 0.01) {
-    const scale = newTotalOther / totalOther;
-    for (const key of Object.keys(result) as (keyof ActionFrequencies)[]) {
-      if (key !== "fold" && result[key]) {
-        result[key] = (result[key] ?? 0) * scale;
-      }
-    }
-  }
-
-  return result;
-}
-
-const CATEGORY_STRENGTH_MAP: Record<string, number> = {
-  sets_plus: 1.0,
-  two_pair: 0.85,
-  premium_pair: 0.82,
-  overpair: 0.78,
-  top_pair_top_kicker: 0.7,
-  top_pair_weak_kicker: 0.6,
-  middle_pair: 0.45,
-  bottom_pair: 0.35,
-  combo_draw: 0.5,
-  flush_draw: 0.4,
-  straight_draw: 0.33,
-  overcards: 0.25,
-  weak_draw: 0.15,
-  air: 0.05,
-};
+// WEAK_CATEGORIES, calibrateWeakHandFrequencies, CATEGORY_STRENGTH imported from shared modules
 
 /**
  * Get GTO base frequencies — solver tables when available, heuristic fallback otherwise.
@@ -280,7 +207,7 @@ function getGtoBaseFrequencies(
 
       if (lookup) {
         return {
-          frequencies: calibrateWeakHandFrequencies(lookup.frequencies, handCat, street),
+          frequencies: calibrateWeakHandFrequencies(lookup.frequencies, handCat.category, street),
           source: "solver",
           archetype,
           handCat,
@@ -308,7 +235,7 @@ function getGtoBaseFrequencies(
       return {
         frequencies: calibrateWeakHandFrequencies(
           postflopHandClassToActionFrequencies(pbLookup),
-          pbHandCat,
+          pbHandCat.category,
           ctx.state.currentStreet,
         ),
         source: "solver",

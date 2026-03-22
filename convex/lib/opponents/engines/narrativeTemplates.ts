@@ -255,7 +255,7 @@ const TRAIT_ACTION_REASONS: Partial<Record<TraitId, TraitActionReasons>> = {
   },
   positional: {
     folds: "Out of position with a marginal hand — discretion wins",
-    checks: "Checks to use position on later streets",
+    checks: "Checks to control the pot from position",
     calls: "Calls to see how the action develops in position",
     bets: "Uses positional advantage to apply pressure",
     raises: "Raises to exploit the positional edge",
@@ -311,14 +311,41 @@ const TRAIT_ACTION_REASONS: Partial<Record<TraitId, TraitActionReasons>> = {
   },
 };
 
+/**
+ * Full context for narrative generation.
+ * When available, produces context-aware narratives instead of trait-only templates.
+ */
+export interface NarrativeContext {
+  handStrength: number;
+  handDescription: string;
+  boardWetness: number;
+  drawOuts: number;
+  bestDrawType: string;
+  potOdds: number;
+  foldEquity: number;
+  spr: number;
+  isInPosition: boolean;
+  isPreflop: boolean;
+}
+
+/**
+ * Generate context-aware primary reason for an action.
+ * Uses trait as character flavor but composes with board, hand, and street context.
+ */
 export function getPrimaryReason(
   dominantTraitId: TraitId,
   action: ActionType,
   factors?: { handStrength: number },
+  fullContext?: NarrativeContext,
 ): string {
+  // If full context available, generate context-aware narrative
+  if (fullContext) {
+    return getContextAwareReason(dominantTraitId, action, fullContext);
+  }
+
+  // Fallback to trait-only templates
   const reasons = TRAIT_ACTION_REASONS[dominantTraitId];
   if (!reasons) {
-    // Fallback for any traits not in the map
     if (action === "fold") return "Decides to fold";
     if (action === "check") return "Decides to check";
     if (action === "call") return "Decides to call";
@@ -329,7 +356,6 @@ export function getPrimaryReason(
   if (action === "fold") return reasons.folds;
   if (action === "check") return reasons.checks;
   if (action === "call") {
-    // For hand-reader trait, use strength-aware text
     if (dominantTraitId === "hand-reader" && factors) {
       if (factors.handStrength > 0.6) return "Hand strength justifies continuing in this spot";
       if (factors.handStrength >= 0.3) return "Marginal hand — proceeding with caution";
@@ -340,6 +366,117 @@ export function getPrimaryReason(
   if (action === "bet") return reasons.bets;
   if (action === "raise" || action === "all_in") return reasons.raises;
   return reasons.calls;
+}
+
+// ═══════════════════════════════════════════════════════
+// CONTEXT-AWARE NARRATIVE GENERATION
+// ═══════════════════════════════════════════════════════
+
+function getContextAwareReason(
+  traitId: TraitId,
+  action: ActionType,
+  ctx: NarrativeContext,
+): string {
+  const hand = ctx.handDescription;
+  const boardNote = ctx.isPreflop ? "" : getBoardNote(ctx);
+  const streetNote = ctx.isPreflop ? "preflop" : "";
+
+  // FOLD — why are we giving up?
+  if (action === "fold") {
+    if (ctx.handStrength < 0.15) {
+      return `${hand} can't compete here — folding is the clear play`;
+    }
+    if (ctx.potOdds > 0.3) {
+      return `The price is too high for ${hand}${boardNote}`;
+    }
+    if (traitId === "cautious") {
+      return `${hand} isn't strong enough for a cautious player to continue`;
+    }
+    return `${hand} doesn't warrant continuing${boardNote}`;
+  }
+
+  // CHECK — what are we accomplishing?
+  if (action === "check") {
+    if (ctx.handStrength > 0.7) {
+      return `Checks ${hand} to trap — the hand is strong enough to slowplay${boardNote}`;
+    }
+    if (ctx.handStrength > 0.4) {
+      return `Checks for pot control with ${hand}${boardNote}`;
+    }
+    if (ctx.drawOuts > 6) {
+      return `Checks to see a free card with ${ctx.bestDrawType}`;
+    }
+    if (traitId === "passive") {
+      return `Checks — prefers to keep the pot small with ${hand}`;
+    }
+    return `Checks with ${hand} — not strong enough to bet for value`;
+  }
+
+  // CALL — why continue without raising?
+  if (action === "call") {
+    if (ctx.drawOuts > 8) {
+      return `Calls with ${ctx.bestDrawType} (${ctx.drawOuts} outs) — the price is right to draw`;
+    }
+    if (ctx.potOdds > 0 && ctx.potOdds < 0.25) {
+      return `Getting good odds to call with ${hand}`;
+    }
+    if (ctx.handStrength > 0.6) {
+      return `Calls with ${hand} — strong but not raising to keep opponents in`;
+    }
+    if (traitId === "sticky" || traitId === "call-heavy") {
+      return `Calls with ${hand} — prefers calling over folding in most spots`;
+    }
+    return `Calls with ${hand}${boardNote}`;
+  }
+
+  // BET — what story are we telling?
+  if (action === "bet") {
+    if (ctx.handStrength > 0.75) {
+      return `Bets ${hand} for value${boardNote}`;
+    }
+    if (ctx.drawOuts > 6) {
+      return `Semi-bluffs with ${ctx.bestDrawType}${boardNote} — fold equity plus draw equity`;
+    }
+    if (ctx.handStrength < 0.2 && ctx.foldEquity > 0.4) {
+      return `Bluffs with ${hand} — opponents likely to fold${boardNote}`;
+    }
+    if (ctx.handStrength > 0.4) {
+      return `Bets ${hand} for thin value${boardNote}`;
+    }
+    if (traitId === "aggressive") {
+      return `Applies pressure with ${hand}${boardNote}`;
+    }
+    return `Bets with ${hand}${boardNote}`;
+  }
+
+  // RAISE / ALL-IN — escalation
+  if (action === "raise" || action === "all_in") {
+    if (ctx.handStrength > 0.8) {
+      return `Raises for value with ${hand} — building the pot with a strong hand`;
+    }
+    if (ctx.drawOuts > 8) {
+      return `Raises as a semi-bluff with ${ctx.bestDrawType} — combining fold equity and draw equity`;
+    }
+    if (ctx.handStrength < 0.2 && ctx.foldEquity > 0.5) {
+      return `Raises as a bluff — representing a strong hand${boardNote}`;
+    }
+    if (ctx.spr < 3) {
+      return `Raises with ${hand} — short stacks demand commitment`;
+    }
+    if (ctx.isPreflop) {
+      return `Raises ${hand} ${ctx.isInPosition ? "in position" : "from early position"}`;
+    }
+    return `Raises with ${hand}${boardNote}`;
+  }
+
+  return `Continues with ${hand}`;
+}
+
+function getBoardNote(ctx: NarrativeContext): string {
+  if (ctx.isPreflop) return "";
+  if (ctx.boardWetness > 0.6) return " on this wet board";
+  if (ctx.boardWetness < 0.2) return " on this dry board";
+  return "";
 }
 
 // ═══════════════════════════════════════════════════════

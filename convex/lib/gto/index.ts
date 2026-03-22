@@ -9,6 +9,7 @@ export {
   derivePotType,
   deriveIsAggressor,
   deriveIsInPosition,
+  ALL_ARCHETYPE_IDS,
   type ArchetypeId,
   type ArchetypeCategory,
   type ArchetypeClassification,

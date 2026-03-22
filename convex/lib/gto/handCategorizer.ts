@@ -16,6 +16,7 @@ import type { CardIndex } from "../types/cards";
 import { rankValue, suitValue } from "../primitives/card";
 import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
 import { detectDraws, type DrawInfo } from "../opponents/engines/drawDetector";
+import { CATEGORY_STRENGTH } from "./categoryStrength";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -44,23 +45,7 @@ export interface HandCategorization {
   description: string;
 }
 
-// Strength ordering for frequency table lookups / fallback matching
-const CATEGORY_STRENGTH: Record<HandCategory, number> = {
-  sets_plus: 1.0,
-  two_pair: 0.85,
-  premium_pair: 0.82,
-  overpair: 0.78,
-  top_pair_top_kicker: 0.7,
-  top_pair_weak_kicker: 0.6,
-  middle_pair: 0.45,
-  bottom_pair: 0.35,
-  combo_draw: 0.5,
-  flush_draw: 0.4,
-  straight_draw: 0.33,
-  overcards: 0.25,
-  weak_draw: 0.15,
-  air: 0.05,
-};
+// CATEGORY_STRENGTH imported from ./categoryStrength (single source of truth)
 
 // ═══════════════════════════════════════════════════════
 // MAIN CLASSIFIER

@@ -64,7 +64,18 @@ export function interpretSituation(
 
   // Build primary and secondary reasons
   const primaryReason = dominantTrait
-    ? getPrimaryReason(dominantTrait.id, action, { handStrength: factors.handStrength })
+    ? getPrimaryReason(dominantTrait.id, action, { handStrength: factors.handStrength }, {
+        handStrength: factors.handStrength,
+        handDescription: factors.handDescription,
+        boardWetness: factors.boardWetness,
+        drawOuts: factors.drawOuts,
+        bestDrawType: factors.bestDrawType,
+        potOdds: factors.potOdds,
+        foldEquity: factors.foldEquity,
+        spr: factors.spr,
+        isInPosition: factors.isInPosition,
+        isPreflop: factors.isPreflop,
+      })
     : action === "fold" ? "Decides to fold" : "Decides to continue";
 
   const secondaryReasons = buildSecondaryReasons(activeTraits, factors);

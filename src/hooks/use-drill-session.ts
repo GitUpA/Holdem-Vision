@@ -20,7 +20,7 @@ import type { GameState } from "../../convex/lib/state/gameState";
 import { currentLegalActions } from "../../convex/lib/state/stateMachine";
 import { HandSession } from "../../convex/lib/session/handSession";
 import { PRESET_PROFILES } from "../../convex/lib/opponents/presets";
-import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
+import { ALL_ARCHETYPE_IDS, type ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
 import type { GtoAction } from "../../convex/lib/gto/tables/types";
 import type { ConstrainedDeal } from "../../convex/lib/gto/constrainedDealer";
 import { gtoActionToGameAction } from "../../convex/lib/gto/actionMapping";
@@ -170,13 +170,7 @@ export function useDrillSession(
       // Interleaved mode: rotate through all archetypes
       if (archetypeId === INTERLEAVED) {
         interleavedRef.current = true;
-        archetypePoolRef.current = [
-          "rfi_opening", "bb_defense_vs_rfi", "three_bet_pots", "blind_vs_blind", "four_bet_five_bet",
-          "ace_high_dry_rainbow", "kq_high_dry_rainbow", "mid_low_dry_rainbow", "paired_boards",
-          "two_tone_disconnected", "two_tone_connected", "monotone", "rainbow_connected",
-          "cbet_sizing_frequency", "turn_barreling", "river_bluff_catching_mdf",
-          "thin_value_river", "overbet_river", "three_bet_pot_postflop", "exploitative_overrides",
-        ];
+        archetypePoolRef.current = [...ALL_ARCHETYPE_IDS];
         // Pick the first one randomly
         archetypeRef.current = archetypePoolRef.current[
           Math.floor(Math.random() * archetypePoolRef.current.length)
