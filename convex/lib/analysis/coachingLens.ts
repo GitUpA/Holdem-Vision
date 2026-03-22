@@ -68,6 +68,12 @@ export interface CoachingSolverData {
   accuracyImpact?: AccuracyImpact;
   /** Preflop confidence based on sample count */
   preflopConfidence?: import("../gto/tables").PreflopConfidence;
+  /** Whether this is a mixed strategy spot (two actions both > 25%, gap < 20%) */
+  isMixedStrategy?: boolean;
+  /** Alternative actions that are also correct in this spot */
+  alternativeActions?: GtoAction[];
+  /** Plain-language explanation of the tradeoff between actions */
+  tradeoffExplanation?: string;
 }
 
 export interface CoachingAdvice {
@@ -232,6 +238,44 @@ function emptyResult(context: AnalysisContext): AnalysisResult<CoachingValue> {
   };
 }
 
+/** Action-pair tradeoff explanations for mixed strategy spots */
+const MIXED_TRADEOFFS: Record<string, string> = {
+  "bet-check": "Betting pressures opponents and builds the pot, but checking disguises your hand and controls pot size",
+  "check-bet": "Checking disguises your hand and controls pot size, but betting pressures opponents and builds the pot",
+  "raise-call": "Raising builds the pot and shows strength, but calling keeps more hands in and disguises your holding",
+  "call-raise": "Calling keeps more hands in and disguises your holding, but raising builds the pot and shows strength",
+  "call-fold": "The price is close — calling captures pot odds, but folding avoids a marginal spot",
+  "fold-call": "The hand is borderline — folding avoids a marginal spot, but calling captures pot odds",
+};
+
+/**
+ * Enrich CoachingSolverData with mixed strategy detection.
+ */
+function enrichWithMixedStrategy(data: CoachingSolverData): void {
+  const sorted = Object.entries(data.frequencies)
+    .filter(([, v]) => (v ?? 0) > 0.01)
+    .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0));
+
+  if (sorted.length < 2) return;
+
+  const [, topFreq] = [sorted[0][0], sorted[0][1] ?? 0];
+  const [secondAction, secondFreq] = [sorted[1][0], sorted[1][1] ?? 0];
+  const gap = topFreq - secondFreq;
+
+  if (secondFreq >= 0.25 && gap < 0.20) {
+    data.isMixedStrategy = true;
+    data.alternativeActions = sorted
+      .slice(1)
+      .filter(([, v]) => (v ?? 0) >= 0.20)
+      .map(([a]) => a as GtoAction);
+
+    const normTop = data.optimalAction.replace(/_.*/, "");
+    const normSecond = secondAction.replace(/_.*/, "");
+    data.tradeoffExplanation = MIXED_TRADEOFFS[`${normTop}-${normSecond}`]
+      ?? `Both ${normTop} and ${normSecond} are valid in this spot — GTO mixes between them`;
+  }
+}
+
 /**
  * Try to produce GTO coaching advice using solver frequency tables.
  * Returns a CoachingAdvice if solver data is available for this spot,
@@ -286,6 +330,7 @@ function tryGtoSolverLookup(
         resolvedCategory: handCat.category,
         preflopConfidence: getPreflopConfidence(hcLookup),
       };
+      enrichWithMixedStrategy(solverData);
 
       return {
         profileName: "GTO",
@@ -332,16 +377,20 @@ function tryGtoSolverLookup(
           actionType: gameAction.actionType,
           amount: gameAction.amount,
           explanation,
-          solverData: {
-            frequencies: remappedFreqs,
-            optimalAction: optAction as GtoAction,
-            optimalFrequency: optFreq,
-            availableActions: Object.keys(remappedFreqs).filter(
-              (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
-            ) as GtoAction[],
-            isExactMatch: false,
-            resolvedCategory: handCat.category,
-          },
+          solverData: (() => {
+            const sd: CoachingSolverData = {
+              frequencies: remappedFreqs,
+              optimalAction: optAction as GtoAction,
+              optimalFrequency: optFreq,
+              availableActions: Object.keys(remappedFreqs).filter(
+                (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
+              ) as GtoAction[],
+              isExactMatch: false,
+              resolvedCategory: handCat.category,
+            };
+            enrichWithMixedStrategy(sd);
+            return sd;
+          })(),
         };
       }
     }
@@ -411,6 +460,7 @@ function tryGtoSolverLookup(
     bands: remappedBands,
     archetypeAccuracy: lookup.archetypeAccuracy,
   };
+  enrichWithMixedStrategy(solverData);
 
   return {
     profileName: "GTO",
@@ -512,16 +562,20 @@ function tryEquityFallback(
     engineId: "equity-engine",
     actionType: topAction,
     explanation: result.explanation,
-    solverData: {
-      frequencies: remappedFreqs,
-      optimalAction: Object.entries(remappedFreqs).sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))[0]?.[0] as GtoAction ?? "fold",
-      optimalFrequency: topFreq,
-      availableActions: Object.keys(remappedFreqs).filter(
-        (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
-      ) as GtoAction[],
-      isExactMatch: false,
-      resolvedCategory: "equity-based",
-    },
+    solverData: (() => {
+      const sd: CoachingSolverData = {
+        frequencies: remappedFreqs,
+        optimalAction: Object.entries(remappedFreqs).sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))[0]?.[0] as GtoAction ?? "fold",
+        optimalFrequency: topFreq,
+        availableActions: Object.keys(remappedFreqs).filter(
+          (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
+        ) as GtoAction[],
+        isExactMatch: false,
+        resolvedCategory: "equity-based",
+      };
+      enrichWithMixedStrategy(sd);
+      return sd;
+    })(),
   };
 }
 

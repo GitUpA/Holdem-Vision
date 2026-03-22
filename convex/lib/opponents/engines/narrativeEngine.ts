@@ -24,6 +24,7 @@ import { interpretSituation } from "./narrativeInterpreter";
 import { actionVerb } from "./narrativeTemplates";
 import { formatSituation } from "./types";
 import { getModifierMap } from "./modifierProfiles";
+import type { ActionFrequencies } from "../../gto/tables/types";
 
 // ═══════════════════════════════════════════════════════
 // MAIN ENTRY POINT
@@ -65,11 +66,14 @@ export function buildNarrativeExplanation(input: NarrativeInput): RenderedNarrat
     previousArc,
   );
 
+  // Detect mixed strategy from GTO base
+  const mixed = detectMixedStrategy(gtoFrequencies);
+
   // Build the one-liner
-  const oneLiner = buildOneLiner(narrativeProfile, action.actionType, interpretation);
+  const oneLiner = buildOneLiner(narrativeProfile, action.actionType, interpretation, mixed);
 
   // Build the full paragraph
-  const paragraph = buildParagraph(narrativeProfile, action, interpretation, factors);
+  const paragraph = buildParagraph(narrativeProfile, action, interpretation, factors, mixed);
 
   // Build the ExplanationNode tree (preserving existing tag structure)
   const profileName = input.profileName ?? profileId.toUpperCase();
@@ -77,7 +81,7 @@ export function buildNarrativeExplanation(input: NarrativeInput): RenderedNarrat
   const explanationTree = buildExplanationTree(
     narrativeProfile, action, interpretation, factors,
     gtoFrequencies, modifiedFrequencies, gtoSource, situationKey,
-    profileName, baseModifier.deviationReason, isGtoProfile,
+    profileName, baseModifier.deviationReason, isGtoProfile, mixed,
   );
 
   return {
@@ -93,6 +97,56 @@ export function buildNarrativeExplanation(input: NarrativeInput): RenderedNarrat
 }
 
 // ═══════════════════════════════════════════════════════
+// MIXED STRATEGY DETECTION
+// ═══════════════════════════════════════════════════════
+
+interface MixedStrategyInfo {
+  isMixed: boolean;
+  topAction: string;
+  topFreq: number;
+  secondAction: string;
+  secondFreq: number;
+  tradeoffNote: string;
+}
+
+/** Action-pair tradeoff explanations — what each action "says" differently */
+const ACTION_TRADEOFFS: Record<string, string> = {
+  "bet-check": "Betting pressures opponents and builds the pot, but checking disguises your hand and controls pot size",
+  "check-bet": "Checking disguises your hand and controls pot size, but betting pressures opponents and builds the pot",
+  "raise-call": "Raising builds the pot and shows strength, but calling keeps more hands in and disguises your holding",
+  "call-raise": "Calling keeps more hands in and disguises your holding, but raising builds the pot and shows strength",
+  "bet-fold": "Betting applies pressure with fold equity, but folding conserves chips when the odds aren't there",
+  "fold-call": "The hand is borderline — folding avoids a marginal spot, but calling captures pot odds",
+  "call-fold": "The price is close — calling captures pot odds, but folding avoids a marginal spot",
+  "raise-fold": "Either go big or go home — raising maximizes fold equity, but folding accepts the spot isn't profitable",
+};
+
+function detectMixedStrategy(frequencies: ActionFrequencies): MixedStrategyInfo {
+  const sorted = Object.entries(frequencies)
+    .filter(([, v]) => (v ?? 0) > 0.01)
+    .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0));
+
+  if (sorted.length < 2) {
+    return { isMixed: false, topAction: sorted[0]?.[0] ?? "", topFreq: sorted[0]?.[1] ?? 0, secondAction: "", secondFreq: 0, tradeoffNote: "" };
+  }
+
+  const [topAction, topFreq] = [sorted[0][0], sorted[0][1] ?? 0];
+  const [secondAction, secondFreq] = [sorted[1][0], sorted[1][1] ?? 0];
+  const gap = topFreq - secondFreq;
+  const isMixed = secondFreq >= 0.25 && gap < 0.20;
+
+  // Normalize action names for tradeoff lookup (strip sizing suffixes)
+  const normTop = topAction.replace(/_.*/, "");
+  const normSecond = secondAction.replace(/_.*/, "");
+  const key = `${normTop}-${normSecond}`;
+  const tradeoffNote = isMixed
+    ? (ACTION_TRADEOFFS[key] ?? `Both ${normTop} and ${normSecond} are valid here`)
+    : "";
+
+  return { isMixed, topAction, topFreq, secondAction, secondFreq, tradeoffNote };
+}
+
+// ═══════════════════════════════════════════════════════
 // ONE-LINER
 // ═══════════════════════════════════════════════════════
 
@@ -100,12 +154,17 @@ function buildOneLiner(
   profile: NarrativeProfile,
   actionType: string,
   interpretation: ReturnType<typeof interpretSituation>,
+  mixed: MixedStrategyInfo,
 ): string {
   const verb = actionVerb(actionType as import("../../state/game-state").ActionType);
-  if (interpretation.contextOverride) {
-    return `${verb} — ${interpretation.contextOverride.toLowerCase()}`;
+  const reason = interpretation.contextOverride ?? interpretation.primaryReason;
+
+  if (mixed.isMixed) {
+    const altVerb = actionVerb(mixed.secondAction.replace(/_.*/, "") as import("../../state/game-state").ActionType);
+    return `${verb} — ${reason.toLowerCase()} (close spot: ${altVerb.toLowerCase()} also works)`;
   }
-  return `${verb} — ${interpretation.primaryReason.toLowerCase()}`;
+
+  return `${verb} — ${reason.toLowerCase()}`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -117,6 +176,7 @@ function buildParagraph(
   action: NarrativeInput["action"],
   interpretation: ReturnType<typeof interpretSituation>,
   _factors: NarrativeInput["factors"],
+  mixed: MixedStrategyInfo,
 ): string {
   const parts: string[] = [];
 
@@ -133,6 +193,11 @@ function buildParagraph(
   const verb = actionVerb(action.actionType as import("../../state/game-state").ActionType, "present");
   const amount = action.amount ? ` ${action.amount}` : "";
   parts.push(`${verb}${amount} — ${interpretation.primaryReason.toLowerCase()}.`);
+
+  // Mixed strategy tradeoff
+  if (mixed.isMixed && mixed.tradeoffNote) {
+    parts.push(`This is a close spot. ${mixed.tradeoffNote}.`);
+  }
 
   // Context override if present
   if (interpretation.contextOverride) {
@@ -163,6 +228,7 @@ function buildExplanationTree(
   profileName: string,
   deviationReason: string,
   isGtoProfile: boolean,
+  mixed: MixedStrategyInfo,
 ): ExplanationNode {
   const situationLabel = formatSituation(situationKey);
   const verb = actionVerb(action.actionType as import("../../state/game-state").ActionType);
@@ -230,6 +296,16 @@ function buildExplanationTree(
     children: narrativeChildren,
     tags: ["narrative"],
   });
+
+  // Mixed strategy tradeoff node
+  if (mixed.isMixed) {
+    children.push({
+      summary: `Close spot: ${mixed.topAction} ${(mixed.topFreq * 100).toFixed(0)}% / ${mixed.secondAction} ${(mixed.secondFreq * 100).toFixed(0)}%`,
+      detail: mixed.tradeoffNote || "Both actions are correct — GTO mixes between them",
+      sentiment: "neutral",
+      tags: ["mixed-strategy", "tradeoff"],
+    });
+  }
 
   // GTO base frequencies (preserved for backward compat)
   const gtoChildren: ExplanationNode[] = Object.entries(gtoFrequencies)
