@@ -28,6 +28,7 @@ import {
   scoreAction,
   type ActionScore,
 } from "../../convex/lib/gto/evScoring";
+import type { NarrativeIntentId } from "../../convex/lib/gto/narrativePrompts";
 import {
   executeDrillPipeline,
   streetFromCommunityCount,
@@ -62,6 +63,8 @@ export interface DrillSessionState {
   /** Full GTO solution — available from the moment the hand is dealt */
   solution: SpotSolution | null;
   progress: DrillProgress;
+  /** User's narrative choice (quiz mode) — null if not yet chosen */
+  narrativeChoice: NarrativeIntentId | null;
 }
 
 export interface DrillSessionActions {
@@ -69,6 +72,8 @@ export interface DrillSessionActions {
   act: (gtoAction: GtoAction) => void;
   nextHand: () => void;
   resetDrill: () => void;
+  /** Set the user's narrative intent before acting */
+  setNarrativeChoice: (id: NarrativeIntentId) => void;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -93,6 +98,7 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
   const currentDealRef = useRef<ConstrainedDeal | null>(null);
   const solutionRef = useRef<SpotSolution | null>(null);
   const rngRef = useRef(() => Math.random());
+  const narrativeChoiceRef = useRef<NarrativeIntentId | null>(null);
 
   // ── Derived state ──
 
@@ -124,6 +130,7 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
 
     currentDealRef.current = result.deal;
     currentScoreRef.current = null;
+    narrativeChoiceRef.current = null;
     solutionRef.current = result.solution;
 
     phaseRef.current = "ready";
@@ -242,9 +249,14 @@ export function useDrillSession(): DrillSessionState & DrillSessionActions {
     gameState: sessionRef.current?.state ?? null,
     solution: solutionRef.current,
     progress: getProgress(),
+    narrativeChoice: narrativeChoiceRef.current,
     startDrill,
     act,
     nextHand,
     resetDrill,
+    setNarrativeChoice: (id: NarrativeIntentId) => {
+      narrativeChoiceRef.current = id;
+      rerender();
+    },
   };
 }

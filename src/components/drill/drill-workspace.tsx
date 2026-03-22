@@ -22,6 +22,7 @@ import { ScoreDisplay } from "./score-display";
 import { SolutionDisplay } from "./solution-display";
 import { DrillGuideDrawer } from "./drill-guide-drawer";
 import { NarrativeBoardContext } from "./narrative-board-context";
+import { NarrativePrompt } from "./narrative-prompt";
 
 // ═══════════════════════════════════════════════════════
 // ARCHETYPE DEFINITIONS
@@ -362,6 +363,18 @@ function ActiveDrill({
           solution={drill.solution}
           userAction={drill.currentScore?.userAction}
           score={drill.currentScore}
+        />
+      )}
+
+      {/* Narrative prompt — quiz mode only, before acting */}
+      {drill.phase === "ready" && drillMode === "quiz" && drill.solution && drill.currentDeal && (
+        <NarrativePrompt
+          handCategory={drill.currentDeal.handCategory}
+          isInPosition={drill.currentDeal.isInPosition}
+          isPreflop={drill.currentDeal.archetype.category === "preflop"}
+          frequencies={drill.solution.frequencies}
+          selectedIntent={drill.narrativeChoice}
+          onSelect={drill.setNarrativeChoice}
         />
       )}
 
