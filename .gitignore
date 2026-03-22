@@ -58,3 +58,4 @@ convex/_generated
 
 # external datasets — raw CSVs/JSONs excluded, scripts + parsed tables committed
 /data/pokerbench/dataset/
+tests/scenarios/output/
