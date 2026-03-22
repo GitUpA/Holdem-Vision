@@ -51,9 +51,14 @@ export interface DrillProgress {
   blunder: number;
 }
 
+/** Special sentinel for interleaved mode */
+export const INTERLEAVED = "__interleaved__" as const;
+
 export interface DrillSessionState {
   phase: DrillPhase;
   archetypeId: ArchetypeId | null;
+  /** True when drilling across mixed archetypes */
+  isInterleaved: boolean;
   handsPlayed: number;
   handsTarget: number;
   scores: ActionScore[];
@@ -68,7 +73,7 @@ export interface DrillSessionState {
 }
 
 export interface DrillSessionActions {
-  startDrill: (archetypeId: ArchetypeId, handsTarget?: number) => void;
+  startDrill: (archetypeId: ArchetypeId | typeof INTERLEAVED, handsTarget?: number) => void;
   act: (gtoAction: GtoAction) => void;
   nextHand: () => void;
   resetDrill: () => void;
@@ -110,6 +115,8 @@ export function useDrillSession(
   const rngRef = useRef(() => Math.random());
   const narrativeChoiceRef = useRef<NarrativeIntentId | null>(null);
   const startTimeRef = useRef(0);
+  const interleavedRef = useRef(false);
+  const archetypePoolRef = useRef<ArchetypeId[]>([]);
 
   // ── Derived state ──
 
@@ -126,7 +133,15 @@ export function useDrillSession(
   // ── Deal a single hand (delegates to shared pipeline) ──
 
   const dealNextHand = useCallback(() => {
-    const archId = archetypeRef.current;
+    let archId = archetypeRef.current;
+
+    // Interleaved mode: pick a random archetype from the pool each hand
+    if (interleavedRef.current && archetypePoolRef.current.length > 0) {
+      const pool = archetypePoolRef.current;
+      archId = pool[Math.floor(rngRef.current() * pool.length)];
+      archetypeRef.current = archId; // update for scoring/display
+    }
+
     if (!archId || !sessionRef.current) return;
 
     phaseRef.current = "dealing";
@@ -151,8 +166,27 @@ export function useDrillSession(
   // ── Public API ──
 
   const startDrill = useCallback(
-    (archetypeId: ArchetypeId, handsTarget = 10) => {
-      archetypeRef.current = archetypeId;
+    (archetypeId: ArchetypeId | typeof INTERLEAVED, handsTarget = 10) => {
+      // Interleaved mode: rotate through all archetypes
+      if (archetypeId === INTERLEAVED) {
+        interleavedRef.current = true;
+        archetypePoolRef.current = [
+          "rfi_opening", "bb_defense_vs_rfi", "three_bet_pots", "blind_vs_blind", "four_bet_five_bet",
+          "ace_high_dry_rainbow", "kq_high_dry_rainbow", "mid_low_dry_rainbow", "paired_boards",
+          "two_tone_disconnected", "two_tone_connected", "monotone", "rainbow_connected",
+          "cbet_sizing_frequency", "turn_barreling", "river_bluff_catching_mdf",
+          "thin_value_river", "overbet_river", "three_bet_pot_postflop", "exploitative_overrides",
+        ];
+        // Pick the first one randomly
+        archetypeRef.current = archetypePoolRef.current[
+          Math.floor(Math.random() * archetypePoolRef.current.length)
+        ];
+      } else {
+        interleavedRef.current = false;
+        archetypePoolRef.current = [];
+        archetypeRef.current = archetypeId;
+      }
+
       handsTargetRef.current = handsTarget;
       handsPlayedRef.current = 0;
       scoresRef.current = [];
@@ -262,6 +296,7 @@ export function useDrillSession(
   return {
     phase: phaseRef.current,
     archetypeId: archetypeRef.current,
+    isInterleaved: interleavedRef.current,
     handsPlayed: handsPlayedRef.current,
     handsTarget: handsTargetRef.current,
     scores: scoresRef.current,

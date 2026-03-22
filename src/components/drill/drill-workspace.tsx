@@ -15,7 +15,7 @@ import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ArchetypeId, ArchetypeCategory } from "../../../convex/lib/gto/archetypeClassifier";
 import { hasTable, hasAnyTableForStreet } from "../../../convex/lib/gto/tables/tableRegistry";
-import { useDrillSession, type OnSessionComplete } from "@/hooks/use-drill-session";
+import { useDrillSession, type OnSessionComplete, INTERLEAVED } from "@/hooks/use-drill-session";
 import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { HandStateViewer } from "../replay/hand-state-viewer";
@@ -206,12 +206,12 @@ function ArchetypeSelector({
   onModeChange,
   onOpenGuide,
 }: {
-  onStart: (id: ArchetypeId, count?: number) => void;
+  onStart: (id: ArchetypeId | typeof INTERLEAVED, count?: number) => void;
   drillMode: DrillMode;
   onModeChange: (mode: DrillMode) => void;
   onOpenGuide: () => void;
 }) {
-  const [selected, setSelected] = useState<ArchetypeId | null>(null);
+  const [selected, setSelected] = useState<ArchetypeId | typeof INTERLEAVED | null>(null);
   const [handCount, setHandCount] = useState(10);
 
   const categories: ArchetypeCategory[] = ["preflop", "flop_texture", "postflop_principle"];
@@ -233,6 +233,23 @@ function ArchetypeSelector({
           <span className="text-xs font-bold">?</span>
         </button>
       </div>
+
+      {/* Interleaved option */}
+      <button
+        onClick={() => setSelected(INTERLEAVED)}
+        className={`
+          w-full text-left px-4 py-3 rounded-lg border text-sm transition-all
+          ${selected === INTERLEAVED
+            ? "border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]"
+            : "border-[var(--border)] text-[var(--foreground)] hover:border-[var(--gold-dim)]"
+          }
+        `}
+      >
+        <span className="font-semibold">Mixed / Interleaved</span>
+        <span className="block text-[10px] text-[var(--muted-foreground)] mt-0.5">
+          Random archetypes each hand — best for long-term learning
+        </span>
+      </button>
 
       {categories.map((cat) => (
         <div key={cat} className="space-y-2">
@@ -365,10 +382,10 @@ function ActiveDrill({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-[var(--foreground)]">
-                {archetypeLabel(drill.archetypeId)}
+                {drill.isInterleaved ? "Mixed Drill" : archetypeLabel(drill.archetypeId)}
               </h2>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20 font-medium">
-                {archetypeCategoryLabel(drill.archetypeId)}
+                {drill.isInterleaved ? archetypeLabel(drill.archetypeId) : archetypeCategoryLabel(drill.archetypeId)}
               </span>
             </div>
             <button
