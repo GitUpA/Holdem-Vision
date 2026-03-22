@@ -14,7 +14,7 @@ import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
 import { traceHand, formatHandTrace, type HandTrace } from "./handTraceRunner";
 
 const OUTPUT_DIR = join(__dirname, "output");
-const HANDS_PER_ARCHETYPE = 5;
+const HANDS_PER_ARCHETYPE = 10;
 
 const ALL_ARCHETYPES: ArchetypeId[] = [
   "rfi_opening",
