@@ -15,7 +15,8 @@ import type { ActionFrequencies } from "../../convex/lib/gto/tables/types";
 import type { Street } from "../../convex/lib/types/cards";
 import type { GameState, ActionType, GamePhase } from "../../convex/lib/state/game-state";
 import type { OpponentProfile } from "../../convex/lib/types/opponents";
-import { executeDrillPipeline } from "../../convex/lib/gto/drillPipeline";
+import { createDrillSession, computeSolution } from "../../convex/lib/gto/drillPipeline";
+import { dealForArchetype, type DrillConstraints } from "../../convex/lib/gto/constrainedDealer";
 import { analyzeBoard } from "../../convex/lib/opponents/engines/boardTexture";
 import { chooseActionFromProfile } from "../../convex/lib/opponents/autoPlay";
 import { currentLegalActions, applyAction } from "../../convex/lib/state/state-machine";
@@ -66,9 +67,18 @@ export interface DecisionTrace {
   // Engine reasoning
   explanationSummary: string;
   gtoBaseFrequencies?: ActionFrequencies;
+  modifiedFrequencies?: ActionFrequencies;
   gtoSource?: string;        // "solver" | "heuristic"
   handStrength?: number;
   handDescription?: string;
+  boardWetness?: number;
+  potOdds?: number;
+  foldEquity?: number;
+  spr?: number;
+  isInPosition?: boolean;
+  modifierIntensity?: number;
+  effectiveFoldScale?: number;
+  effectiveAggressionScale?: number;
 }
 
 /** All decisions on one street */
@@ -133,10 +143,23 @@ export interface HandTrace {
   // Coaching at hero's decision point(s)
   coaching: CoachingTrace[];
 
+  // GTO solution for the target decision point (if hand reaches it)
+  solution?: {
+    frequencies: ActionFrequencies;
+    optimalAction: string;
+    optimalFrequency: number;
+    resolvedCategory: string;
+    isExactMatch: boolean;
+  };
+
+  // Target archetype info
+  targetStreet: string;
+
   // Outcome
   outcome: {
     phase: GamePhase;
     finalPotBB: number;
+    reachedTargetStreet: boolean;
     winners?: string[];  // seat labels that won
   };
 
@@ -203,10 +226,16 @@ export function traceHand(config: HandTraceConfig): HandTrace {
   const rng = seededRng(config.seed);
   const flags: string[] = [];
 
-  // ── Deal ──
-  const result = executeDrillPipeline(config.archetypeId, rng);
-  const { deal, session } = result;
-  let state = result.state;
+  // ── Deal (constrained for archetype, but DON'T auto-advance) ──
+  const deal = dealForArchetype({ archetypeId: config.archetypeId } as DrillConstraints, rng);
+  const session = createDrillSession(deal);
+
+  // Start the hand — posts blinds, deals cards, but no actions yet
+  session.startHand(undefined, deal.cardOverrides, deal.communityCards);
+
+  const initialState = session.state;
+  if (!initialState) throw new Error("No state after startHand");
+  let state: GameState = initialState;
 
   const bb = state.blinds.big;
   const heroSeat = deal.heroSeatIndex;
@@ -323,9 +352,18 @@ export function traceHand(config: HandTraceConfig): HandTrace {
       characterLabel: decision.narrative?.character?.label ?? "",
       explanationSummary: decision.explanationNode?.summary ?? decision.explanation ?? "",
       gtoBaseFrequencies: decision.reasoning?.gtoBaseFrequencies as ActionFrequencies | undefined,
+      modifiedFrequencies: decision.reasoning?.frequencies as ActionFrequencies | undefined,
       gtoSource: decision.reasoning?.gtoSource as string | undefined,
       handStrength: decision.reasoning?.handStrength as number | undefined,
       handDescription: decision.reasoning?.handDescription as string | undefined,
+      boardWetness: decision.reasoning?.boardWetness as number | undefined,
+      potOdds: decision.reasoning?.potOdds as number | undefined,
+      foldEquity: decision.reasoning?.foldEquity as number | undefined,
+      spr: decision.reasoning?.spr as number | undefined,
+      isInPosition: decision.reasoning?.isInPosition as boolean | undefined,
+      modifierIntensity: decision.reasoning?.modifierIntensity as number | undefined,
+      effectiveFoldScale: decision.reasoning?.effectiveFoldScale as number | undefined,
+      effectiveAggressionScale: decision.reasoning?.effectiveAggressionScale as number | undefined,
     };
     currentStreetDecisions.push(trace);
 
@@ -333,7 +371,7 @@ export function traceHand(config: HandTraceConfig): HandTrace {
     try {
       const result = applyAction(state, actingSeat, decision.actionType, decision.amount);
       state = result.state;
-    } catch (err) {
+    } catch (_err) {
       flags.push(`ACTION_ERROR:${seatLabel(actingSeat, heroSeat)}_${decision.actionType}_${state.currentStreet}`);
       break;
     }
@@ -348,6 +386,33 @@ export function traceHand(config: HandTraceConfig): HandTrace {
     flags.push("MAX_ACTIONS_REACHED");
   }
 
+  // Compute target street and solution
+  const targetStreet = deal.communityCards.length === 0 ? "preflop"
+    : deal.communityCards.length <= 3 ? "flop"
+    : deal.communityCards.length === 4 ? "turn" : "river";
+
+  const reachedTargetStreet = streets.some((s) => s.street === targetStreet);
+  if (!reachedTargetStreet && deal.archetype.category !== "preflop") {
+    flags.push(`ENDED_BEFORE_TARGET:${targetStreet}`);
+  }
+
+  // GTO solution for the target spot
+  let solutionData: HandTrace["solution"];
+  try {
+    const solution = computeSolution(deal);
+    if (solution) {
+      solutionData = {
+        frequencies: solution.frequencies,
+        optimalAction: solution.optimalAction,
+        optimalFrequency: solution.optimalFrequency,
+        resolvedCategory: solution.resolvedCategory,
+        isExactMatch: solution.isExactMatch,
+      };
+    }
+  } catch (_err) {
+    flags.push("SOLUTION_ERROR");
+  }
+
   return {
     config,
     timestamp: new Date().toISOString(),
@@ -360,9 +425,12 @@ export function traceHand(config: HandTraceConfig): HandTrace {
     seatProfiles,
     streets,
     coaching,
+    solution: solutionData,
+    targetStreet,
     outcome: {
       phase: state.phase,
       finalPotBB: bbAmount(state.pot.total, bb),
+      reachedTargetStreet,
     },
     flags,
   };
@@ -452,6 +520,24 @@ export function formatHandTrace(t: HandTrace): string {
           .join(", ");
         lines.push(`    GTO base (${d.gtoSource ?? "?"}): ${freqStr}`);
       }
+      // Context factors
+      const ctx: string[] = [];
+      if (d.handStrength !== undefined) ctx.push(`strength: ${d.handStrength.toFixed(2)}`);
+      if (d.boardWetness !== undefined) ctx.push(`wetness: ${(d.boardWetness * 100).toFixed(0)}%`);
+      if (d.potOdds !== undefined) ctx.push(`potOdds: ${(d.potOdds * 100).toFixed(0)}%`);
+      if (d.foldEquity !== undefined) ctx.push(`foldEq: ${(d.foldEquity * 100).toFixed(0)}%`);
+      if (d.spr !== undefined) ctx.push(`SPR: ${d.spr.toFixed(1)}`);
+      if (d.isInPosition !== undefined) ctx.push(d.isInPosition ? "IP" : "OOP");
+      if (ctx.length > 0) {
+        lines.push(`    Context: ${ctx.join(" | ")}`);
+      }
+      // Modifier effects
+      if (d.modifierIntensity !== undefined && d.modifierIntensity > 0.01) {
+        const mods: string[] = [`intensity: ${d.modifierIntensity.toFixed(2)}`];
+        if (d.effectiveFoldScale !== undefined) mods.push(`foldScale: ${d.effectiveFoldScale.toFixed(2)}`);
+        if (d.effectiveAggressionScale !== undefined) mods.push(`aggrScale: ${d.effectiveAggressionScale.toFixed(2)}`);
+        lines.push(`    Modifier: ${mods.join(" | ")}`);
+      }
       lines.push("");
     }
 
@@ -481,9 +567,23 @@ export function formatHandTrace(t: HandTrace): string {
     }
   }
 
+  // Solution
+  if (t.solution) {
+    lines.push(`──── GTO SOLUTION (target: ${t.targetStreet}) ────`);
+    const freqStr = Object.entries(t.solution.frequencies)
+      .filter(([, v]) => v > 0.01)
+      .sort(([, a], [, b]) => b - a)
+      .map(([k, v]) => `${k}: ${(v * 100).toFixed(0)}%`)
+      .join(", ");
+    lines.push(`Optimal: ${t.solution.optimalAction} (${(t.solution.optimalFrequency * 100).toFixed(0)}%)`);
+    lines.push(`Frequencies: ${freqStr}`);
+    lines.push(`Category: ${t.solution.resolvedCategory} | Exact: ${t.solution.isExactMatch}`);
+    lines.push("");
+  }
+
   // Outcome
   lines.push(`──── OUTCOME ────`);
-  lines.push(`Phase: ${t.outcome.phase} | Final pot: ${t.outcome.finalPotBB.toFixed(1)} BB`);
+  lines.push(`Phase: ${t.outcome.phase} | Final pot: ${t.outcome.finalPotBB.toFixed(1)} BB | Reached target: ${t.outcome.reachedTargetStreet}`);
   lines.push("");
 
   // Flags

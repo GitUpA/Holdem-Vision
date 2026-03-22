@@ -17,7 +17,6 @@ import {
   runScenario,
   runBatch,
   formatSnapshot,
-  type ScenarioSnapshot,
 } from "./scenarioRunner";
 
 // ═══════════════════════════════════════════════════════

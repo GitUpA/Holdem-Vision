@@ -14,11 +14,10 @@
 import type { ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
 import type { ActionFrequencies, GtoAction } from "../../convex/lib/gto/tables/types";
 import type { ExplanationNode } from "../../convex/lib/types/analysis";
-import type { RenderedNarrative } from "../../convex/lib/opponents/engines/narrativeTypes";
 import { executeDrillPipeline } from "../../convex/lib/gto/drillPipeline";
 import { buildBoardNarrative } from "../../convex/lib/gto/narrativeContext";
 import { analyzeBoard } from "../../convex/lib/opponents/engines/boardTexture";
-import { scoreAction, normalizeToGtoAction } from "../../convex/lib/gto/evScoring";
+import { scoreAction } from "../../convex/lib/gto/evScoring";
 import { coachingLens } from "../../convex/lib/analysis/coachingLens";
 import { cardToString } from "../../convex/lib/primitives/card";
 import type { CardIndex } from "../../convex/lib/types/cards";
