@@ -61,6 +61,8 @@ import {
   executeDrillPipeline,
   streetFromCommunityCount,
 } from "../../convex/lib/gto/drillPipeline";
+import type { NarrativeIntentId } from "../../convex/lib/gto/narrativePrompts";
+import { ALL_ARCHETYPE_IDS } from "../../convex/lib/gto/archetypeClassifier";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -119,6 +121,9 @@ const EMPTY_POT: PotState = { mainPot: 0, sidePots: [], total: 0, explanation: "
 const LENS_ORDER = ["raw-equity", "monte-carlo", "threats", "outs", "draws", "opponent-read", "coaching"];
 const DEFAULT_DRILL_BLINDS: BlindStructure = { small: 1, big: 2 };
 const DEFAULT_DRILL_STACK = 100;
+
+/** Special sentinel for interleaved drill mode */
+export const INTERLEAVED_SENTINEL = "__interleaved__" as const;
 
 // ═══════════════════════════════════════════════════════
 // HOOK
@@ -200,6 +205,9 @@ export function useWorkspace(mode: WorkspaceMode) {
   const drillDealRef = useRef<ConstrainedDeal | null>(null);
   const drillSolutionRef = useRef<SpotSolution | null>(null);
   const drillRngRef = useRef(() => Math.random());
+  const drillNarrativeChoiceRef = useRef<NarrativeIntentId | null>(null);
+  const drillInterleavedRef = useRef(false);
+  const drillArchetypePoolRef = useRef<ArchetypeId[]>([]);
 
   // ─── Derived state ───
 
@@ -530,7 +538,15 @@ export function useWorkspace(mode: WorkspaceMode) {
   }, []);
 
   const dealNextDrillHand = useCallback(() => {
-    const archId = drillArchetypeRef.current;
+    let archId = drillArchetypeRef.current;
+
+    // Interleaved mode: pick a random archetype from the pool each hand
+    if (drillInterleavedRef.current && drillArchetypePoolRef.current.length > 0) {
+      const pool = drillArchetypePoolRef.current;
+      archId = pool[Math.floor(drillRngRef.current() * pool.length)];
+      drillArchetypeRef.current = archId;
+    }
+
     if (!archId || !sessionRef.current) return;
 
     drillPhaseRef.current = "dealing";
@@ -545,6 +561,7 @@ export function useWorkspace(mode: WorkspaceMode) {
 
     drillDealRef.current = result.deal;
     drillCurrentScoreRef.current = null;
+    drillNarrativeChoiceRef.current = null;
     drillSolutionRef.current = result.solution;
 
     // Sync React state so seats/positions/hero derivations update
@@ -594,13 +611,26 @@ export function useWorkspace(mode: WorkspaceMode) {
   // ── Drill actions ──
 
   const startDrill = useCallback(
-    (archetypeId: ArchetypeId, handsTarget = 10) => {
-      drillArchetypeRef.current = archetypeId;
+    (archetypeId: ArchetypeId | typeof INTERLEAVED_SENTINEL, handsTarget = 10) => {
+      // Interleaved mode: rotate through all archetypes
+      if (archetypeId === INTERLEAVED_SENTINEL) {
+        drillInterleavedRef.current = true;
+        drillArchetypePoolRef.current = [...ALL_ARCHETYPE_IDS];
+        drillArchetypeRef.current = drillArchetypePoolRef.current[
+          Math.floor(Math.random() * drillArchetypePoolRef.current.length)
+        ];
+      } else {
+        drillInterleavedRef.current = false;
+        drillArchetypePoolRef.current = [];
+        drillArchetypeRef.current = archetypeId;
+      }
+
       drillHandsTargetRef.current = handsTarget;
       drillHandsPlayedRef.current = 0;
       drillScoresRef.current = [];
       drillCurrentScoreRef.current = null;
       drillSolutionRef.current = null;
+      drillNarrativeChoiceRef.current = null;
 
       // Re-create session with TAG villains for drill
       const profiles = new Map<number, OpponentProfile>();
@@ -676,6 +706,9 @@ export function useWorkspace(mode: WorkspaceMode) {
     drillCurrentScoreRef.current = null;
     drillDealRef.current = null;
     drillSolutionRef.current = null;
+    drillNarrativeChoiceRef.current = null;
+    drillInterleavedRef.current = false;
+    drillArchetypePoolRef.current = [];
     // Clear the table so board/players reset
     session.resetHand();
     setSelectionTarget("hero");
@@ -957,6 +990,12 @@ export function useWorkspace(mode: WorkspaceMode) {
     drillCurrentDeal: drillDealRef.current,
     drillSolution: drillSolutionRef.current,
     drillProgress: getDrillProgress(),
+    drillNarrativeChoice: drillNarrativeChoiceRef.current,
+    setDrillNarrativeChoice: (id: NarrativeIntentId) => {
+      drillNarrativeChoiceRef.current = id;
+      forceRender();
+    },
+    drillIsInterleaved: drillInterleavedRef.current,
     startDrill,
     drillAct,
     drillNextHand,

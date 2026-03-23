@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { WorkspaceMode, WorkspaceModeId } from "@/types/workspace-mode";
 import { visionMode, drillMode as drillModeConfig } from "@/types/workspace-mode";
-import { useWorkspace, type WorkspaceState } from "@/hooks/use-workspace";
+import { useWorkspace, type WorkspaceState, INTERLEAVED_SENTINEL } from "@/hooks/use-workspace";
 import { PanelWrapper } from "@/components/ui/panel-wrapper";
 
 // ── Existing components ──
@@ -45,6 +45,10 @@ import type { CardIndex } from "../../../convex/lib/types/cards";
 import { ScoreDisplay } from "../drill/score-display";
 import { DrillGuideDrawer } from "../drill/drill-guide-drawer";
 import { ArchetypeTutorialDrawer } from "../drill/archetype-tutorial-drawer";
+import { NarrativeBoardContext } from "../drill/narrative-board-context";
+import { NarrativePrompt } from "../drill/narrative-prompt";
+import { NarrativeFeedbackDisplay } from "../drill/narrative-feedback";
+import { buildNarrativeSummary } from "../../../convex/lib/gto/narrativeSummary";
 
 
 // Drill archetype data
@@ -427,7 +431,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                   )}
 
                   {ws.drillPhase !== "idle" && ws.drillPhase !== "summary" && (
-                    <ActiveDrill ws={ws} onOpenGuide={() => setDrillGuideOpen(true)} />
+                    <ActiveDrill ws={ws} drillQuizMode={drillQuizMode} onOpenGuide={() => setDrillGuideOpen(true)} />
                   )}
 
                   {ws.drillPhase === "summary" && (
@@ -561,6 +565,20 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                     onCardClick={() => {}}
                   />
 
+                  {/* Narrative prompt — quiz mode only, before acting */}
+                  {ws.drillPhase === "ready" && drillQuizMode === "quiz" && ws.drillSolution && ws.drillCurrentDeal && (
+                    <div className="mt-4">
+                      <NarrativePrompt
+                        handCategory={ws.drillCurrentDeal.handCategory}
+                        isInPosition={ws.drillCurrentDeal.isInPosition}
+                        isPreflop={ws.drillCurrentDeal.archetype.category === "preflop"}
+                        frequencies={ws.drillSolution.frequencies}
+                        selectedIntent={ws.drillNarrativeChoice}
+                        onSelect={ws.setDrillNarrativeChoice}
+                      />
+                    </div>
+                  )}
+
                   {/* Action buttons — mode selects game vs GTO style */}
                   {ws.isHeroTurn && ws.legalActions && (
                     <div className="mt-4">
@@ -604,6 +622,18 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                   score={ws.drillCurrentScore}
                   onNextHand={ws.drillNextHand}
                   isLastHand={ws.drillHandsPlayed >= ws.drillHandsTarget}
+                />
+              )}
+
+              {/* ── Drill: Narrative feedback (quiz mode, after acting) ── */}
+              {ws.drillPhase === "acted" && drillQuizMode === "quiz" && ws.drillCurrentScore && ws.drillSolution && (
+                <NarrativeFeedbackDisplay
+                  userAction={ws.drillCurrentScore.userAction}
+                  narrativeChoice={ws.drillNarrativeChoice}
+                  optimalAction={ws.drillSolution.optimalAction}
+                  optimalFrequency={ws.drillSolution.optimalFrequency}
+                  frequencies={ws.drillSolution.frequencies}
+                  archetypeId={ws.drillArchetypeId ?? undefined}
                 />
               )}
 
@@ -949,13 +979,13 @@ function ArchetypeSelector({
   onOpenGuide,
   onArchetypeSelect,
 }: {
-  onStart: (id: ArchetypeId, count?: number) => void;
+  onStart: (id: ArchetypeId | typeof INTERLEAVED_SENTINEL, count?: number) => void;
   drillMode: DrillMode;
   onModeChange: (mode: DrillMode) => void;
   onOpenGuide: () => void;
   onArchetypeSelect?: (id: ArchetypeId) => void;
 }) {
-  const [selected, setSelected] = useState<ArchetypeId | null>(null);
+  const [selected, setSelected] = useState<ArchetypeId | typeof INTERLEAVED_SENTINEL | null>(null);
   const [handCount, setHandCount] = useState(10);
   const categories: ArchetypeCategory[] = ["preflop", "flop_texture", "postflop_principle"];
 
@@ -974,6 +1004,21 @@ function ArchetypeSelector({
           <span className="text-xs font-bold">?</span>
         </button>
       </div>
+
+      {/* Interleaved option */}
+      <button
+        onClick={() => setSelected(INTERLEAVED_SENTINEL)}
+        className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-all ${
+          selected === INTERLEAVED_SENTINEL
+            ? "border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]"
+            : "border-[var(--border)] text-[var(--foreground)] hover:border-[var(--gold-dim)]"
+        }`}
+      >
+        <span className="font-semibold">Mixed / Interleaved</span>
+        <span className="block text-[10px] text-[var(--muted-foreground)] mt-0.5">
+          Random archetypes each hand — best for long-term learning
+        </span>
+      </button>
 
       {categories.map((cat) => (
         <div key={cat} className="space-y-2">
@@ -1032,9 +1077,11 @@ function ArchetypeSelector({
 /** Active drill with progress, game viewer, solution */
 function ActiveDrill({
   ws,
+  drillQuizMode,
   onOpenGuide,
 }: {
   ws: WorkspaceState;
+  drillQuizMode: DrillMode;
   onOpenGuide: () => void;
 }) {
   const progressPct = ws.drillHandsTarget > 0
@@ -1048,10 +1095,10 @@ function ActiveDrill({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-[var(--foreground)]">
-                {archetypeLabel(ws.drillArchetypeId)}
+                {ws.drillIsInterleaved ? "Mixed Drill" : archetypeLabel(ws.drillArchetypeId)}
               </h2>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20 font-medium">
-                {archetypeCategoryLabel(ws.drillArchetypeId)}
+                {ws.drillIsInterleaved ? archetypeLabel(ws.drillArchetypeId) : archetypeCategoryLabel(ws.drillArchetypeId)}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -1078,15 +1125,15 @@ function ActiveDrill({
         </div>
       </div>
 
-      {/* Deal info — board texture + position + hand category */}
+      {/* Board narrative — sets the scene for the decision */}
       {ws.drillCurrentDeal && (
-        <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
-          <span className="px-2 py-0.5 rounded bg-[var(--muted)]/20 border border-[var(--border)]">
-            {ws.drillCurrentDeal.archetype.description}
-          </span>
-          <span>{ws.drillCurrentDeal.isInPosition ? "IP" : "OOP"}</span>
-          <span>{ws.drillCurrentDeal.handCategory.category.replace(/_/g, " ")}</span>
-        </div>
+        <NarrativeBoardContext
+          archetype={ws.drillCurrentDeal.archetype}
+          handCategory={ws.drillCurrentDeal.handCategory}
+          communityCards={ws.drillCurrentDeal.communityCards}
+          isInPosition={ws.drillCurrentDeal.isInPosition}
+          drillMode={drillQuizMode}
+        />
       )}
 
       {ws.drillPhase === "dealing" && (
@@ -1149,6 +1196,43 @@ function DrillSummary({ ws, onNewDrill }: { ws: WorkspaceState; onNewDrill: () =
           </div>
         </div>
       )}
+      {/* Narrative insights */}
+      {total > 0 && (() => {
+        const summary = buildNarrativeSummary(
+          scores,
+          [],
+          ws.drillArchetypeId ?? undefined,
+        );
+        return (
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase tracking-widest text-[var(--muted-foreground)]">
+              Insights
+            </span>
+            {summary.insights.map((insight, i) => (
+              <div
+                key={i}
+                className={`border-l-2 pl-3 py-1 ${
+                  insight.type === "strength"
+                    ? "border-green-500/50"
+                    : insight.type === "weakness"
+                    ? "border-orange-500/50"
+                    : "border-[var(--border)]"
+                }`}
+              >
+                <p className="text-xs text-[var(--foreground)] leading-relaxed">
+                  {insight.summary}
+                </p>
+                {insight.principle && (
+                  <p className="text-[10px] text-[var(--muted-foreground)] italic mt-0.5">
+                    {insight.principle}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       <button onClick={onNewDrill}
         className="w-full py-2.5 rounded-lg bg-[var(--gold)] text-black font-semibold text-sm hover:bg-[var(--gold)]/90 transition-colors">
         New Drill
