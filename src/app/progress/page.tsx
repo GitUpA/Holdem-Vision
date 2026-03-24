@@ -225,8 +225,8 @@ export default function ProgressPage() {
       {totalHands === 0 && (
         <div className="text-center py-8 text-sm text-[var(--muted-foreground)]">
           No training data yet. Head to{" "}
-          <a href="/vision?mode=drill" className="text-[var(--gold)] hover:underline">
-            Drill Mode
+          <a href="/vision?source=archetype" className="text-[var(--gold)] hover:underline">
+            Archetype Training
           </a>{" "}
           to start practicing.
         </div>

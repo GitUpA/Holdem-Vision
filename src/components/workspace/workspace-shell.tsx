@@ -13,8 +13,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { WorkspaceMode, WorkspaceModeId } from "@/types/workspace-mode";
-import { visionMode, drillMode as drillModeConfig } from "@/types/workspace-mode";
+import type { WorkspaceMode, WorkspaceModeId, BoardSource } from "@/types/workspace-mode";
+import { buildMode } from "@/types/workspace-mode";
 import { useWorkspace, type WorkspaceState, INTERLEAVED_SENTINEL } from "@/hooks/use-workspace";
 import { PanelWrapper } from "@/components/ui/panel-wrapper";
 
@@ -203,19 +203,26 @@ export interface VisionParams {
 }
 
 interface WorkspaceShellProps {
+  /** @deprecated Use initialSource instead */
   initialMode?: WorkspaceModeId;
+  initialSource?: BoardSource;
   drillParams?: DrillParams;
   visionParams?: VisionParams;
 }
 
-const MODE_CONFIGS: Record<WorkspaceModeId, () => WorkspaceMode> = {
-  vision: visionMode,
-  drill: drillModeConfig,
-};
+const BOARD_SOURCES: { id: BoardSource; label: string }[] = [
+  { id: "free_play", label: "Free Play" },
+  { id: "archetype", label: "Archetype" },
+  { id: "custom", label: "Custom" },
+];
 
-export function WorkspaceShell({ initialMode = "vision", drillParams, visionParams }: WorkspaceShellProps) {
-  const [modeId, setModeId] = useState<WorkspaceModeId>(initialMode);
-  const mode = useMemo(() => MODE_CONFIGS[modeId](), [modeId]);
+export function WorkspaceShell({ initialMode, initialSource, drillParams, visionParams }: WorkspaceShellProps) {
+  // Map legacy mode to source for backward compat
+  const resolvedSource: BoardSource = initialSource ?? (initialMode === "drill" ? "archetype" : "free_play");
+  const [boardSource, setBoardSource] = useState<BoardSource>(resolvedSource);
+  const mode = useMemo(() => buildMode(boardSource, { quiz: drillParams?.mode !== "learn" }), [boardSource, drillParams?.mode]);
+  // Legacy compat — some components still check modeId
+  const modeId: WorkspaceModeId = mode.id;
   const ws = useWorkspace(mode);
   const [guideOpen, setGuideOpen] = useState(false);
   const [drillGuideOpen, setDrillGuideOpen] = useState(false);
@@ -237,7 +244,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
   // Auto-setup vision mode from URL params
   const visionAutoStarted = useRef(false);
   useEffect(() => {
-    if (visionAutoStarted.current || !visionParams?.deal || modeId !== "vision") return;
+    if (visionAutoStarted.current || !visionParams?.deal || boardSource === "archetype") return;
     visionAutoStarted.current = true;
 
     // Configure table before dealing
@@ -367,7 +374,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
 
   // ── Drill: show solution based on mode ──
   const showDrillSolution = drillQuizMode === "learn" || ws.drillPhase === "acted";
-  const isDrillActive = modeId === "drill" && ws.drillPhase !== "idle";
+  const isDrillActive = boardSource === "archetype" && ws.drillPhase !== "idle";
 
   // ── Layout ──
   const isTwoColumn = mode.layout === "two-column";
@@ -375,28 +382,25 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
   return (
     <div className="min-h-[calc(100vh-65px)] felt-bg">
       <div className="max-w-[1600px] mx-auto px-4 py-4">
-        {/* ── Mode toggle ── */}
+        {/* ── Board source selector ── */}
         <div className="flex items-center gap-3 mb-4">
           <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
-            {(["vision", "drill"] as const).map((id) => (
+            {BOARD_SOURCES.map(({ id, label }, i) => (
               <button
                 key={id}
-                onClick={() => setModeId(id)}
+                onClick={() => setBoardSource(id)}
                 className={cn(
-                  "px-4 py-1.5 text-xs font-medium transition-colors capitalize",
-                  id !== "vision" && "border-l border-[var(--border)]",
-                  modeId === id
+                  "px-4 py-1.5 text-xs font-medium transition-colors",
+                  i > 0 && "border-l border-[var(--border)]",
+                  boardSource === id
                     ? "bg-[var(--gold)]/15 text-[var(--gold)]"
                     : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
                 )}
               >
-                {id}
+                {label}
               </button>
             ))}
           </div>
-          <span className="text-[10px] text-[var(--muted-foreground)]">
-            {modeId === "vision" ? "Analyze hands with full control" : "Practice GTO decisions"}
-          </span>
         </div>
 
         <div className={cn(
@@ -481,7 +485,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
               </PanelWrapper>
 
               {/* ── Game setup panel (vision mode only) ── */}
-              {modeId !== "drill" && (
+              {!isDrillActive && (
               <PanelWrapper enabled={mode.setup.enabled} hint="Switch to Vision mode for hand setup">
                 {!ws.isHandActive && !ws.isHandOver && (
                   <GameSetupPanel
@@ -496,7 +500,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
               )}
 
               {/* ── Hand-over result (vision mode only) ── */}
-              {modeId !== "drill" && (
+              {!isDrillActive && (
               <PanelWrapper enabled={mode.postHand.dealNext || mode.postHand.revealAll} hint="Finish hand to see results">
                 {!ws.isHandActive && ws.isHandOver && (
                   <HandOverPanel
@@ -529,7 +533,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                         </span>
                       ))}
                     </div>
-                    {modeId !== "drill" && (
+                    {!isDrillActive && (
                     <>
                     <div className="h-4 w-px bg-[var(--border)]" />
                     <PanelWrapper enabled={mode.setup.enabled}>
@@ -545,7 +549,7 @@ export function WorkspaceShell({ initialMode = "vision", drillParams, visionPara
                     )}
                   </div>
                   <button
-                    onClick={() => mode.id === "drill" ? setDrillGuideOpen(true) : setGuideOpen(true)}
+                    onClick={() => isDrillActive ? setDrillGuideOpen(true) : setGuideOpen(true)}
                     className="w-7 h-7 rounded-full border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)]/40 transition-colors flex items-center justify-center text-xs font-bold shrink-0"
                     title="How to use"
                   >

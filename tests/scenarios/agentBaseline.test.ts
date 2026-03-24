@@ -118,7 +118,7 @@ function createAgentStudent(): (view: StudentView) => StudentDecision {
     // Coaching tells us the SIZING (small, medium, large)
     let chosenAction: GtoAction;
     let reasoning: string;
-    let chosenNarrative = topNarrative?.id ?? null;
+    const chosenNarrative = topNarrative?.id ?? null;
 
     if (narrativeAction) {
       // Start with narrative's action
