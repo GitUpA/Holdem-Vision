@@ -328,7 +328,7 @@ export const coachingLens: AnalysisLens = {
       explanation,
       visuals: advices.length > 0 ? [{
         type: "coaching" as VisualDirectiveType,
-        data: { advices, consensus } as Record<string, unknown>,
+        data: { advices, consensus, opponentStory: primaryOpponentStory } as Record<string, unknown>,
         priority: 100,
         lensId: "coaching",
       }] : [],

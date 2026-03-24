@@ -751,8 +751,9 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
   if (!coachingResult || coachingResult.visuals.length === 0) return null;
   const coachingVisual = coachingResult.visuals.find((v) => v.type === "coaching");
   if (!coachingVisual) return null;
-  const { advices } = coachingVisual.data as {
+  const { advices, opponentStory } = coachingVisual.data as {
     advices: CoachingAdvice[];
+    opponentStory?: import("../../../convex/lib/analysis/opponentStory").OpponentStory;
   };
   if (!advices || advices.length === 0) return null;
 
@@ -777,6 +778,7 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
           archetype={archetype}
           onArchetypeClick={onArchetypeClick}
           archetypeLabel={archetypeLabel}
+          opponentStory={opponentStory}
         />
       </div>
     </div>

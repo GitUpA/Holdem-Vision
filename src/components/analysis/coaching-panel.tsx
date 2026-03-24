@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { ExplanationTree } from "./explanation-tree";
 import { SolutionDisplay } from "../drill/solution-display";
 import type { CoachingAdvice } from "../../../convex/lib/analysis/coachingLens";
+import type { OpponentStory } from "../../../convex/lib/analysis/opponentStory";
 import type { SpotSolution } from "@/hooks/use-workspace";
 import type { ArchetypeClassification, ArchetypeId } from "../../../convex/lib/gto/archetypeClassifier";
 import { getKnowledge } from "../../../convex/lib/knowledge";
@@ -48,6 +49,8 @@ interface CoachingPanelProps {
   onArchetypeClick?: (id: ArchetypeId) => void;
   /** Label resolver for archetype IDs */
   archetypeLabel?: (id: ArchetypeId) => string;
+  /** Opponent story — what their actions reveal about their holdings */
+  opponentStory?: OpponentStory;
 }
 
 /** GTO first — it's the reference point other profiles compare against */
@@ -55,7 +58,7 @@ const PROFILE_ORDER: Record<string, number> = {
   gto: 0, tag: 1, lag: 2, nit: 3, fish: 4,
 };
 
-export function CoachingPanel({ advices, drillSolution, drillScore, autoExpandGto, archetype, onArchetypeClick, archetypeLabel: labelFn }: CoachingPanelProps) {
+export function CoachingPanel({ advices, drillSolution, drillScore, autoExpandGto, archetype, onArchetypeClick, archetypeLabel: labelFn, opponentStory }: CoachingPanelProps) {
   const [expandedProfile, setExpandedProfile] = useState<string | null>(
     autoExpandGto ? "gto" : null,
   );
@@ -82,6 +85,11 @@ export function CoachingPanel({ advices, drillSolution, drillScore, autoExpandGt
           onClick={onArchetypeClick}
           labelFn={labelFn}
         />
+      )}
+
+      {/* Opponent Story */}
+      {opponentStory && opponentStory.confidence !== "speculative" && (
+        <OpponentStoryCard story={opponentStory} />
       )}
 
       {/* Profile Rows */}
@@ -307,6 +315,82 @@ function ArchetypeBadge({
         Learn more
       </span>
     </button>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// OPPONENT STORY CARD
+// ═══════════════════════════════════════════════════════
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  strong: "text-green-400",
+  moderate: "text-yellow-400",
+  speculative: "text-orange-400",
+};
+
+function OpponentStoryCard({ story }: { story: OpponentStory }) {
+  const [expanded, setExpanded] = useState(false);
+  const eqPct = (story.data.equityVsRange * 100).toFixed(0);
+  const confColor = CONFIDENCE_COLORS[story.confidence] ?? "text-[var(--muted-foreground)]";
+
+  return (
+    <div className="rounded-md border border-[var(--border)]/50 bg-[var(--muted)]/10 p-2.5">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--gold-dim)]">
+            Opponent&apos;s Story
+          </span>
+          <span className={cn("text-[9px] font-medium", confColor)}>
+            {story.confidence} read
+          </span>
+        </div>
+        <span className="text-[10px] text-[var(--muted-foreground)]">
+          Your equity: {eqPct}% {expanded ? "▲" : "▼"}
+        </span>
+      </button>
+
+      {!expanded && (
+        <p className="text-[10px] text-[var(--foreground)]/70 mt-1.5 leading-relaxed">
+          {story.heroImplication}
+        </p>
+      )}
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 space-y-2">
+              {/* Street-by-street narrative */}
+              <div className="space-y-1">
+                {story.streetNarratives.map((sn, i) => (
+                  <div key={i} className="text-[10px] pl-2 border-l border-[var(--border)]/30">
+                    <span className="text-[var(--muted-foreground)] uppercase text-[8px]">
+                      {sn.street}
+                    </span>
+                    <span className="text-[var(--foreground)]/60 ml-1">{sn.action}{sn.amount ? ` ${sn.amount}` : ""}</span>
+                    <p className="text-[var(--foreground)]/70">{sn.interpretation}</p>
+                    <p className="text-[var(--muted-foreground)] text-[9px]">{sn.rangeUpdate}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Range and implication */}
+              <div className="text-[10px] text-[var(--foreground)]/70 bg-[var(--muted)]/20 rounded p-2">
+                <p className="font-medium text-[var(--foreground)]/80 mb-1">{story.rangeNarrative}</p>
+                <p>{story.heroImplication}</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
