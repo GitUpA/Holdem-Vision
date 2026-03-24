@@ -19,27 +19,12 @@ import type { ActionType, LegalActions } from "../../state/gameState";
 import type { ActionFrequencies, GtoAction } from "../../gto/tables/types";
 import { registerEngine } from "./engineRegistry";
 
-// GTO base frequency retrieval
-import {
-  classifyArchetype,
-  contextFromGameState,
-  type ArchetypeClassification,
-} from "../../gto/archetypeClassifier";
-import {
-  categorizeHand,
-  type HandCategorization,
-} from "../../gto/handCategorizer";
-import {
-  lookupFrequencies,
-  hasTable,
-  lookupPreflopHandClass,
-  handClassToActionFrequencies,
-  lookupPostflopHandClass,
-  postflopHandClassToActionFrequencies,
-} from "../../gto/tables";
-import { equityBasedRecommendation } from "../../analysis/equityRecommendation";
+// GTO base frequency retrieval — shared lookup
+import type { ArchetypeClassification } from "../../gto/archetypeClassifier";
+import type { HandCategorization } from "../../gto/handCategorizer";
+import { lookupGtoFrequencies } from "../../gto/frequencyLookup";
 import { PRESET_PROFILES } from "../../opponents/presets";
-import { comboToHandClass, cardsToCombo } from "../../opponents/combos";
+import type { OpponentInput } from "../../analysis/equityRecommendation";
 
 // Shared context analysis
 import { computeContextFactors, type ContextFactors } from "./contextAnalysis";
@@ -55,13 +40,6 @@ import { paramsToFrequencies } from "../autoPlay";
 
 // Shared calibration
 import { calibrateWeakHandFrequencies } from "../../gto/weakHandCalibration";
-
-// ═══════════════════════════════════════════════════════
-// CONFIG
-// ═══════════════════════════════════════════════════════
-
-/** Minimum archetype confidence to use solver tables. */
-const CONFIDENCE_THRESHOLD = 0.6;
 
 // ═══════════════════════════════════════════════════════
 // ENGINE
@@ -159,95 +137,15 @@ interface GtoBaseResult {
 // WEAK_CATEGORIES, calibrateWeakHandFrequencies, CATEGORY_STRENGTH imported from shared modules
 
 /**
- * Get GTO base frequencies — solver tables when available, heuristic fallback otherwise.
+ * Get GTO base frequencies — shared solver lookup, then heuristic fallback.
  */
 function getGtoBaseFrequencies(
   ctx: DecisionContext,
   _factors: ContextFactors,
 ): GtoBaseResult {
   if (ctx.holeCards && ctx.holeCards.length >= 2) {
-    const classCtx = contextFromGameState(ctx.state, ctx.seatIndex);
-    const archetype = classifyArchetype(classCtx);
-    const street = ctx.state.currentStreet;
-
-    // Preflop: try per-hand-class lookup first (169 grid from PokerBench)
-    if (street === "preflop") {
-      const combo = cardsToCombo(ctx.holeCards[0], ctx.holeCards[1]);
-      const handClass = comboToHandClass(combo);
-      const position = ctx.state.players[ctx.seatIndex].position;
-      const openerPos = findPreflopOpener(ctx.state, ctx.seatIndex);
-      const hcLookup = lookupPreflopHandClass(archetype.archetypeId, position, handClass, openerPos);
-
-      if (hcLookup) {
-        const handCat = categorizeHand(ctx.holeCards, ctx.state.communityCards);
-        return {
-          frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
-          source: "solver",
-          archetype,
-          handCat,
-        };
-      }
-    }
-
-    // Postflop (or preflop fallback): try solver table lookup by hand category
-    const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
-
-    if (archetype.confidence >= CONFIDENCE_THRESHOLD && hasTable(lookupArchetypeId, street)) {
-      const handCat = categorizeHand(ctx.holeCards, ctx.state.communityCards);
-      // Pass hand class for per-hand-class solver lookup (more granular than category)
-      const postflopCombo = cardsToCombo(ctx.holeCards[0], ctx.holeCards[1]);
-      const postflopHandClass = comboToHandClass(postflopCombo);
-      const lookup = lookupFrequencies(
-        lookupArchetypeId,
-        handCat.category,
-        classCtx.isInPosition,
-        street,
-        postflopHandClass,
-      );
-
-      if (lookup) {
-        return {
-          frequencies: calibrateWeakHandFrequencies(lookup.frequencies, handCat.category, street),
-          source: "solver",
-          archetype,
-          handCat,
-        };
-      }
-    }
-  }
-
-  // PokerBench postflop fallback: per-hand-class from 500k aggregated data
-  if (ctx.holeCards && ctx.holeCards.length >= 2 && ctx.state.currentStreet !== "preflop") {
-    const combo = cardsToCombo(ctx.holeCards[0], ctx.holeCards[1]);
-    const handClass = comboToHandClass(combo);
-    const classCtx2 = contextFromGameState(ctx.state, ctx.seatIndex);
-    const archetype2 = classifyArchetype(classCtx2);
-    const textureId = archetype2.textureArchetypeId ?? archetype2.archetypeId;
-
-    const pbLookup = lookupPostflopHandClass(
-      textureId,
-      handClass,
-      classCtx2.isInPosition,
-      ctx.state.currentStreet,
-    );
-    if (pbLookup) {
-      const pbHandCat = categorizeHand(ctx.holeCards, ctx.state.communityCards);
-      return {
-        frequencies: calibrateWeakHandFrequencies(
-          postflopHandClassToActionFrequencies(pbLookup),
-          pbHandCat.category,
-          ctx.state.currentStreet,
-        ),
-        source: "solver",
-        archetype: archetype2,
-        handCat: pbHandCat,
-      };
-    }
-  }
-
-  // Equity-based fallback: compute from range estimation + pot odds
-  if (ctx.holeCards && ctx.holeCards.length >= 2) {
-    const opponents = ctx.state.players
+    // Build opponent inputs for equity-based fallback
+    const opponents: OpponentInput[] = ctx.state.players
       .filter((p) => p.seatIndex !== ctx.seatIndex && (p.status === "active" || p.status === "all_in"))
       .map((p) => ({
         profile: ctx.opponentProfiles?.get(p.seatIndex) ?? PRESET_PROFILES["gto"],
@@ -258,32 +156,33 @@ function getGtoBaseFrequencies(
         knownCards: p.holeCards.length >= 2 ? p.holeCards : undefined,
       }));
 
-    if (opponents.length > 0) {
-      const bigBlind = ctx.state.blinds.big || 1;
-      const potBB = ctx.state.pot.total / bigBlind;
-      const hero = ctx.state.players[ctx.seatIndex];
-      const callCostBB = ctx.legal.canCall
-        ? (ctx.state.currentBet - hero.streetCommitted) / bigBlind
-        : 0;
-      const classCtxEq = contextFromGameState(ctx.state, ctx.seatIndex);
+    const result = lookupGtoFrequencies(
+      ctx.holeCards,
+      ctx.state.communityCards,
+      ctx.state,
+      ctx.seatIndex,
+      ctx.legal,
+      { opponents: opponents.length > 0 ? opponents : undefined },
+    );
 
-      const eqResult = equityBasedRecommendation(
-        ctx.holeCards,
-        ctx.state.communityCards,
-        opponents,
-        potBB,
-        callCostBB,
-        ctx.state.currentStreet,
-        classCtxEq.isInPosition,
-        ctx.legal,
-      );
-
-      if (eqResult) {
-        return {
-          frequencies: eqResult.frequencies,
-          source: "solver", // treat equity engine as better than heuristic
-        };
+    if (result) {
+      // Apply calibration for solver-category and postflop-handclass sources
+      // (the engine path historically calibrated weak hands; coaching did not)
+      let frequencies = result.frequencies;
+      if (result.source === "category" || result.source === "postflop-handclass") {
+        frequencies = calibrateWeakHandFrequencies(
+          frequencies,
+          result.handCat.category,
+          ctx.state.currentStreet,
+        );
       }
+
+      return {
+        frequencies,
+        source: "solver",
+        archetype: result.archetype,
+        handCat: result.handCat,
+      };
     }
   }
 
@@ -293,21 +192,6 @@ function getGtoBaseFrequencies(
     frequencies: gtoFreqs,
     source: "heuristic",
   };
-}
-
-/** Find the first preflop raiser's position (the opener) from action history. */
-function findPreflopOpener(
-  state: import("../../state/gameState").GameState,
-  heroSeatIndex: number,
-): string | undefined {
-  for (const action of state.actionHistory) {
-    if (action.street !== "preflop") break;
-    if (action.seatIndex === heroSeatIndex) continue;
-    if (action.actionType === "raise" || action.actionType === "bet") {
-      return action.position;
-    }
-  }
-  return undefined;
 }
 
 // ═══════════════════════════════════════════════════════

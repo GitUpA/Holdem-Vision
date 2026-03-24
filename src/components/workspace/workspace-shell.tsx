@@ -757,8 +757,8 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
   };
   if (!advices || advices.length === 0) return null;
 
-  // Classify the current spot (vision mode only)
-  const archetype: ArchetypeClassification | null = !isDrill && gameState && heroSeatIndex !== undefined
+  // Classify the current spot — always, every street, every mode
+  const archetype: ArchetypeClassification | null = gameState && heroSeatIndex !== undefined
     ? classifyArchetype(contextFromGameState(gameState, heroSeatIndex))
     : null;
 
@@ -766,7 +766,7 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
       <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)]">
-          {isDrill ? "GTO Solution & Coaching" : "Coaching"}
+          Coaching
         </h3>
       </div>
       <div className="px-4 py-3">

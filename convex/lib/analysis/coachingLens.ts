@@ -25,26 +25,13 @@ import { getAllPresets, PRESET_PROFILES } from "../opponents/presets";
 import { currentLegalActions } from "../state/stateMachine";
 import { seededRandom } from "../primitives/deck";
 
-// GTO frequency table lookups for coaching the GTO profile with solver data
-import {
-  lookupFrequencies,
-  hasTable,
-  lookupPreflopHandClass,
-  handClassToActionFrequencies,
-  getPreflopConfidence,
-  lookupPostflopHandClass,
-  postflopHandClassToActionFrequencies,
-} from "../gto/tables";
-import { equityBasedRecommendation, type OpponentInput } from "./equityRecommendation";
-import { comboToHandClass, cardsToCombo } from "../opponents/combos";
+// GTO frequency lookup — shared with engine
+import { lookupGtoFrequencies } from "../gto/frequencyLookup";
+import { type OpponentInput } from "./equityRecommendation";
 import type { ActionFrequencies, ActionFrequencyBands, GtoAction } from "../gto/tables/types";
 import type { ArchetypeAccuracy } from "../gto/tables/types";
 import type { AccuracyImpact } from "../gto/tables/types";
-import {
-  classifyArchetype,
-  contextFromGameState,
-} from "../gto/archetypeClassifier";
-import { categorizeHand } from "../gto/handCategorizer";
+import { contextFromGameState } from "../gto/archetypeClassifier";
 import { explainArchetype } from "../gto/archetypeExplainer";
 import { gtoActionToGameAction, remapFrequenciesToLegal } from "../gto/actionMapping";
 import { detectMixedStrategy, getTradeoffText } from "../gto/mixedStrategy";
@@ -376,8 +363,8 @@ function enrichWithMixedStrategy(data: CoachingSolverData): void {
 
 /**
  * Try to produce GTO coaching advice using solver frequency tables.
- * Returns a CoachingAdvice if solver data is available for this spot,
- * or null if we should fall back to the heuristic engine.
+ * Uses the shared lookupGtoFrequencies() and then wraps the result
+ * in coaching-specific data (remapping, explanation, solver display).
  */
 function tryGtoSolverLookup(
   gameState: GameState,
@@ -387,145 +374,55 @@ function tryGtoSolverLookup(
 ): CoachingAdvice | null {
   if (heroCards.length < 2) return null;
 
-  // Classify archetype from the game state
+  // Build opponent inputs for equity-based fallback within the shared lookup
+  const opponents: OpponentInput[] = [];
+  for (const player of gameState.players) {
+    if (player.seatIndex === heroSeat) continue;
+    if (player.status === "folded" || player.status === "sitting_out") continue;
+    opponents.push({
+      profile: PRESET_PROFILES["gto"],
+      actions: gameState.actionHistory
+        .filter((a) => a.seatIndex === player.seatIndex)
+        .map((a) => ({
+          street: a.street as "preflop" | "flop" | "turn" | "river",
+          actionType: a.actionType,
+          amount: a.amount,
+        })),
+      position: player.position,
+      knownCards: player.holeCards.length >= 2 ? player.holeCards : undefined,
+    });
+  }
+
+  const result = lookupGtoFrequencies(
+    heroCards,
+    gameState.communityCards,
+    gameState,
+    heroSeat,
+    legal,
+    { opponents: opponents.length > 0 ? opponents : undefined },
+  );
+
+  if (!result) return null;
+
   const classCtx = contextFromGameState(gameState, heroSeat);
-  const archetype = classifyArchetype(classCtx);
   const street = gameState.currentStreet;
 
-  // Preflop: try per-hand-class lookup first (169 grid from PokerBench)
-  if (street === "preflop") {
-    const combo = cardsToCombo(heroCards[0], heroCards[1]);
-    const handClass = comboToHandClass(combo);
-    const position = gameState.players[heroSeat].position;
-    // Find the opener position for position-aware lookup
-    const openerPos = findPreflopOpenerFromState(gameState, heroSeat);
-    const hcLookup = lookupPreflopHandClass(archetype.archetypeId, position, handClass, openerPos);
-
-    if (hcLookup) {
-      const handCat = categorizeHand(heroCards, gameState.communityCards);
-      const frequencies = handClassToActionFrequencies(hcLookup, archetype.archetypeId);
-      const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition, undefined, street);
-      const remappedFreqs = remapFrequenciesToLegal(frequencies, legal);
-
-      let remappedOptimalAction = "check";
-      let remappedOptimalFreq = 0;
-      for (const [action, freq] of Object.entries(remappedFreqs)) {
-        if ((freq ?? 0) > remappedOptimalFreq) {
-          remappedOptimalFreq = freq ?? 0;
-          remappedOptimalAction = action;
-        }
-      }
-
-      const gameAction = gtoActionToGameAction(remappedOptimalAction as GtoAction, legal, gameState.pot.total);
-      const solverData: CoachingSolverData = {
-        frequencies: remappedFreqs,
-        optimalAction: remappedOptimalAction as GtoAction,
-        optimalFrequency: remappedOptimalFreq,
-        availableActions: Object.keys(remappedFreqs).filter(
-          (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
-        ) as GtoAction[],
-        isExactMatch: true,
-        resolvedCategory: handCat.category,
-        preflopConfidence: getPreflopConfidence(hcLookup),
-      };
-      enrichWithMixedStrategy(solverData);
-
-      return {
-        profileName: "GTO",
-        profileId: "gto",
-        engineId: "modified-gto",
-        actionType: gameAction.actionType,
-        amount: gameAction.amount,
-        explanation,
-        solverData,
-      };
-    }
-  }
-
-  // Postflop (or preflop fallback): use solver table by hand category
-  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
-
-  // Need sufficient confidence and a registered table
-  if (archetype.confidence < 0.6 || !hasTable(lookupArchetypeId, street)) {
-    // Try PokerBench postflop fallback before giving up
-    if (street !== "preflop" && heroCards.length >= 2) {
-      const pbCombo = cardsToCombo(heroCards[0], heroCards[1]);
-      const pbHandClass = comboToHandClass(pbCombo);
-      const pbLookup = lookupPostflopHandClass(lookupArchetypeId, pbHandClass, classCtx.isInPosition, street);
-      if (pbLookup) {
-        const handCat = categorizeHand(heroCards, gameState.communityCards);
-        const frequencies = postflopHandClassToActionFrequencies(pbLookup);
-        const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition, undefined, street);
-        const remappedFreqs = remapFrequenciesToLegal(frequencies, legal);
-
-        let optAction = "check";
-        let optFreq = 0;
-        for (const [action, freq] of Object.entries(remappedFreqs)) {
-          if ((freq ?? 0) > optFreq) {
-            optFreq = freq ?? 0;
-            optAction = action;
-          }
-        }
-
-        const gameAction = gtoActionToGameAction(optAction as GtoAction, legal, gameState.pot.total);
-        return {
-          profileName: "GTO",
-          profileId: "gto",
-          engineId: "modified-gto",
-          actionType: gameAction.actionType,
-          amount: gameAction.amount,
-          explanation,
-          solverData: (() => {
-            const sd: CoachingSolverData = {
-              frequencies: remappedFreqs,
-              optimalAction: optAction as GtoAction,
-              optimalFrequency: optFreq,
-              availableActions: Object.keys(remappedFreqs).filter(
-                (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
-              ) as GtoAction[],
-              isExactMatch: false,
-              resolvedCategory: handCat.category,
-            };
-            enrichWithMixedStrategy(sd);
-            return sd;
-          })(),
-        };
-      }
-    }
-
-    // Equity-based fallback: compute recommendation from range estimation + pot odds
-    const equityRec = tryEquityFallback(gameState, heroSeat, heroCards, legal);
-    if (equityRec) return equityRec;
-
-    return null;
-  }
-
-  // Categorize the hero's hand
-  const handCat = categorizeHand(heroCards, gameState.communityCards);
-
-  // Look up GTO frequencies (with per-hand-class granularity when available)
-  const postflopCombo = cardsToCombo(heroCards[0], heroCards[1]);
-  const postflopHandClass = comboToHandClass(postflopCombo);
-  const lookup = lookupFrequencies(
-    lookupArchetypeId,
-    handCat.category,
+  // Build explanation from archetype + hand categorization
+  const explanation = explainArchetype(
+    result.archetype,
+    result.handCat,
     classCtx.isInPosition,
+    undefined,
     street,
-    postflopHandClass,
   );
-  if (!lookup) return null;
-
-  // Use shared explainer — same rich explanation for coaching and drill
-  const explanation = explainArchetype(archetype, handCat, classCtx.isInPosition, undefined, street);
 
   // Remap solver frequencies to match what's actually legal
-  // (e.g., solver "check" → "call" when facing a bet)
-  const remappedFreqs = remapFrequenciesToLegal(lookup.frequencies, legal);
-  const remappedBands = lookup.bands
-    ? remapBandsToLegal(lookup.bands, legal)
+  const remappedFreqs = remapFrequenciesToLegal(result.frequencies, legal);
+  const remappedBands = result.bands
+    ? remapBandsToLegal(result.bands, legal)
     : undefined;
 
-  // Recompute optimal after remapping
+  // Find optimal action after remapping
   let remappedOptimalAction = "check";
   let remappedOptimalFreq = 0;
   for (const [action, freq] of Object.entries(remappedFreqs)) {
@@ -535,15 +432,12 @@ function tryGtoSolverLookup(
     }
   }
 
-  // Map the remapped optimal GTO action to game ActionType
-  // Uses the shared actionMapping to ensure coaching row matches the solver panel
+  // Map GTO action to game ActionType
   const gameAction = gtoActionToGameAction(
     remappedOptimalAction as GtoAction,
     legal,
     gameState.pot.total,
   );
-  const actionType = gameAction.actionType;
-  const amount = gameAction.amount;
 
   // Build solver data for SolutionDisplay in coaching UI
   const solverData: CoachingSolverData = {
@@ -553,127 +447,22 @@ function tryGtoSolverLookup(
     availableActions: Object.keys(remappedFreqs).filter(
       (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
     ) as GtoAction[],
-    isExactMatch: lookup.isExact,
-    resolvedCategory: handCat.category,
+    isExactMatch: result.isExactMatch,
+    resolvedCategory: result.handCat.category,
     bands: remappedBands,
-    archetypeAccuracy: lookup.archetypeAccuracy,
+    archetypeAccuracy: result.archetypeAccuracy,
+    preflopConfidence: result.preflopConfidence,
   };
   enrichWithMixedStrategy(solverData);
 
   return {
     profileName: "GTO",
     profileId: "gto",
-    engineId: "modified-gto",
-    actionType,
-    amount,
+    engineId: result.source === "equity" ? "equity-engine" : "modified-gto",
+    actionType: gameAction.actionType,
+    amount: gameAction.amount,
     explanation,
     solverData,
-  };
-}
-
-/** Find the first preflop raiser's position (the opener) from action history. */
-function findPreflopOpenerFromState(state: GameState, heroSeat: number): string | undefined {
-  for (const action of state.actionHistory) {
-    if (action.street !== "preflop") break;
-    if (action.seatIndex === heroSeat) continue;
-    if (action.actionType === "raise" || action.actionType === "bet") {
-      return action.position;
-    }
-  }
-  return undefined;
-}
-
-/** Try equity-based recommendation when solver data is unavailable. */
-function tryEquityFallback(
-  gameState: GameState,
-  heroSeat: number,
-  heroCards: CardIndex[],
-  legal: LegalActions,
-): CoachingAdvice | null {
-  // Build opponent inputs from game state
-  const opponents: OpponentInput[] = [];
-  const heroPlayer = gameState.players[heroSeat];
-
-  for (const player of gameState.players) {
-    if (player.seatIndex === heroSeat) continue;
-    if (player.status === "folded" || player.status === "sitting_out") continue;
-
-    // We need a profile — use GTO as default estimation
-    const profile = PRESET_PROFILES["gto"];
-    const actions = gameState.actionHistory
-      .filter((a) => a.seatIndex === player.seatIndex)
-      .map((a) => ({
-        street: a.street as "preflop" | "flop" | "turn" | "river",
-        actionType: a.actionType,
-        amount: a.amount,
-      }));
-
-    opponents.push({
-      profile,
-      actions,
-      position: player.position,
-      knownCards: player.holeCards.length >= 2 ? player.holeCards : undefined,
-    });
-  }
-
-  if (opponents.length === 0) return null;
-
-  // Compute pot and call cost in BB
-  const bigBlind = gameState.blinds.big || 1;
-  const potBB = gameState.pot.total / bigBlind;
-  const callCostBB = legal.canCall
-    ? (gameState.currentBet - heroPlayer.streetCommitted) / bigBlind
-    : 0;
-
-  const isIP = contextFromGameState(gameState, heroSeat).isInPosition;
-
-  const result = equityBasedRecommendation(
-    heroCards,
-    gameState.communityCards,
-    opponents,
-    potBB,
-    callCostBB,
-    gameState.currentStreet,
-    isIP,
-    legal,
-  );
-
-  if (!result) return null;
-
-  // Find the top action
-  let topAction: import("../state/gameState").ActionType = "fold";
-  let topFreq = 0;
-  for (const [action, freq] of Object.entries(result.frequencies)) {
-    if ((freq ?? 0) > topFreq) {
-      topFreq = freq ?? 0;
-      topAction = action === "bet_large" || action === "bet_medium" || action === "bet_small"
-        ? "raise"
-        : action as import("../state/gameState").ActionType;
-    }
-  }
-
-  const remappedFreqs = remapFrequenciesToLegal(result.frequencies, legal);
-
-  return {
-    profileName: "GTO",
-    profileId: "gto",
-    engineId: "equity-engine",
-    actionType: topAction,
-    explanation: result.explanation,
-    solverData: (() => {
-      const sd: CoachingSolverData = {
-        frequencies: remappedFreqs,
-        optimalAction: Object.entries(remappedFreqs).sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))[0]?.[0] as GtoAction ?? "fold",
-        optimalFrequency: topFreq,
-        availableActions: Object.keys(remappedFreqs).filter(
-          (a) => (remappedFreqs[a as GtoAction] ?? 0) > 0.001,
-        ) as GtoAction[],
-        isExactMatch: false,
-        resolvedCategory: "equity-based",
-      };
-      enrichWithMixedStrategy(sd);
-      return sd;
-    })(),
   };
 }
 
