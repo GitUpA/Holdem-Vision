@@ -78,6 +78,7 @@ export class HandRecorder {
     potAfter: number,
     source: "engine" | "manual" | "system",
     decision?: RecordableDecision,
+    coachingSnapshot?: HandEvent["coachingSnapshot"],
   ): void {
     if (this.finalized) return;
 
@@ -92,8 +93,12 @@ export class HandRecorder {
       source,
     };
 
-    if (decision && source === "engine") {
+    if (decision) {
       event.decision = this.snapshotDecision(decision);
+    }
+
+    if (coachingSnapshot) {
+      event.coachingSnapshot = coachingSnapshot;
     }
 
     this.record.events.push(event);

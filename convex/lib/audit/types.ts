@@ -77,8 +77,18 @@ export interface HandEvent {
   potAfter: number;
   /** Engine auto-play, hero manual action, or system (blinds/ante) */
   source: "engine" | "manual" | "system";
-  /** Engine reasoning — only for auto-play actions */
+  /** Engine reasoning — for auto-play and manual actions (if coaching was active) */
   decision?: DecisionSnapshot;
+  /** What coaching recommended at the time of a manual action */
+  coachingSnapshot?: {
+    /** What GTO profile recommended */
+    gtoAction: string;
+    gtoAmount?: number;
+    /** Archetype classified for this spot */
+    archetypeId?: string;
+    /** All profile recommendations */
+    profileActions?: Array<{ profileId: string; action: string; amount?: number }>;
+  };
 }
 
 // ═══════════════════════════════════════════════════════

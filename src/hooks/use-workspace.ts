@@ -603,9 +603,27 @@ export function useWorkspace(mode: WorkspaceMode) {
 
   const act = useCallback(
     (actionType: ActionType, amount?: number) => {
-      session.act(actionType, amount);
+      // Capture coaching snapshot for audit
+      const coachingResult = analysisResults.get("coaching");
+      let coachingSnapshot: import("../../convex/lib/audit/types").HandEvent["coachingSnapshot"];
+      if (coachingResult?.value) {
+        const cv = coachingResult.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number }> };
+        if (cv.advices) {
+          const gtoAdvice = cv.advices.find((a) => a.profileId === "gto");
+          coachingSnapshot = {
+            gtoAction: gtoAdvice?.actionType ?? "unknown",
+            gtoAmount: gtoAdvice?.amount,
+            profileActions: cv.advices.map((a) => ({
+              profileId: a.profileId,
+              action: a.actionType,
+              amount: a.amount,
+            })),
+          };
+        }
+      }
+      session.act(actionType, amount, coachingSnapshot);
     },
-    [session],
+    [session, analysisResults],
   );
 
   // ── Drill actions ──
