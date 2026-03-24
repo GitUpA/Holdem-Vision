@@ -132,16 +132,12 @@ describe("calculatePotsFromContributions", () => {
       { seat: 2, amount: 200 },
     ]);
     const result = calculatePotsFromContributions(contribs);
-    // All 100 from seat 0 goes into main pot (100*3 = 300 at threshold 100... but seat 0 folded)
-    // Actually: threshold 100: each contributes min(amount,100) - 0 = 100,100,100 = 300
-    //   eligible: seat 1 and 2 (seat 0 folded)
-    // threshold 200: each contributes min(amount,200)-100 = 0,100,100 = 200
-    //   eligible: seat 1 and 2
+    // Folded player's amount does NOT create a pot division — only non-folded
+    // players' amounts create thresholds. All chips go into one pot.
+    // Threshold 200 only: 100 + 200 + 200 = 500 in main pot, no side pots.
     expect(result.total).toBe(500);
-    // Main pot should include folded player's chips
-    expect(result.mainPot).toBe(300);
-    expect(result.sidePots).toHaveLength(1);
-    expect(result.sidePots[0].amount).toBe(200);
+    expect(result.mainPot).toBe(500);
+    expect(result.sidePots).toHaveLength(0);
   });
 
   it("all players fold except one — still calculates pot", () => {

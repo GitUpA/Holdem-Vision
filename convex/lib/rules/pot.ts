@@ -30,11 +30,13 @@ export function calculatePotsFromContributions(
     return { mainPot: 0, sidePots: [], total: 0, explanation: "No contributions" };
   }
 
-  // Get unique non-zero commitment levels from non-folded, non-zero players
+  // Get unique commitment levels from non-folded players only.
+  // Folded players' chips still go into pots (they contributed),
+  // but their amounts don't create pot divisions (they can't win).
   const allInThresholds = [
     ...new Set(
       contributions
-        .filter((c) => c.amount > 0)
+        .filter((c) => !c.folded && c.amount > 0)
         .map((c) => c.amount),
     ),
   ].sort((a, b) => a - b);
