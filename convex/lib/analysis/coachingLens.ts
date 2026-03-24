@@ -48,6 +48,7 @@ import { categorizeHand } from "../gto/handCategorizer";
 import { explainArchetype } from "../gto/archetypeExplainer";
 import { gtoActionToGameAction, remapFrequenciesToLegal } from "../gto/actionMapping";
 import { detectMixedStrategy, getTradeoffText } from "../gto/mixedStrategy";
+import { buildOpponentStory, type OpponentStory } from "./opponentStory";
 
 // Ensure engine is registered
 import "../opponents/engines/modifiedGtoEngine";
@@ -99,6 +100,8 @@ export interface CoachingValue {
     agreeing: string[];
     disagreeing: string[];
   };
+  /** Opponent story — what their actions reveal about their holdings */
+  opponentStory?: OpponentStory;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -131,6 +134,120 @@ export const coachingLens: AnalysisLens = {
 
     // Pre-compute GTO solver data if available (shared across the GTO profile)
     const gtoSolverAdvice = tryGtoSolverLookup(gameState, heroSeat, context.heroCards, legal);
+
+    // Build opponent story for each active opponent (not hero, not folded)
+    let primaryOpponentStory: OpponentStory | undefined;
+    try {
+      const activePlayers = gameState.players.filter(
+        (p) => p.seatIndex !== heroSeat && (p.status === "active" || p.status === "all_in"),
+      );
+      if (activePlayers.length > 0 && context.opponents && context.opponents.length > 0) {
+        const opponentStories: OpponentStory[] = [];
+        for (const opp of activePlayers) {
+          // Find this opponent's profile from context
+          const oppCtx = context.opponents.find((o) => o.seatIndex === opp.seatIndex);
+          if (!oppCtx?.profile) continue;
+          // Collect opponent's actions from hand history
+          const oppActions = gameState.actionHistory
+            .filter((a) => a.seatIndex === opp.seatIndex && a.actionType !== "bet" || a.seatIndex === opp.seatIndex)
+            .filter((a) => a.seatIndex === opp.seatIndex)
+            .map((a) => ({
+              street: a.street,
+              actionType: a.actionType,
+              amount: a.amount,
+            }));
+          if (oppActions.length === 0) continue;
+
+          const story = buildOpponentStory(
+            context.heroCards,
+            context.communityCards,
+            oppActions,
+            oppCtx.profile,
+            opp.position,
+            gameState.pot.total,
+            legal.canCall ? legal.callAmount : 0,
+            gameState.currentStreet,
+            context.deadCards,
+          );
+          opponentStories.push(story);
+        }
+        // Use the opponent with the strongest range (lowest hero equity)
+        if (opponentStories.length > 0) {
+          primaryOpponentStory = opponentStories.reduce((a, b) =>
+            a.data.equityVsRange < b.data.equityVsRange ? a : b,
+          );
+        }
+      }
+    } catch {
+      // Opponent story is best-effort — don't break coaching if it fails
+    }
+
+    // If opponent story says hero is behind, adjust the GTO solver advice
+    if (primaryOpponentStory && gtoSolverAdvice?.solverData) {
+      const eq = primaryOpponentStory.data.equityVsRange;
+      const needed = primaryOpponentStory.data.potOddsNeeded;
+      // Only adjust when we have a confident read that hero is behind
+      if (primaryOpponentStory.confidence !== "speculative" && eq < 0.45) {
+        const adjusted = { ...gtoSolverAdvice.solverData.frequencies };
+        // Shift frequencies toward checking/folding when behind
+        const behindFactor = 1 - eq; // 0.6 when eq=0.4, 0.8 when eq=0.2
+        if (adjusted.fold !== undefined) {
+          adjusted.fold = Math.min(1, (adjusted.fold ?? 0) * (1 + behindFactor));
+        }
+        if (adjusted.check !== undefined) {
+          adjusted.check = Math.min(1, (adjusted.check ?? 0) * (1 + behindFactor * 0.5));
+        }
+        // Reduce aggressive actions
+        for (const key of Object.keys(adjusted) as (keyof typeof adjusted)[]) {
+          if (key.startsWith("bet_") || key.startsWith("raise")) {
+            adjusted[key] = (adjusted[key] ?? 0) * eq; // Scale down by equity
+          }
+        }
+        // Normalize
+        const total = Object.values(adjusted).reduce((s, v) => s + (v ?? 0), 0);
+        if (total > 0) {
+          for (const key of Object.keys(adjusted) as (keyof typeof adjusted)[]) {
+            adjusted[key] = (adjusted[key] ?? 0) / total;
+          }
+        }
+        // Update the solver advice with adjusted frequencies
+        gtoSolverAdvice.solverData = {
+          ...gtoSolverAdvice.solverData,
+          frequencies: adjusted,
+        };
+        // Re-determine optimal action from adjusted frequencies
+        let bestAction = gtoSolverAdvice.solverData.optimalAction;
+        let bestFreq = 0;
+        for (const [action, freq] of Object.entries(adjusted)) {
+          if ((freq ?? 0) > bestFreq) {
+            bestFreq = freq ?? 0;
+            bestAction = action as typeof bestAction;
+          }
+        }
+        if (bestAction !== gtoSolverAdvice.solverData.optimalAction) {
+          gtoSolverAdvice.solverData.optimalAction = bestAction;
+          // Map GTO action back to game action type
+          if (bestAction === "fold") gtoSolverAdvice.actionType = "fold";
+          else if (bestAction === "check") gtoSolverAdvice.actionType = legal.canCheck ? "check" : "call";
+          else if (bestAction === "call") gtoSolverAdvice.actionType = "call";
+          else if (bestAction.startsWith("bet_")) gtoSolverAdvice.actionType = legal.canBet ? "bet" : "raise";
+          else if (bestAction.startsWith("raise")) gtoSolverAdvice.actionType = "raise";
+        }
+        // Add opponent story context to explanation
+        gtoSolverAdvice.explanation = {
+          ...gtoSolverAdvice.explanation,
+          children: [
+            ...(gtoSolverAdvice.explanation.children ?? []),
+            {
+              summary: `Opponent's story: ${primaryOpponentStory.rangeNarrative}`,
+              detail: primaryOpponentStory.heroImplication,
+              sentiment: eq < needed ? "warning" : "neutral",
+              tags: ["opponent-story"],
+            },
+          ],
+        };
+      }
+    }
 
     for (const profile of presets) {
       try {
@@ -203,7 +320,7 @@ export const coachingLens: AnalysisLens = {
       tags: ["coaching"],
     };
 
-    const value: CoachingValue = { advices, consensus };
+    const value: CoachingValue = { advices, consensus, opponentStory: primaryOpponentStory };
 
     return {
       value,
