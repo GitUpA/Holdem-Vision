@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 import { formatSituationKey } from "@/lib/format";
 import type { UnifiedSeatConfig } from "@/hooks/use-hand-manager";
 import type { SelectionTarget } from "@/hooks/use-hand-manager";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { OpponentAnalysis } from "../../../convex/lib/analysis/opponentRead";
 import type { AutoPlayDecision } from "../../../convex/lib/opponents/autoPlay";
-import type { CardIndex } from "../../../convex/lib/types/cards";
+import type { CardIndex, Street } from "../../../convex/lib/types/cards";
 import { rankOf, suitOf } from "../../../convex/lib/primitives/card";
 import { ProfilePicker } from "./profile-picker";
 import { ExplanationTree } from "../analysis/explanation-tree";
+import { buildOpponentStory, type OpponentStory } from "../../../convex/lib/analysis/opponentStory";
 
 interface OpponentDetailProps {
   seat: UnifiedSeatConfig;
@@ -27,6 +28,14 @@ interface OpponentDetailProps {
   villainCardBuffer?: CardIndex[];
   /** When true, hide editing controls (profile picker, card assignment) but show info */
   readOnly?: boolean;
+  /** Hero's hole cards — needed for opponent story computation */
+  heroCards?: CardIndex[];
+  /** Community cards on board — needed for opponent story computation */
+  communityCards?: CardIndex[];
+  /** Current street */
+  street?: Street;
+  /** Current pot in BB — needed for opponent story computation */
+  potBB?: number;
 }
 
 const SUIT_SYMBOLS: Record<string, string> = { c: "\u2663", d: "\u2666", h: "\u2665", s: "\u2660" };
@@ -70,8 +79,35 @@ export function OpponentDetail({
   selectionTarget,
   villainCardBuffer,
   readOnly,
+  heroCards,
+  communityCards,
+  street,
+  potBB,
 }: OpponentDetailProps) {
   const posShort = seat.position.toUpperCase();
+
+  // Compute opponent story when we have enough data
+  const opponentStory: OpponentStory | null = useMemo(() => {
+    if (
+      !heroCards || heroCards.length < 2 ||
+      !seat.profile ||
+      seat.actions.length === 0
+    ) return null;
+    try {
+      return buildOpponentStory(
+        heroCards,
+        communityCards ?? [],
+        seat.actions,
+        seat.profile,
+        seat.position,
+        potBB ?? 0,
+        0, // callCostBB — we don't know what hero faces; 0 is safe for narrative
+        street ?? "preflop",
+      );
+    } catch {
+      return null;
+    }
+  }, [heroCards, communityCards, seat.actions, seat.profile, seat.position, potBB, street]);
 
   return (
     <motion.div
@@ -216,7 +252,10 @@ export function OpponentDetail({
           </div>
         )}
 
-        {/* Engine reasoning — shows when an auto-play decision exists */}
+        {/* Opponent's Story — primary narrative view */}
+        {opponentStory && <OpponentStorySection story={opponentStory} />}
+
+        {/* Engine reasoning — collapsed by default behind "Show engine internals" */}
         {decision && <EngineReasoningSection decision={decision} />}
 
         {/* Analysis results */}
@@ -290,7 +329,8 @@ const ENGINE_ACTION_COLORS: Record<string, { text: string; bg: string; border: s
 };
 
 function EngineReasoningSection({ decision }: { decision: AutoPlayDecision }) {
-  const [treeOpen, setTreeOpen] = useState(true);
+  const [sectionOpen, setSectionOpen] = useState(false);
+  const [treeOpen, setTreeOpen] = useState(false);
   const actionColor = ENGINE_ACTION_COLORS[decision.actionType] ?? ENGINE_ACTION_COLORS.check;
   const isBluff = decision.explanationNode?.children?.some(
     (c) => c.tags?.includes("bluff"),
@@ -298,9 +338,40 @@ function EngineReasoningSection({ decision }: { decision: AutoPlayDecision }) {
 
   return (
     <div className="border-t border-[var(--border)] pt-3">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--gold-dim)] mb-2">
-        Engine Reasoning
-      </h4>
+      <button
+        onClick={() => setSectionOpen(!sectionOpen)}
+        className="w-full flex items-center justify-between text-left mb-2"
+      >
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+          Show engine internals
+        </h4>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={cn(
+            "text-[var(--muted-foreground)] transition-transform duration-200",
+            sectionOpen && "rotate-90",
+          )}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+
+      <AnimatePresence>
+        {sectionOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
 
       {/* Situation + Engine badges */}
       <div className="flex items-center gap-1.5 mb-2 flex-wrap">
@@ -407,6 +478,104 @@ function EngineReasoningSection({ decision }: { decision: AutoPlayDecision }) {
           </AnimatePresence>
         </div>
       )}
+
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// OPPONENT STORY SECTION
+// ═══════════════════════════════════════════════════════
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  strong: "text-green-400",
+  moderate: "text-blue-400",
+  speculative: "text-orange-400",
+};
+
+function OpponentStorySection({ story }: { story: OpponentStory }) {
+  const [expanded, setExpanded] = useState(false);
+  const eqPct = (story.data.equityVsRange * 100).toFixed(0);
+  const confColor = CONFIDENCE_COLORS[story.confidence] ?? "text-[var(--muted-foreground)]";
+
+  return (
+    <div className="border-t border-[var(--border)] pt-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--gold-dim)]">
+            Opponent&apos;s Story
+          </span>
+          <span className={cn("text-[9px] font-medium", confColor)}>
+            {story.confidence} read
+          </span>
+        </div>
+        <span className="text-[10px] text-[var(--muted-foreground)]">
+          Your equity: {eqPct}% {expanded ? "\u25B2" : "\u25BC"}
+        </span>
+      </button>
+
+      {/* Range assessment */}
+      <p className="text-[10px] text-[var(--foreground)]/70 mt-1.5 leading-relaxed">
+        {story.rangeNarrative}
+      </p>
+
+      {/* Hero implication — always visible */}
+      <p className="text-[10px] text-[var(--foreground)]/70 mt-1 leading-relaxed">
+        {story.heroImplication}
+      </p>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 space-y-2">
+              {/* Street-by-street narrative */}
+              {story.streetNarratives.length > 0 && (
+                <div className="space-y-1">
+                  {story.streetNarratives.map((sn, i) => (
+                    <div key={i} className="text-[10px] pl-2 border-l border-[var(--border)]/30">
+                      <span className="text-[var(--muted-foreground)] uppercase text-[8px]">
+                        {sn.street}
+                      </span>
+                      <span className="text-[var(--foreground)]/60 ml-1">
+                        {sn.action}{sn.amount ? ` ${sn.amount}` : ""}
+                      </span>
+                      <p className="text-[var(--foreground)]/70">{sn.interpretation}</p>
+                      <p className="text-[var(--muted-foreground)] text-[9px]">{sn.rangeUpdate}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Range percent + equity detail */}
+              <div className="text-[10px] text-[var(--foreground)]/70 bg-[var(--muted)]/20 rounded p-2">
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="text-[var(--muted-foreground)]">
+                    Range: ~{story.data.rangePercent.toFixed(0)}% of hands
+                  </span>
+                  <span className="text-[var(--muted-foreground)]">
+                    Equity: {eqPct}%
+                  </span>
+                </div>
+                <p className="text-[9px] text-[var(--muted-foreground)]">
+                  Suggested: <span className="font-medium text-[var(--foreground)]/80 uppercase">{story.adjustedAction}</span>
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

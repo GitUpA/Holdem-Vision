@@ -478,6 +478,10 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                         selectionTarget={ws.selectionTarget}
                         villainCardBuffer={ws.villainCardBuffer.get(selectedSeat.seatIndex)}
                         readOnly={isDrillActive}
+                        heroCards={ws.heroCards}
+                        communityCards={ws.communityCards}
+                        street={ws.street}
+                        potBB={ws.pot.total}
                       />
                     </motion.div>
                   )}
