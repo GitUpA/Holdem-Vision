@@ -618,6 +618,8 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                 gameState={ws.gameState}
                 heroSeatIndex={ws.heroSeatIndex}
                 onArchetypeClick={setTutorialArchetype}
+                legalActions={ws.legalActions}
+                heroCards={ws.heroCards}
               />
 
               {/* ── Drill: Score feedback + next hand ── */}
@@ -738,7 +740,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
 // ═══════════════════════════════════════════════════════
 
 /** Coaching panel — unified with drill solution in drill mode */
-function CoachingSection({ results, drillSolution, drillScore, isDrill, gameState, heroSeatIndex, onArchetypeClick }: {
+function CoachingSection({ results, drillSolution, drillScore, isDrill, gameState, heroSeatIndex, onArchetypeClick, legalActions, heroCards }: {
   results: Map<string, import("../../../convex/lib/types/analysis").AnalysisResult>;
   drillSolution?: import("@/hooks/use-workspace").SpotSolution;
   drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
@@ -746,6 +748,8 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
   gameState?: import("../../../convex/lib/state/gameState").GameState | null;
   heroSeatIndex?: number;
   onArchetypeClick?: (id: ArchetypeId) => void;
+  legalActions?: import("../../../convex/lib/state/gameState").LegalActions | null;
+  heroCards?: import("../../../convex/lib/types/cards").CardIndex[];
 }) {
   const coachingResult = results.get("coaching");
   if (!coachingResult || coachingResult.visuals.length === 0) return null;
@@ -761,6 +765,22 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
   const archetype: ArchetypeClassification | null = gameState && heroSeatIndex !== undefined
     ? classifyArchetype(contextFromGameState(gameState, heroSeatIndex))
     : null;
+
+  // Build action stories — what each action tells opponents
+  const actionStories = useMemo(() => {
+    if (!legalActions || !gameState || !heroCards || heroCards.length < 2) return undefined;
+    const { buildActionStories } = require("../../../convex/lib/gto/actionNarratives");
+    const { categorizeHand } = require("../../../convex/lib/gto/handCategorizer");
+    const handCat = categorizeHand(heroCards, gameState.communityCards);
+    return buildActionStories(
+      heroCards,
+      gameState.communityCards,
+      legalActions,
+      opponentStory,
+      handCat,
+      gameState.currentStreet,
+    ) as import("../../../convex/lib/gto/actionNarratives").ActionStory[];
+  }, [legalActions, gameState, heroCards, opponentStory]);
 
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
@@ -779,6 +799,7 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
           onArchetypeClick={onArchetypeClick}
           archetypeLabel={archetypeLabel}
           opponentStory={opponentStory}
+          actionStories={actionStories}
         />
       </div>
     </div>

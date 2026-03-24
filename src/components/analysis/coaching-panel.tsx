@@ -7,6 +7,7 @@ import { ExplanationTree } from "./explanation-tree";
 import { SolutionDisplay } from "../drill/solution-display";
 import type { CoachingAdvice } from "../../../convex/lib/analysis/coachingLens";
 import type { OpponentStory } from "../../../convex/lib/analysis/opponentStory";
+import type { ActionStory } from "../../../convex/lib/gto/actionNarratives";
 import type { SpotSolution } from "@/hooks/use-workspace";
 import type { ArchetypeClassification, ArchetypeId } from "../../../convex/lib/gto/archetypeClassifier";
 import { getKnowledge } from "../../../convex/lib/knowledge";
@@ -51,6 +52,8 @@ interface CoachingPanelProps {
   archetypeLabel?: (id: ArchetypeId) => string;
   /** Opponent story — what their actions reveal about their holdings */
   opponentStory?: OpponentStory;
+  /** Per-action narratives — what each action tells opponents */
+  actionStories?: ActionStory[];
 }
 
 /** GTO first — it's the reference point other profiles compare against */
@@ -58,7 +61,7 @@ const PROFILE_ORDER: Record<string, number> = {
   gto: 0, tag: 1, lag: 2, nit: 3, fish: 4,
 };
 
-export function CoachingPanel({ advices, drillSolution, drillScore, autoExpandGto, archetype, onArchetypeClick, archetypeLabel: labelFn, opponentStory }: CoachingPanelProps) {
+export function CoachingPanel({ advices, drillSolution, drillScore, autoExpandGto, archetype, onArchetypeClick, archetypeLabel: labelFn, opponentStory, actionStories }: CoachingPanelProps) {
   const [expandedProfile, setExpandedProfile] = useState<string | null>(
     autoExpandGto ? "gto" : null,
   );
@@ -90,6 +93,11 @@ export function CoachingPanel({ advices, drillSolution, drillScore, autoExpandGt
       {/* Opponent Story */}
       {opponentStory && opponentStory.confidence !== "speculative" && (
         <OpponentStoryCard story={opponentStory} />
+      )}
+
+      {/* Action Stories — what each action tells opponents */}
+      {actionStories && actionStories.length > 0 && (
+        <ActionStoriesSection stories={actionStories} />
       )}
 
       {/* Profile Rows */}
@@ -315,6 +323,80 @@ function ArchetypeBadge({
         Learn more
       </span>
     </button>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// ACTION STORIES — what each action tells opponents
+// ═══════════════════════════════════════════════════════
+
+const ACTION_STORY_ICONS: Record<string, string> = {
+  fold: "🏳️", check: "👁️", call: "📞", bet: "💰", raise: "🚀",
+};
+
+function ActionStoriesSection({ stories }: { stories: ActionStory[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-md border border-[var(--border)]/50 bg-[var(--muted)]/10 p-2.5">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--gold-dim)]">
+          Your Possible Stories
+        </span>
+        <span className="text-[10px] text-[var(--muted-foreground)]">
+          {expanded ? "▲" : "▼"}
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 space-y-1.5">
+              {stories.map((story) => {
+                const colors = ACTION_COLORS[story.action] ?? ACTION_COLORS.check;
+                return (
+                  <div key={story.action} className="text-[10px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase",
+                        colors.bg, colors.text, "border", colors.border,
+                      )}>
+                        {story.action}
+                      </span>
+                      {story.amount ? (
+                        <span className="text-[var(--muted-foreground)]">{story.amount} BB</span>
+                      ) : null}
+                    </div>
+                    <p className="text-[var(--foreground)]/70 mt-0.5 pl-1 border-l-2 border-[var(--border)]/30">
+                      {story.narrative}
+                    </p>
+                    {story.counterNarrative && (
+                      <p className="text-[var(--gold-dim)]/70 text-[9px] mt-0.5 pl-1 italic">
+                        {story.counterNarrative}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {!expanded && (
+        <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+          Each action tells a different story. Tap to see what each communicates.
+        </p>
+      )}
+    </div>
   );
 }
 
