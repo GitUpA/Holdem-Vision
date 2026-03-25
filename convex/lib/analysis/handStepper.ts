@@ -18,11 +18,8 @@ import type { HandRecord } from "../audit/types";
 import { HandSession } from "../session/handSession";
 import { captureFullSnapshot, formatSnapshot, type FullSnapshot, type SnapshotOptions } from "./snapshot";
 import { currentLegalActions } from "../state/stateMachine";
-import { lookupGtoFrequencies } from "../gto/frequencyLookup";
-import { facingBetAction } from "../gto/facingBetDecision";
-import { CATEGORY_STRENGTH } from "../gto/categoryStrength";
-import { categorizeHand } from "../gto/handCategorizer";
 import { GTO_PROFILE } from "../opponents/presets";
+import { chooseActionFromProfile } from "../opponents/autoPlay";
 import { buildOpponentStory } from "./opponentStory";
 
 // ═══════════════════════════════════════════════════════
@@ -161,59 +158,21 @@ export class HandStepper {
     const legal = currentLegalActions(state);
     if (!legal) return null;
 
-    // Fast GTO lookup (no expensive equity computation)
-    const gtoLookup = this._heroCards.length >= 2
-      ? lookupGtoFrequencies(this._heroCards, state.communityCards, state, this.session.heroSeatIndex, legal)
-      : null;
+    // ONE ENGINE — same path as villain auto-play and coaching.
+    // Hero uses GTO profile (identity modifier = pure solver frequencies).
+    // Villains use their assigned profile (NIT/FISH/TAG/LAG modifiers).
+    // The engine handles facing-bet logic, preflop opening, action mapping.
+    const decision = chooseActionFromProfile(
+      state,
+      this.session.heroSeatIndex,
+      GTO_PROFILE,
+      legal,
+      () => undefined,
+      Math.random,
+      this.profiles,
+    );
 
-    let action: ActionType = legal.canCheck ? "check" : "fold";
-    let amount: number | undefined;
-
-    const facingBet = !legal.canCheck && legal.canCall;
-
-    if (facingBet) {
-      // Facing a bet: use hand strength + pot odds, NOT solver frequencies.
-      // Solver frequencies are for "first to act" — they don't apply here.
-      const handCat = this._heroCards.length >= 2
-        ? categorizeHand(this._heroCards, state.communityCards)
-        : null;
-      const strength = handCat
-        ? (CATEGORY_STRENGTH[handCat.category] ?? handCat.relativeStrength)
-        : 0.3;
-      const result = facingBetAction(
-        strength, legal.callAmount, state.pot.total,
-        legal.canRaise, legal.raiseMin,
-      );
-      action = result.action;
-      if (result.amount !== undefined) amount = result.amount;
-    } else if (gtoLookup) {
-      // First to act: use solver frequencies directly.
-      // Pick the highest-frequency action. This tends to be check (correct OOP).
-      let bestAction = "";
-      let bestFreq = 0;
-      for (const [a, f] of Object.entries(gtoLookup.frequencies)) {
-        if ((f ?? 0) > bestFreq) { bestFreq = f ?? 0; bestAction = a; }
-      }
-      if (bestAction === "fold") action = "fold";
-      else if (bestAction === "check") action = legal.canCheck ? "check" : "call";
-      else if (bestAction === "call") action = "call";
-      else if (bestAction.startsWith("bet")) action = legal.canBet ? "bet" : "check";
-      else if (bestAction.startsWith("raise")) action = legal.canRaise ? "raise" : "check";
-    }
-
-    // Validate action is legal (can't fold when no bet to face)
-    if (action === "fold" && !legal.canFold) {
-      action = legal.canCheck ? "check" : "call";
-    }
-
-    // Determine amount for bet/raise (if not already set by facingBet path)
-    if (amount === undefined) {
-      if (action === "call") amount = legal.callAmount;
-      else if (action === "bet") amount = legal.betMin;
-      else if (action === "raise") amount = legal.raiseMin;
-    }
-
-    return this.act(action, amount);
+    return this.act(decision.actionType, decision.amount);
   }
 
   /**
