@@ -141,6 +141,17 @@ describe("Outcome Analysis — Coaching vs Results", () => {
     const TOTAL_HANDS = 500;
     const startingStack = 100;
     const showdowns: ShowdownOutcome[] = [];
+    const preflopFoldAnalysis: Array<{
+      handIndex: number;
+      heroCards: string;
+      villainCards: string;
+      communityCards: string;
+      position: string;
+      gtoAction: string;
+      heroHand: string;
+      villainHand: string;
+      heroWouldHaveWon: boolean;
+    }> = [];
     const postflopFoldAnalysis: Array<{
       handIndex: number;
       heroCards: string;
@@ -189,6 +200,33 @@ describe("Outcome Analysis — Coaching vs Results", () => {
         const foldAction = result.heroActions.find((a) => a.action === "fold");
         if (foldAction?.street === "preflop") {
           foldedPreflop++;
+          // Capture preflop fold data for analysis
+          const heroCards = heroPlayer.holeCards as CardIndex[];
+          const communityCards = result.finalState.communityCards as CardIndex[];
+          const activeVillains = result.finalState.players.filter(
+            (p, idx) => idx !== heroSeat && p.status !== "folded" && p.holeCards.length === 2,
+          );
+          if (heroCards.length === 2 && communityCards.length >= 5 && activeVillains.length > 0) {
+            const villCards = activeVillains[0].holeCards as CardIndex[];
+            const heroEval = evaluateHand([...heroCards, ...communityCards]);
+            const villEval = evaluateHand([...villCards, ...communityCards]);
+            const heroWouldWin = compareHandRanks(heroEval.rank, villEval.rank) > 0;
+            const position = heroPlayer.position;
+            const gtoAction = result.steps.length > 0
+              ? result.steps[0].snapshot.gtoOptimalAction ?? "unknown"
+              : "unknown";
+            preflopFoldAnalysis.push({
+              handIndex: i,
+              heroCards: heroCards.map(cardToString).join(" "),
+              villainCards: villCards.map(cardToString).join(" "),
+              communityCards: communityCards.map(cardToString).join(" "),
+              position,
+              gtoAction,
+              heroHand: heroEval.rank.name,
+              villainHand: villEval.rank.name,
+              heroWouldHaveWon: heroWouldWin,
+            });
+          }
           continue;
         }
         // Postflop fold — analyze what would have happened
@@ -328,7 +366,39 @@ describe("Outcome Analysis — Coaching vs Results", () => {
       }
     }
 
+    // ── Preflop Fold Analysis ──
+    if (preflopFoldAnalysis.length > 0) {
+      const pfWinners = preflopFoldAnalysis.filter((f) => f.heroWouldHaveWon);
+      const pfLosers = preflopFoldAnalysis.filter((f) => !f.heroWouldHaveWon);
+
+      console.log(`\n${"=".repeat(70)}`);
+      console.log(`PREFLOP FOLD ANALYSIS — ${preflopFoldAnalysis.length} hands (of ${foldedPreflop} preflop folds)`);
+      console.log(`${"=".repeat(70)}`);
+      console.log(`  Correctly folded (would have lost):  ${pfLosers.length} (${((pfLosers.length / preflopFoldAnalysis.length) * 100).toFixed(0)}%)`);
+      console.log(`  Folded winners (left money):         ${pfWinners.length} (${((pfWinners.length / preflopFoldAnalysis.length) * 100).toFixed(0)}%)`);
+
+      // Show folded winners grouped by position
+      if (pfWinners.length > 0) {
+        console.log(`\n  FOLDED WINNERS BY POSITION:`);
+        const byPos: Record<string, number> = {};
+        for (const f of pfWinners) {
+          byPos[f.position] = (byPos[f.position] ?? 0) + 1;
+        }
+        for (const [pos, count] of Object.entries(byPos).sort((a, b) => b[1] - a[1])) {
+          console.log(`    ${pos.padEnd(5)}: ${count}`);
+        }
+
+        // Show some example folded winners
+        console.log(`\n  EXAMPLE FOLDED WINNERS (first 10):`);
+        for (const f of pfWinners.slice(0, 10)) {
+          console.log(
+            `    #${String(f.handIndex).padStart(3)} ${f.position.padEnd(5)} ${f.heroCards.padEnd(6)} → ${f.heroHand.padEnd(15)} vs ${f.villainHand.padEnd(15)} Board: ${f.communityCards}`,
+          );
+        }
+      }
+    }
+
     // ── Assertions ──
-    expect(showdowns.length + postflopFoldAnalysis.length).toBeGreaterThan(0);
+    expect(showdowns.length + postflopFoldAnalysis.length + preflopFoldAnalysis.length).toBeGreaterThan(0);
   }, 120_000);
 });
