@@ -36,6 +36,7 @@ import { explainArchetype } from "../gto/archetypeExplainer";
 import { gtoActionToGameAction, remapFrequenciesToLegal } from "../gto/actionMapping";
 import { detectMixedStrategy, getTradeoffText } from "../gto/mixedStrategy";
 import { buildOpponentStory, type OpponentStory } from "./opponentStory";
+import { analyzeBoard } from "../opponents/engines/boardTexture";
 
 // Ensure engine is registered
 import "../opponents/engines/modifiedGtoEngine";
@@ -129,6 +130,10 @@ export const coachingLens: AnalysisLens = {
         (p) => p.seatIndex !== heroSeat && (p.status === "active" || p.status === "all_in"),
       );
       if (activePlayers.length > 0 && context.opponents && context.opponents.length > 0) {
+        // Pre-compute board texture once for all opponent stories
+        const boardTex = gameState.communityCards.length >= 3
+          ? analyzeBoard(gameState.communityCards)
+          : undefined;
         const opponentStories: OpponentStory[] = [];
         for (const opp of activePlayers) {
           // Find this opponent's profile from context
@@ -155,6 +160,7 @@ export const coachingLens: AnalysisLens = {
             legal.canCall ? legal.callAmount : 0,
             gameState.currentStreet,
             context.deadCards,
+            boardTex,
           );
           opponentStories.push(story);
         }
@@ -278,6 +284,24 @@ export const coachingLens: AnalysisLens = {
             sentiment: "warning",
           },
         });
+      }
+    }
+
+    // Adjust non-GTO advices when opponent story is confident and hero is behind
+    if (primaryOpponentStory && primaryOpponentStory.confidence !== "speculative") {
+      const eq = primaryOpponentStory.data.equityVsRange;
+      if (eq < 0.45) {
+        for (const advice of advices) {
+          if (advice.profileId === "gto") continue; // already adjusted above
+          const isAggressive = advice.actionType === "bet" || advice.actionType === "raise";
+          if (isAggressive && primaryOpponentStory.adjustedAction === "fold") {
+            advice.actionType = "fold";
+            advice.amount = undefined;
+          } else if (isAggressive && primaryOpponentStory.adjustedAction === "check") {
+            advice.actionType = legal.canCheck ? "check" : "call";
+            advice.amount = advice.actionType === "call" ? legal.callAmount : undefined;
+          }
+        }
       }
     }
 

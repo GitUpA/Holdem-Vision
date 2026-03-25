@@ -76,6 +76,7 @@ export function buildOpponentStory(
   callCostBB: number,
   street: Street,
   deadCards: CardIndex[] = [],
+  boardTexture?: BoardTexture,
 ): OpponentStory {
   // 1. Estimate opponent's range from their action sequence
   const knownCards = [...heroCards, ...communityCards, ...deadCards];
@@ -86,12 +87,12 @@ export function buildOpponentStory(
     opponentPosition,
   );
 
-  // 2. Analyze board texture
-  const boardTexture = communityCards.length >= 3
+  // 2. Analyze board texture (use pre-computed if provided)
+  const boardTex = boardTexture ?? (communityCards.length >= 3
     ? analyzeBoard(communityCards)
     : { wetness: 0.5, isMonotone: false, isTwoTone: false, isRainbow: true,
         isPaired: false, isTrips: false, hasConnectors: false, highCard: 12,
-        flushPossible: false, straightHeavy: false, cardCount: 0, description: "preflop" } as BoardTexture;
+        flushPossible: false, straightHeavy: false, cardCount: 0, description: "preflop" } as BoardTexture);
 
   // 3. Compute equity vs estimated range
   let equityResult: EquityResult;
@@ -109,7 +110,7 @@ export function buildOpponentStory(
     opponentActions,
     opponentProfile,
     communityCards,
-    boardTexture,
+    boardTex,
   );
 
   // 6. Build range narrative
@@ -137,11 +138,12 @@ export function buildOpponentStory(
     street,
   );
 
-  // 9. Determine confidence
+  // 9. Determine confidence — consider both action count and range narrowing
   const actionCount = opponentActions.filter(a => a.actionType !== "fold").length;
   const confidence: OpponentStory["confidence"] =
     actionCount >= 3 ? "strong" :
-    actionCount >= 2 ? "moderate" : "speculative";
+    actionCount >= 2 ? "moderate" :
+    rangePctVal < 20 ? "moderate" : "speculative";
 
   // 10. Build explanation tree
   const explanation = buildExplanationTree(
@@ -165,7 +167,7 @@ export function buildOpponentStory(
       equityVsRange: equityResult.win,
       potOddsNeeded,
       rangePercent: rangePctVal,
-      boardTexture,
+      boardTexture: boardTex,
       heroHandStrength: heroStrength,
     },
     explanation,

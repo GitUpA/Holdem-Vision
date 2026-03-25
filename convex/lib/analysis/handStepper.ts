@@ -20,6 +20,7 @@ import { captureFullSnapshot, formatSnapshot, type FullSnapshot, type SnapshotOp
 import { currentLegalActions } from "../state/stateMachine";
 import { lookupGtoFrequencies } from "../gto/frequencyLookup";
 import { GTO_PROFILE } from "../opponents/presets";
+import { buildOpponentStory } from "./opponentStory";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -174,6 +175,31 @@ export class HandStepper {
       else if (bestAction === "call") action = "call";
       else if (bestAction.startsWith("bet")) action = legal.canBet ? "bet" : "raise";
       else if (bestAction.startsWith("raise")) action = "raise";
+    }
+
+    // Check opponent story for override — if hero is significantly behind, fold
+    if (this._heroCards.length >= 2 && this.profiles.size > 0) {
+      const activeOpps = state.players.filter(
+        p => p.seatIndex !== this.session.heroSeatIndex && (p.status === "active" || p.status === "all_in"),
+      );
+      for (const opp of activeOpps) {
+        const profile = this.profiles.get(opp.seatIndex);
+        if (!profile) continue;
+        const oppActions = state.actionHistory
+          .filter(a => a.seatIndex === opp.seatIndex)
+          .map(a => ({ street: a.street as "preflop" | "flop" | "turn" | "river", actionType: a.actionType, amount: a.amount }));
+        if (oppActions.length === 0) continue;
+        try {
+          const story = buildOpponentStory(
+            this._heroCards, state.communityCards, oppActions, profile, opp.position,
+            state.pot.total, legal.canCall ? legal.callAmount : 0, state.currentStreet,
+          );
+          if (story.confidence !== "speculative" && story.data.equityVsRange < 0.35) {
+            action = "fold";
+            break;
+          }
+        } catch { /* best effort */ }
+      }
     }
 
     // Determine amount for bet/raise

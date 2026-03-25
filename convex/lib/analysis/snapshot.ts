@@ -244,6 +244,7 @@ export function captureFullSnapshot(
         gameState.pot.total / bigBlind,
         legal?.canCall ? legal.callAmount / bigBlind : 0,
         street, opts.deadCards ?? [],
+        boardTex ?? undefined,
       );
       rawOpponentStories.push(story);
     } catch { /* best-effort */ }

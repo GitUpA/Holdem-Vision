@@ -181,12 +181,20 @@ function categorizePreflop(holeCards: CardIndex[]): HandCategorization {
     };
   }
 
-  // Everything else
+  // Everything else — suited junk is marginal (flush potential), offsuit is air
+  if (suited) {
+    return {
+      category: "weak_draw",
+      subCategory: "suited_junk",
+      relativeStrength: 0.1 + highRank * 0.01,
+      description: `Weak suited hand (${rankName(highRank)}${rankName(lowRank)}s)`,
+    };
+  }
   return {
     category: "air",
-    subCategory: suited ? "suited_junk" : "offsuit_junk",
+    subCategory: "offsuit_junk",
     relativeStrength: 0.05 + highRank * 0.01,
-    description: `${rankName(highRank)}${rankName(lowRank)}${suited ? "s" : "o"}`,
+    description: `Weak offsuit hand (${rankName(highRank)}${rankName(lowRank)}o)`,
   };
 }
 
