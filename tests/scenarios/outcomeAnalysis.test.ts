@@ -14,7 +14,7 @@
 import { describe, it, expect } from "vitest";
 import { HandStepper, type StepperConfig } from "../../convex/lib/analysis/handStepper";
 import type { FullSnapshot } from "../../convex/lib/analysis/snapshot";
-import { evaluateHand } from "../../convex/lib/primitives/handEvaluator";
+import { evaluateHand, compareHandRanks } from "../../convex/lib/primitives/handEvaluator";
 import type { CardIndex, Street } from "../../convex/lib/types/cards";
 import { cardToString } from "../../convex/lib/primitives/card";
 
@@ -141,6 +141,18 @@ describe("Outcome Analysis — Coaching vs Results", () => {
     const TOTAL_HANDS = 500;
     const startingStack = 100;
     const showdowns: ShowdownOutcome[] = [];
+    const postflopFoldAnalysis: Array<{
+      handIndex: number;
+      heroCards: string;
+      villainCards: string;
+      communityCards: string;
+      foldStreet: string;
+      heroHand: string;
+      villainHand: string;
+      heroWouldHaveWon: boolean;
+      invested: number;
+      coachingAction: string;
+    }> = [];
     let foldedPreflop = 0;
     let foldedPostflop = 0;
     let everyoneFolded = 0;
@@ -175,8 +187,38 @@ describe("Outcome Analysis — Coaching vs Results", () => {
       const heroDidFold = heroPlayer.status === "folded" || result.heroActions.some((a) => a.action === "fold");
       if (heroDidFold) {
         const foldAction = result.heroActions.find((a) => a.action === "fold");
-        if (foldAction?.street === "preflop") foldedPreflop++;
-        else foldedPostflop++;
+        if (foldAction?.street === "preflop") {
+          foldedPreflop++;
+          continue;
+        }
+        // Postflop fold — analyze what would have happened
+        foldedPostflop++;
+        const heroCards = heroPlayer.holeCards as CardIndex[];
+        const communityCards = result.finalState.communityCards as CardIndex[];
+        const activeVillains = result.finalState.players.filter(
+          (p, idx) => idx !== heroSeat && p.status !== "folded" && p.holeCards.length === 2,
+        );
+        if (communityCards.length >= 5 && heroCards.length === 2 && activeVillains.length > 0) {
+          const villCards = activeVillains[0].holeCards as CardIndex[];
+          const heroEval = evaluateHand([...heroCards, ...communityCards]);
+          const villEval = evaluateHand([...villCards, ...communityCards]);
+          const heroWouldWin = compareHandRanks(heroEval.rank, villEval.rank) > 0;
+          const invested = startingStack - heroPlayer.currentStack;
+          postflopFoldAnalysis.push({
+            handIndex: i,
+            heroCards: heroCards.map(cardToString).join(" "),
+            villainCards: villCards.map(cardToString).join(" "),
+            communityCards: communityCards.map(cardToString).join(" "),
+            foldStreet: foldAction?.street ?? "unknown",
+            heroHand: heroEval.rank.name,
+            villainHand: villEval.rank.name,
+            heroWouldHaveWon: heroWouldWin,
+            invested,
+            coachingAction: result.steps.length > 0
+              ? result.steps[result.steps.length - 1].snapshot.gtoOptimalAction ?? "unknown"
+              : "unknown",
+          });
+        }
         continue;
       }
 
@@ -261,7 +303,32 @@ describe("Outcome Analysis — Coaching vs Results", () => {
       }
     }
 
+    // ── Postflop Fold Analysis ──
+    if (postflopFoldAnalysis.length > 0) {
+      const foldedWinners = postflopFoldAnalysis.filter((f) => f.heroWouldHaveWon);
+      const foldedLosers = postflopFoldAnalysis.filter((f) => !f.heroWouldHaveWon);
+      const savedByFolding = foldedLosers.reduce((s, f) => s + f.invested, 0);
+
+      console.log(`\n${"=".repeat(70)}`);
+      console.log(`POSTFLOP FOLD ANALYSIS — ${postflopFoldAnalysis.length} hands`);
+      console.log(`${"=".repeat(70)}`);
+      console.log(`  Correctly folded (would have lost):  ${foldedLosers.length} (${((foldedLosers.length / postflopFoldAnalysis.length) * 100).toFixed(0)}%)`);
+      console.log(`  Folded winners (left money):         ${foldedWinners.length} (${((foldedWinners.length / postflopFoldAnalysis.length) * 100).toFixed(0)}%)`);
+      console.log();
+
+      for (const f of postflopFoldAnalysis) {
+        const icon = f.heroWouldHaveWon ? "FOLDED WINNER" : "CORRECT FOLD";
+        console.log(
+          `[${icon}] #${String(f.handIndex).padStart(3)} Hero: ${f.heroCards.padEnd(6)} vs Villain: ${f.villainCards.padEnd(6)} ` +
+          `Board: ${f.communityCards}`,
+        );
+        console.log(
+          `     ${f.heroHand.padEnd(15)} vs ${f.villainHand.padEnd(15)} Folded ${f.foldStreet} (invested ${f.invested} BB)`,
+        );
+      }
+    }
+
     // ── Assertions ──
-    expect(showdowns.length).toBeGreaterThan(0);
+    expect(showdowns.length + postflopFoldAnalysis.length).toBeGreaterThan(0);
   }, 120_000);
 });

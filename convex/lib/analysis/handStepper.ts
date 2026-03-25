@@ -19,6 +19,9 @@ import { HandSession } from "../session/handSession";
 import { captureFullSnapshot, formatSnapshot, type FullSnapshot, type SnapshotOptions } from "./snapshot";
 import { currentLegalActions } from "../state/stateMachine";
 import { lookupGtoFrequencies } from "../gto/frequencyLookup";
+import { facingBetAction } from "../gto/facingBetDecision";
+import { CATEGORY_STRENGTH } from "../gto/categoryStrength";
+import { categorizeHand } from "../gto/handCategorizer";
 import { GTO_PROFILE } from "../opponents/presets";
 import { buildOpponentStory } from "./opponentStory";
 
@@ -162,36 +165,37 @@ export class HandStepper {
       : null;
 
     let action: ActionType = legal.canCheck ? "check" : "fold";
+    let amount: number | undefined;
 
-    if (gtoLookup) {
-      const freqs = gtoLookup.frequencies;
-      const facingBet = !legal.canCheck && legal.canCall;
+    const facingBet = !legal.canCheck && legal.canCall;
 
-      if (facingBet) {
-        // Facing a bet: solver "check" doesn't apply. Remap to fold/call/raise.
-        // check → fold (passive intent becomes fold when can't be passive)
-        // fold → fold, call → call, bet_* → raise
-        const foldFreq = (freqs.fold ?? 0) + (freqs.check ?? 0);
-        const callFreq = freqs.call ?? 0;
-        const raiseFreq = (freqs.raise_large ?? 0) + (freqs.raise_small ?? 0)
-          + (freqs.bet_large ?? 0) + (freqs.bet_medium ?? 0) + (freqs.bet_small ?? 0);
-
-        if (foldFreq >= callFreq && foldFreq >= raiseFreq) action = "fold";
-        else if (callFreq >= raiseFreq) action = "call";
-        else action = "raise";
-      } else {
-        // First to act or check available: use frequencies directly
-        let bestAction = "";
-        let bestFreq = 0;
-        for (const [a, f] of Object.entries(freqs)) {
-          if ((f ?? 0) > bestFreq) { bestFreq = f ?? 0; bestAction = a; }
-        }
-        if (bestAction === "fold") action = "fold";
-        else if (bestAction === "check") action = "check";
-        else if (bestAction === "call") action = "call";
-        else if (bestAction.startsWith("bet")) action = legal.canBet ? "bet" : "raise";
-        else if (bestAction.startsWith("raise")) action = "raise";
+    if (facingBet) {
+      // Facing a bet: use hand strength + pot odds, NOT solver frequencies.
+      // Solver frequencies are for "first to act" — they don't apply here.
+      const handCat = this._heroCards.length >= 2
+        ? categorizeHand(this._heroCards, state.communityCards)
+        : null;
+      const strength = handCat
+        ? (CATEGORY_STRENGTH[handCat.category] ?? handCat.relativeStrength)
+        : 0.3;
+      const result = facingBetAction(
+        strength, legal.callAmount, state.pot.total,
+        legal.canRaise, legal.raiseMin,
+      );
+      action = result.action;
+      if (result.amount !== undefined) amount = result.amount;
+    } else if (gtoLookup) {
+      // First to act: use solver frequencies directly
+      let bestAction = "";
+      let bestFreq = 0;
+      for (const [a, f] of Object.entries(gtoLookup.frequencies)) {
+        if ((f ?? 0) > bestFreq) { bestFreq = f ?? 0; bestAction = a; }
       }
+      if (bestAction === "fold") action = "fold";
+      else if (bestAction === "check") action = "check";
+      else if (bestAction === "call") action = "call";
+      else if (bestAction.startsWith("bet")) action = legal.canBet ? "bet" : "raise";
+      else if (bestAction.startsWith("raise")) action = "raise";
     }
 
     // Validate action is legal (can't fold when no bet to face)
@@ -199,11 +203,12 @@ export class HandStepper {
       action = legal.canCheck ? "check" : "call";
     }
 
-    // Determine amount for bet/raise
-    let amount: number | undefined;
-    if (action === "call") amount = legal.callAmount;
-    else if (action === "bet") amount = legal.betMin;
-    else if (action === "raise") amount = legal.raiseMin;
+    // Determine amount for bet/raise (if not already set by facingBet path)
+    if (amount === undefined) {
+      if (action === "call") amount = legal.callAmount;
+      else if (action === "bet") amount = legal.betMin;
+      else if (action === "raise") amount = legal.raiseMin;
+    }
 
     return this.act(action, amount);
   }
