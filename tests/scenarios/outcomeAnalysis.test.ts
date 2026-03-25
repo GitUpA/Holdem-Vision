@@ -138,7 +138,7 @@ function buildShowdownOutcome(
 
 describe("Outcome Analysis — Coaching vs Results", () => {
   it("plays 100 hands following coaching, analyzes showdown outcomes", () => {
-    const TOTAL_HANDS = 50;
+    const TOTAL_HANDS = 500;
     const startingStack = 100;
     const showdowns: ShowdownOutcome[] = [];
     let foldedPreflop = 0;
