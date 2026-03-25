@@ -259,7 +259,7 @@ function buildHeroAssessment(
   if (bestOppEquity !== null) {
     const eqPct = (bestOppEquity * 100).toFixed(0);
     if (bestOppEquity < 0.3) {
-      return `Your ${heroHandDesc} is in trouble — only ${eqPct}% equity against their likely range. You have no story to tell here.`;
+      return `Your ${heroHandDesc} is behind — only ${eqPct}% equity against their likely range. But pot odds may justify continuing.`;
     }
     if (bestOppEquity < 0.45) {
       return `Your ${heroHandDesc} has ${eqPct}% equity against their range — marginal. This is a spot where your story needs to be convincing or you fold.`;
@@ -297,23 +297,19 @@ function buildRecommendation(
   let recommendedAction: ActionType | null = null;
   let confidence: HandCommentary["confidence"] = "close_spot";
 
-  // Use opponent story's adjusted action if available and confident
-  const strongestOpp = opponentStories?.length
-    ? opponentStories.reduce((a, b) => a.data.equityVsRange < b.data.equityVsRange ? a : b)
-    : undefined;
-
-  if (strongestOpp && strongestOpp.confidence !== "speculative") {
-    recommendedAction = strongestOpp.adjustedAction as ActionType;
-  }
-
-  // Fall back to GTO optimal action
-  if (!recommendedAction && gtoOptimalAction) {
+  // GTO is the primary recommendation — opponent story provides narrative context
+  if (gtoOptimalAction) {
     if (gtoOptimalAction === "fold") recommendedAction = "fold";
     else if (gtoOptimalAction === "check") recommendedAction = legal.canCheck ? "check" : "call";
     else if (gtoOptimalAction === "call") recommendedAction = "call";
     else if (gtoOptimalAction.startsWith("bet")) recommendedAction = "bet";
     else if (gtoOptimalAction.startsWith("raise")) recommendedAction = "raise";
   }
+
+  // Opponent story adds narrative tension but does NOT override GTO
+  const strongestOpp = opponentStories?.length
+    ? opponentStories.reduce((a, b) => a.data.equityVsRange < b.data.equityVsRange ? a : b)
+    : undefined;
 
   // Determine confidence
   if (gtoFrequencies) {
@@ -332,9 +328,23 @@ function buildRecommendation(
 
   let recommendation: string;
 
+  // Detect tension: GTO says continue but equity says fold (MDF / bluff-catching spots)
+  const equityVsStory = strongestOpp?.data.equityVsRange;
+  const gtoSaysContinue = recommendedAction && recommendedAction !== "fold";
+  const equitySaysFold = equityVsStory !== undefined && equityVsStory < 0.3 && strongestOpp?.confidence !== "speculative";
+  const isMdfSpot = gtoSaysContinue && equitySaysFold;
+
   if (recommendedAction === "fold") {
     const reason = actionNarrative?.counterNarrative ?? "The math doesn't support continuing.";
     recommendation = `Fold. ${reason}${gtoConfirmation}`;
+  } else if (isMdfSpot && recommendedAction === "call") {
+    // Special MDF narrative: equity is low but pot odds demand a call
+    const eqPct = equityVsStory !== undefined ? (equityVsStory * 100).toFixed(0) : "?";
+    recommendation = `Call. Your equity is only ${eqPct}% against their likely range, but the pot odds demand it — at these odds, they must be bluffing often enough to make this profitable. This is a bluff-catching spot where folding lets them exploit you.${gtoConfirmation}`;
+  } else if (isMdfSpot) {
+    const eqPct = equityVsStory !== undefined ? (equityVsStory * 100).toFixed(0) : "?";
+    const label = recommendedAction === "bet" ? "Bet" : recommendedAction === "raise" ? "Raise" : recommendedAction === "check" ? "Check" : "Continue";
+    recommendation = `${label}. Despite only ${eqPct}% equity against their range, the pot odds and position justify continuing.${gtoConfirmation}`;
   } else if (recommendedAction === "check") {
     const reason = actionNarrative?.counterNarrative ?? "Control the pot and see what develops.";
     recommendation = `Check. ${reason}${gtoConfirmation}`;

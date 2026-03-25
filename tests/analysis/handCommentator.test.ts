@@ -53,7 +53,7 @@ describe("Hand Commentator", () => {
     expect(result.summary.length).toBeGreaterThan(10);
   });
 
-  it("recommends fold when equity is low against opponent story", () => {
+  it("recommends fold when GTO says fold and equity is low", () => {
     const input: CommentaryInput = {
       heroCards: [cardFromString("9c"), cardFromString("4c")],
       communityCards: [],
@@ -61,15 +61,36 @@ describe("Hand Commentator", () => {
       heroSeat: 5,
       legal: makeLegal(),
       handCat: makeHandCat("weak starting hand", 0.15),
+      gtoFrequencies: { fold: 0.9, call: 0.05, raise_large: 0.05 },
+      gtoOptimalAction: "fold",
       opponentStories: [makeOppStory(0.25, 12)],
     };
 
     const result = commentateHand(input);
     expect(result.recommendedAction).toBe("fold");
-    expect(result.narrative).toContain("no story to tell");
+    expect(result.narrative).toContain("behind");
   });
 
-  it("recommends continuing when equity is good", () => {
+  it("recommends call when GTO says call even with low equity (MDF spot)", () => {
+    const input: CommentaryInput = {
+      heroCards: [cardFromString("Kc"), cardFromString("Td")],
+      communityCards: [],
+      gameState: state,
+      heroSeat: 5,
+      legal: makeLegal(),
+      handCat: makeHandCat("air (K high)", 0.15),
+      gtoFrequencies: { fold: 0, call: 1.0 },
+      gtoOptimalAction: "call",
+      opponentStories: [makeOppStory(0.01, 3)],
+    };
+
+    const result = commentateHand(input);
+    // GTO says call, even though equity is 1% — MDF spot
+    expect(result.recommendedAction).toBe("call");
+    expect(result.narrative).toContain("pot odds");
+  });
+
+  it("recommends continuing when GTO says continue and equity is good", () => {
     const input: CommentaryInput = {
       heroCards: [cardFromString("As"), cardFromString("Ah")],
       communityCards: [],
@@ -77,6 +98,8 @@ describe("Hand Commentator", () => {
       heroSeat: 5,
       legal: makeLegal(),
       handCat: makeHandCat("premium pair", 0.95),
+      gtoFrequencies: { fold: 0, call: 0.3, raise_large: 0.7 },
+      gtoOptimalAction: "raise_large",
       opponentStories: [makeOppStory(0.8, 15)],
     };
 
