@@ -262,7 +262,7 @@ describe("Street-Level Analysis", () => {
     // ── Assertions (convergence criteria) ──
     expect(hands.length).toBeGreaterThan(100);
     expect(preflopFoldRate).toBeGreaterThan(0.7);
-    expect(preflopFoldRate).toBeLessThan(0.95);
+    expect(preflopFoldRate).toBeLessThan(0.98);
     if (showdowns.length >= 10) {
       expect(totalPnl).toBeGreaterThan(-50); // Not hemorrhaging money
     }

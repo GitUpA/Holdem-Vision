@@ -18,6 +18,9 @@ import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
 import type { ActionType, LegalActions } from "../../state/gameState";
 import type { ActionFrequencies, GtoAction } from "../../gto/tables/types";
 import { registerEngine } from "./engineRegistry";
+import { facingBetAction } from "../../gto/facingBetDecision";
+import { CATEGORY_STRENGTH } from "../../gto/categoryStrength";
+import { categorizeHand } from "../../gto/handCategorizer";
 
 // GTO base frequency retrieval — shared lookup
 import type { ArchetypeClassification } from "../../gto/archetypeClassifier";
@@ -69,11 +72,13 @@ export const modifiedGtoEngine: DecisionEngine = {
     const modifiedFreqs = applyModifier(gtoFreqs, modifier, factors);
 
     // ── 5. Sample action from modified frequencies ──
+    // Pass hand strength so facing-bet mapping (check→fold vs check→call) uses it
     const { actionType, amount } = sampleFromModifiedFrequencies(
       modifiedFreqs,
       ctx.legal,
       ctx.potSize,
       ctx.random,
+      factors.handStrength,
     );
 
     // ── 6. Build narrative explanation ──
@@ -207,6 +212,7 @@ function sampleFromModifiedFrequencies(
   legal: LegalActions,
   potSize: number,
   random: () => number,
+  handStrength?: number,
 ): { actionType: ActionType; amount?: number } {
   // Build weighted options
   const options: { actionType: ActionType; amount?: number; weight: number }[] = [];
@@ -214,7 +220,7 @@ function sampleFromModifiedFrequencies(
   for (const [action, freq] of Object.entries(frequencies)) {
     if (!freq || freq < 0.001) continue;
 
-    const mapped = mapGtoActionToLegal(action as GtoAction, legal, potSize);
+    const mapped = mapGtoActionToLegal(action as GtoAction, legal, potSize, handStrength);
     if (mapped) {
       const existing = options.find(
         (o) => o.actionType === mapped.actionType && o.amount === mapped.amount,
@@ -254,6 +260,7 @@ function mapGtoActionToLegal(
   gtoAction: GtoAction,
   legal: LegalActions,
   potSize: number,
+  handStrength?: number,
 ): { actionType: ActionType; amount?: number } | null {
   const clamp = (v: number, min: number, max: number) =>
     Math.max(min, Math.min(max, v));
@@ -265,6 +272,13 @@ function mapGtoActionToLegal(
       return null;
     case "check":
       if (legal.canCheck) return { actionType: "check" };
+      // Facing a bet: solver "check" includes both weak (check-fold) and strong (check-call).
+      // Use hand strength to decide: strong hands call, weak hands fold.
+      if (handStrength !== undefined && handStrength >= 0.35) {
+        if (legal.canCall) return { actionType: "call", amount: legal.callAmount };
+      } else {
+        if (legal.canFold) return { actionType: "fold" };
+      }
       if (legal.canCall) return { actionType: "call", amount: legal.callAmount };
       return null;
     case "call":
