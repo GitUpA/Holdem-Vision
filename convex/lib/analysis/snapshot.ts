@@ -147,9 +147,15 @@ export interface FullSnapshot {
 // MAIN
 // ═══════════════════════════════════════════════════════
 
+export type SnapshotDetailLevel = boolean | "lite";
+
 export interface SnapshotOptions {
-  /** Include raw debug data (larger output, development use) */
-  debug?: boolean;
+  /** Detail level:
+   *  - false: minimal (GTO action, basic state, no stories/commentary)
+   *  - "lite": everything EXCEPT Monte Carlo equity (opponent cards, commentary, stories without equity)
+   *  - true: full capture including Monte Carlo equity computations
+   */
+  debug?: SnapshotDetailLevel;
   /** Opponent profiles keyed by seat index */
   opponentProfiles?: Map<number, OpponentProfile>;
   /** Dead cards (folded hands we know about) */
@@ -226,28 +232,35 @@ export function captureFullSnapshot(
 
   // ── Opponent stories ──
   const rawOpponentStories: OpponentStory[] = [];
+  const detailLevel = opts.debug;
+  const includeStories = detailLevel === true || detailLevel === "lite";
+
   const activeOpponents = gameState.players.filter(
     (p) => p.seatIndex !== heroSeat && (p.status === "active" || p.status === "all_in"),
   );
 
-  for (const opp of activeOpponents) {
-    const profile = opts.opponentProfiles?.get(opp.seatIndex);
-    if (!profile) continue;
-    const oppActions: PlayerAction[] = gameState.actionHistory
-      .filter((a) => a.seatIndex === opp.seatIndex)
-      .map((a) => ({ street: a.street as Street, actionType: a.actionType, amount: a.amount }));
-    if (oppActions.length === 0) continue;
+  if (includeStories) {
+    for (const opp of activeOpponents) {
+      const profile = opts.opponentProfiles?.get(opp.seatIndex);
+      if (!profile) continue;
+      const oppActions: PlayerAction[] = gameState.actionHistory
+        .filter((a) => a.seatIndex === opp.seatIndex)
+        .map((a) => ({ street: a.street as Street, actionType: a.actionType, amount: a.amount }));
+      if (oppActions.length === 0) continue;
 
-    try {
-      const story = buildOpponentStory(
-        heroCards, communityCards, oppActions, profile, opp.position,
-        gameState.pot.total / bigBlind,
-        legal?.canCall ? legal.callAmount / bigBlind : 0,
-        street, opts.deadCards ?? [],
-        boardTex ?? undefined,
-      );
-      rawOpponentStories.push(story);
-    } catch { /* best-effort */ }
+      try {
+        // "lite" mode skips Monte Carlo equity — passes skipEquity flag
+        const story = buildOpponentStory(
+          heroCards, communityCards, oppActions, profile, opp.position,
+          gameState.pot.total / bigBlind,
+          legal?.canCall ? legal.callAmount / bigBlind : 0,
+          street, opts.deadCards ?? [],
+          boardTex ?? undefined,
+          detailLevel === "lite", // skipEquity
+        );
+        rawOpponentStories.push(story);
+      } catch { /* best-effort */ }
+    }
   }
 
   // ── Action stories ──

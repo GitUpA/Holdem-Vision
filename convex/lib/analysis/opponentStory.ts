@@ -77,6 +77,7 @@ export function buildOpponentStory(
   street: Street,
   deadCards: CardIndex[] = [],
   boardTexture?: BoardTexture,
+  skipEquity = false,
 ): OpponentStory {
   // 1. Estimate opponent's range from their action sequence
   const knownCards = [...heroCards, ...communityCards, ...deadCards];
@@ -94,9 +95,11 @@ export function buildOpponentStory(
         isPaired: false, isTrips: false, hasConnectors: false, highCard: 12,
         flushPossible: false, straightHeavy: false, cardCount: 0, description: "preflop" } as BoardTexture);
 
-  // 3. Compute equity vs estimated range
+  // 3. Compute equity vs estimated range (skip in lite mode — Monte Carlo is expensive)
   let equityResult: EquityResult;
-  if (heroCards.length === 2 && rangeEst.range.size > 0) {
+  if (skipEquity) {
+    equityResult = { win: 0.5, tie: 0, lose: 0.5, trials: 0, handDistribution: {} };
+  } else if (heroCards.length === 2 && rangeEst.range.size > 0) {
     equityResult = equityVsRange(heroCards, communityCards, rangeEst.range, deadCards, 3000);
   } else {
     equityResult = { win: 0.5, tie: 0, lose: 0.5, trials: 0, handDistribution: {} };

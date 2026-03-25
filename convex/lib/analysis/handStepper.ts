@@ -164,42 +164,39 @@ export class HandStepper {
     let action: ActionType = legal.canCheck ? "check" : "fold";
 
     if (gtoLookup) {
-      // Find optimal action from GTO frequencies
-      let bestAction = "";
-      let bestFreq = 0;
-      for (const [a, f] of Object.entries(gtoLookup.frequencies)) {
-        if ((f ?? 0) > bestFreq) { bestFreq = f ?? 0; bestAction = a; }
+      const freqs = gtoLookup.frequencies;
+      const facingBet = !legal.canCheck && legal.canCall;
+
+      if (facingBet) {
+        // Facing a bet: solver "check" doesn't apply. Remap to fold/call/raise.
+        // check → fold (passive intent becomes fold when can't be passive)
+        // fold → fold, call → call, bet_* → raise
+        const foldFreq = (freqs.fold ?? 0) + (freqs.check ?? 0);
+        const callFreq = freqs.call ?? 0;
+        const raiseFreq = (freqs.raise_large ?? 0) + (freqs.raise_small ?? 0)
+          + (freqs.bet_large ?? 0) + (freqs.bet_medium ?? 0) + (freqs.bet_small ?? 0);
+
+        if (foldFreq >= callFreq && foldFreq >= raiseFreq) action = "fold";
+        else if (callFreq >= raiseFreq) action = "call";
+        else action = "raise";
+      } else {
+        // First to act or check available: use frequencies directly
+        let bestAction = "";
+        let bestFreq = 0;
+        for (const [a, f] of Object.entries(freqs)) {
+          if ((f ?? 0) > bestFreq) { bestFreq = f ?? 0; bestAction = a; }
+        }
+        if (bestAction === "fold") action = "fold";
+        else if (bestAction === "check") action = "check";
+        else if (bestAction === "call") action = "call";
+        else if (bestAction.startsWith("bet")) action = legal.canBet ? "bet" : "raise";
+        else if (bestAction.startsWith("raise")) action = "raise";
       }
-      if (bestAction === "fold") action = "fold";
-      else if (bestAction === "check") action = legal.canCheck ? "check" : "call";
-      else if (bestAction === "call") action = "call";
-      else if (bestAction.startsWith("bet")) action = legal.canBet ? "bet" : "raise";
-      else if (bestAction.startsWith("raise")) action = "raise";
     }
 
-    // Check opponent story for override — if hero is significantly behind, fold
-    if (this._heroCards.length >= 2 && this.profiles.size > 0) {
-      const activeOpps = state.players.filter(
-        p => p.seatIndex !== this.session.heroSeatIndex && (p.status === "active" || p.status === "all_in"),
-      );
-      for (const opp of activeOpps) {
-        const profile = this.profiles.get(opp.seatIndex);
-        if (!profile) continue;
-        const oppActions = state.actionHistory
-          .filter(a => a.seatIndex === opp.seatIndex)
-          .map(a => ({ street: a.street as "preflop" | "flop" | "turn" | "river", actionType: a.actionType, amount: a.amount }));
-        if (oppActions.length === 0) continue;
-        try {
-          const story = buildOpponentStory(
-            this._heroCards, state.communityCards, oppActions, profile, opp.position,
-            state.pot.total, legal.canCall ? legal.callAmount : 0, state.currentStreet,
-          );
-          if (story.confidence !== "speculative" && story.data.equityVsRange < 0.35) {
-            action = "fold";
-            break;
-          }
-        } catch { /* best effort */ }
-      }
+    // Validate action is legal (can't fold when no bet to face)
+    if (action === "fold" && !legal.canFold) {
+      action = legal.canCheck ? "check" : "call";
     }
 
     // Determine amount for bet/raise
