@@ -47,7 +47,7 @@ import {
 } from "./tables";
 import { equityBasedRecommendation } from "../analysis/equityRecommendation";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
-import { getRfiFrequencies } from "./tables/preflopRanges";
+import { getRfiFrequencies, getBbDefenseFrequencies, get3BetFrequencies, getBvbFrequencies, get4BetFrequencies } from "./tables/preflopRanges";
 
 // ═══════════════════════════════════════════════════════
 // CONFIG
@@ -109,40 +109,48 @@ export function lookupGtoFrequencies(
     const position = gameState.players[heroSeat].position;
     const handCat = categorizeHand(heroCards, communityCards);
 
-    // 1a. RFI (Raise First In) — use validated GTO opening ranges.
+    // Use validated GTO preflop ranges for all archetypes.
     // These are well-established and more reliable than PokerBench small-sample data.
-    if (archetype.archetypeId === "rfi_opening") {
-      const rfiFreqs = getRfiFrequencies(handClass, position);
-      const raiseAction = "bet_medium"; // Standard open raise
+    const openerPos = findPreflopOpener(gameState, heroSeat);
+    let preflopFreqs: { fold: number; call: number; raise: number } | null = null;
+
+    switch (archetype.archetypeId) {
+      case "rfi_opening":
+        preflopFreqs = getRfiFrequencies(handClass, position);
+        break;
+      case "bb_defense_vs_rfi":
+        preflopFreqs = getBbDefenseFrequencies(handClass, openerPos ?? "btn");
+        break;
+      case "three_bet_pots":
+        preflopFreqs = get3BetFrequencies(handClass, position);
+        break;
+      case "blind_vs_blind":
+        preflopFreqs = getBvbFrequencies(handClass, position);
+        break;
+      case "four_bet_five_bet": {
+        // Count raises in action history to determine 3-bet vs 4-bet
+        const raises = gameState.actionHistory.filter(
+          (a) => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet"),
+        );
+        preflopFreqs = get4BetFrequencies(handClass, raises.length);
+        break;
+      }
+    }
+
+    if (preflopFreqs) {
+      // Map raise to appropriate action key per archetype
+      const raiseAction = archetype.archetypeId === "rfi_opening" || archetype.archetypeId === "blind_vs_blind"
+        ? "bet_medium"  // Open raise
+        : "raise_large"; // 3-bet, 4-bet, 5-bet
       return {
         frequencies: {
-          fold: rfiFreqs.fold,
-          call: rfiFreqs.call,
-          [raiseAction]: rfiFreqs.raise,
+          fold: preflopFreqs.fold,
+          call: preflopFreqs.call,
+          [raiseAction]: preflopFreqs.raise,
         },
         source: "preflop-handclass",
         archetype,
         handCat,
-        isExactMatch: true,
-      };
-    }
-
-    // 1b. Other preflop archetypes (3-bet, BB defense, etc.) — use PokerBench hand-class data.
-    const openerPos = findPreflopOpener(gameState, heroSeat);
-    const hcLookup = lookupPreflopHandClass(
-      archetype.archetypeId,
-      position,
-      handClass,
-      openerPos,
-    );
-
-    if (hcLookup) {
-      return {
-        frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
-        source: "preflop-handclass",
-        archetype,
-        handCat,
-        preflopConfidence: getPreflopConfidence(hcLookup),
         isExactMatch: true,
       };
     }
