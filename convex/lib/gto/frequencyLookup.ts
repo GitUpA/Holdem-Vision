@@ -39,9 +39,6 @@ import { categorizeHand } from "./handCategorizer";
 import {
   lookupFrequencies,
   hasTable,
-  lookupPreflopHandClass,
-  handClassToActionFrequencies,
-  getPreflopConfidence,
   lookupPostflopHandClass,
   postflopHandClassToActionFrequencies,
 } from "./tables";
