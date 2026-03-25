@@ -268,4 +268,18 @@ COACH (clear): You're on the Button with A♠ K♥. ...
 | `tests/scenarios/learnerSimulation.test.ts` | Educational effectiveness simulation |
 | `tests/scenarios/agentBaseline.test.ts` | AI agent student baseline |
 
-### Test Count: 1268 across 62 files. Zero tsc/lint errors.
+### Test Count: 1269 across 62 files. Zero tsc/lint errors.
+
+## Base-Level Issues — All Resolved
+
+| Layer | Issue | Fix | Commit |
+|---|---|---|---|
+| **1. Game State** | False side pots when no all-in | Only create side pots when `isAllIn` | `81fd9b8` |
+| **2. Classification** | Suited vs offsuit not distinguished | `weak_draw` for suited junk, `air` for offsuit | `fa49527` |
+| **3. Analysis** | Opponent story hidden preflop (speculative) | Range < 20% → "moderate" confidence even with 1 action | `fa49527` |
+| **3. Analysis** | Board texture computed per-opponent | Accept optional pre-computed `boardTexture` param | `fa49527` |
+| **4. Coaching** | Opponent story only adjusted GTO row | Adjust ALL profile rows when hero is behind | `fa49527` |
+| **5. Programmatic** | Auto-play ignores opponent story | Check stories in `autoAct()`, fold when clearly behind | `fa49527` |
+
+All issues that would affect what the user sees or what we capture are now resolved.
+The system is ready for quality iteration.
