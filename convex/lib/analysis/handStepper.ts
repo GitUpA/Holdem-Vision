@@ -39,6 +39,8 @@ export interface StepperConfig {
   communityCards?: CardIndex[];
   /** Profile for each villain seat */
   villainProfile?: OpponentProfile;
+  /** Dealer seat (default 0). Hero position depends on heroSeat relative to dealer. */
+  dealerSeat?: number;
   /** Enable debug data in snapshots */
   debug?: boolean;
 }
@@ -95,7 +97,7 @@ export class HandStepper {
     // Create session
     this.session = new HandSession({
       numPlayers,
-      dealerSeatIndex: (heroSeat + numPlayers - 1) % numPlayers, // hero is on button
+      dealerSeatIndex: config.dealerSeat ?? 0, // fixed dealer; hero position varies with heroSeat
       heroSeatIndex: heroSeat,
       blinds: { small: 0.5, big: 1 },
       startingStack: config.startingStack ?? 100,
