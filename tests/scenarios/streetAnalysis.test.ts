@@ -106,8 +106,8 @@ describe("Street-Level Analysis", () => {
           facingBet: snap.legalActions ? (!snap.legalActions.canCheck && snap.legalActions.canCall) : false,
           potSize: snap.pot ?? 0,
           callAmount: snap.legalActions?.callAmount ?? 0,
-          handCategory: snap.handCategory ?? "unknown",
-          handStrength: snap.handStrength ?? 0,
+          handCategory: snap.handStrength?.category ?? "unknown",
+          handStrength: snap.handStrength?.relativeStrength ?? 0,
           gtoOptimalAction: snap.gtoOptimalAction ?? "unknown",
           gtoFrequency: 0,
         });
