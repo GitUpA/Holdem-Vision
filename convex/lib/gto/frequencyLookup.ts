@@ -47,6 +47,7 @@ import {
 } from "./tables";
 import { equityBasedRecommendation } from "../analysis/equityRecommendation";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
+import { getRfiFrequencies } from "./tables/preflopRanges";
 
 // ═══════════════════════════════════════════════════════
 // CONFIG
@@ -103,9 +104,30 @@ export function lookupGtoFrequencies(
   const combo = cardsToCombo(heroCards[0], heroCards[1]);
   const handClass = comboToHandClass(combo);
 
-  // ── 1. Preflop per-hand-class (169 grid from PokerBench) ──
+  // ── 1. Preflop ──
   if (street === "preflop") {
     const position = gameState.players[heroSeat].position;
+    const handCat = categorizeHand(heroCards, communityCards);
+
+    // 1a. RFI (Raise First In) — use validated GTO opening ranges.
+    // These are well-established and more reliable than PokerBench small-sample data.
+    if (archetype.archetypeId === "rfi_opening") {
+      const rfiFreqs = getRfiFrequencies(handClass, position);
+      const raiseAction = "bet_medium"; // Standard open raise
+      return {
+        frequencies: {
+          fold: rfiFreqs.fold,
+          call: rfiFreqs.call,
+          [raiseAction]: rfiFreqs.raise,
+        },
+        source: "preflop-handclass",
+        archetype,
+        handCat,
+        isExactMatch: true,
+      };
+    }
+
+    // 1b. Other preflop archetypes (3-bet, BB defense, etc.) — use PokerBench hand-class data.
     const openerPos = findPreflopOpener(gameState, heroSeat);
     const hcLookup = lookupPreflopHandClass(
       archetype.archetypeId,
@@ -115,7 +137,6 @@ export function lookupGtoFrequencies(
     );
 
     if (hcLookup) {
-      const handCat = categorizeHand(heroCards, communityCards);
       return {
         frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
         source: "preflop-handclass",
