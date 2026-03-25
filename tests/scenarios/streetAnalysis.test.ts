@@ -73,7 +73,7 @@ describe("Street-Level Analysis", () => {
       const firstStep = stepper.deal();
       if (!firstStep) continue;
 
-      let step = firstStep;
+      let step: ReturnType<typeof stepper.autoAct> = firstStep;
       let safety = 0;
       while (step && !step.isHandOver && safety < 20) {
         step = stepper.autoAct();

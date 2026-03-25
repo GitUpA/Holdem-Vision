@@ -185,17 +185,18 @@ export class HandStepper {
       action = result.action;
       if (result.amount !== undefined) amount = result.amount;
     } else if (gtoLookup) {
-      // First to act: use solver frequencies directly
+      // First to act: use solver frequencies directly.
+      // Pick the highest-frequency action. This tends to be check (correct OOP).
       let bestAction = "";
       let bestFreq = 0;
       for (const [a, f] of Object.entries(gtoLookup.frequencies)) {
         if ((f ?? 0) > bestFreq) { bestFreq = f ?? 0; bestAction = a; }
       }
       if (bestAction === "fold") action = "fold";
-      else if (bestAction === "check") action = "check";
+      else if (bestAction === "check") action = legal.canCheck ? "check" : "call";
       else if (bestAction === "call") action = "call";
-      else if (bestAction.startsWith("bet")) action = legal.canBet ? "bet" : "raise";
-      else if (bestAction.startsWith("raise")) action = "raise";
+      else if (bestAction.startsWith("bet")) action = legal.canBet ? "bet" : "check";
+      else if (bestAction.startsWith("raise")) action = legal.canRaise ? "raise" : "check";
     }
 
     // Validate action is legal (can't fold when no bet to face)
