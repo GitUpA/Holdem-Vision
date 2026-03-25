@@ -36,6 +36,8 @@ interface OpponentDetailProps {
   street?: Street;
   /** Current pot in BB — needed for opponent story computation */
   potBB?: number;
+  /** Pre-computed opponent story from coaching lens (DRY — avoids recomputing) */
+  precomputedStory?: OpponentStory | null;
 }
 
 const SUIT_SYMBOLS: Record<string, string> = { c: "\u2663", d: "\u2666", h: "\u2665", s: "\u2660" };
@@ -83,11 +85,13 @@ export function OpponentDetail({
   communityCards,
   street,
   potBB,
+  precomputedStory,
 }: OpponentDetailProps) {
   const posShort = seat.position.toUpperCase();
 
-  // Compute opponent story when we have enough data
+  // Use pre-computed story from coaching lens (DRY), or compute if not available
   const opponentStory: OpponentStory | null = useMemo(() => {
+    if (precomputedStory !== undefined) return precomputedStory;
     if (
       !heroCards || heroCards.length < 2 ||
       !seat.profile ||
@@ -101,13 +105,13 @@ export function OpponentDetail({
         seat.profile,
         seat.position,
         potBB ?? 0,
-        0, // callCostBB — we don't know what hero faces; 0 is safe for narrative
+        0,
         street ?? "preflop",
       );
     } catch {
       return null;
     }
-  }, [heroCards, communityCards, seat.actions, seat.profile, seat.position, potBB, street]);
+  }, [precomputedStory, heroCards, communityCards, seat.actions, seat.profile, seat.position, potBB, street]);
 
   return (
     <motion.div

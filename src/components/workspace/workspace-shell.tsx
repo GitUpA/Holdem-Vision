@@ -55,6 +55,9 @@ import { buildNarrativeSummary } from "../../../convex/lib/gto/narrativeSummary"
 import type { ArchetypeId, ArchetypeCategory, ArchetypeClassification } from "../../../convex/lib/gto/archetypeClassifier";
 import { classifyArchetype, contextFromGameState } from "../../../convex/lib/gto/archetypeClassifier";
 import { hasTable, hasAnyTableForStreet } from "../../../convex/lib/gto/tables/tableRegistry";
+import { categorizeHand } from "../../../convex/lib/gto/handCategorizer";
+import { buildActionStories } from "../../../convex/lib/gto/actionNarratives";
+import { commentateHand } from "../../../convex/lib/analysis/handCommentator";
 
 // ═══════════════════════════════════════════════════════
 // HELPERS
@@ -376,6 +379,15 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
   const showDrillSolution = drillQuizMode === "learn" || ws.drillPhase === "acted";
   const isDrillActive = boardSource === "archetype" && ws.drillPhase !== "idle";
 
+  // ── Extract opponent story from coaching results (DRY — shared with coaching panel + opponent detail) ──
+  const coachingOpponentStory = useMemo(() => {
+    const cr = ws.analysisResults.get("coaching");
+    if (!cr) return undefined;
+    const cv = cr.visuals.find((v) => v.type === "coaching");
+    if (!cv) return undefined;
+    return (cv.data as { opponentStory?: import("../../../convex/lib/analysis/opponentStory").OpponentStory }).opponentStory;
+  }, [ws.analysisResults]);
+
   // ── Layout ──
   const isTwoColumn = mode.layout === "two-column";
 
@@ -482,6 +494,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                         communityCards={ws.communityCards}
                         street={ws.street}
                         potBB={ws.pot.total}
+                        precomputedStory={coachingOpponentStory}
                       />
                     </motion.div>
                   )}
@@ -765,51 +778,51 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
   };
   if (!advices || advices.length === 0) return null;
 
-  // Classify the current spot — always, every street, every mode
-  const archetype: ArchetypeClassification | null = gameState && heroSeatIndex !== undefined
-    ? classifyArchetype(contextFromGameState(gameState, heroSeatIndex))
-    : null;
+  // ── Cached computations (each computed ONCE per decision point) ──
 
-  // Build action stories — what each action tells opponents
-  const handCatMemo = useMemo(() => {
+  // 1. Archetype — classify the current spot
+  const archetype = useMemo<ArchetypeClassification | null>(() => {
+    if (!gameState || heroSeatIndex === undefined) return null;
+    return classifyArchetype(contextFromGameState(gameState, heroSeatIndex));
+  }, [gameState, heroSeatIndex]);
+
+  // 2. Hand category — assess hero's hand
+  const handCat = useMemo(() => {
     if (!heroCards || heroCards.length < 2 || !gameState) return undefined;
-    const { categorizeHand } = require("../../../convex/lib/gto/handCategorizer");
-    return categorizeHand(heroCards, gameState.communityCards) as import("../../../convex/lib/gto/handCategorizer").HandCategorization;
+    return categorizeHand(heroCards, gameState.communityCards);
   }, [heroCards, gameState]);
 
+  // 3. Action stories — what each action tells opponents
   const actionStories = useMemo(() => {
-    if (!legalActions || !gameState || !heroCards || heroCards.length < 2 || !handCatMemo) return undefined;
-    const { buildActionStories } = require("../../../convex/lib/gto/actionNarratives");
+    if (!legalActions || !gameState || !heroCards || heroCards.length < 2 || !handCat) return undefined;
     return buildActionStories(
       heroCards,
       gameState.communityCards,
       legalActions,
       opponentStory,
-      handCatMemo,
+      handCat,
       gameState.currentStreet,
-    ) as import("../../../convex/lib/gto/actionNarratives").ActionStory[];
-  }, [legalActions, gameState, heroCards, opponentStory, handCatMemo]);
+    );
+  }, [legalActions, gameState, heroCards, opponentStory, handCat]);
 
-  // Build hand commentary — the coach's voice
+  // 4. Hand commentary — the coach's voice (composes everything above)
   const commentary = useMemo(() => {
-    if (!gameState || !heroCards || heroCards.length < 2 || heroSeatIndex === undefined) return undefined;
-    const { commentateHand } = require("../../../convex/lib/analysis/handCommentator");
-    // Get GTO advice frequencies if available
+    if (!gameState || !heroCards || heroCards.length < 2 || heroSeatIndex === undefined || !legalActions) return undefined;
     const gtoAdvice = advices.find((a: CoachingAdvice) => a.profileId === "gto");
     return commentateHand({
       heroCards,
       communityCards: gameState.communityCards,
       gameState,
       heroSeat: heroSeatIndex,
-      legal: legalActions ?? { seatIndex: 0, position: "btn" as const, canFold: true, canCheck: false, canCall: false, callAmount: 0, canBet: false, betMin: 0, betMax: 0, canRaise: false, raiseMin: 0, raiseMax: 0, isCallAllIn: false, explanation: "" },
-      handCat: handCatMemo,
+      legal: legalActions,
+      handCat,
       archetype: archetype ?? undefined,
       opponentStories: opponentStory ? [opponentStory] : undefined,
       actionStories,
       gtoFrequencies: gtoAdvice?.solverData?.frequencies,
       gtoOptimalAction: gtoAdvice?.solverData?.optimalAction,
-    }) as import("../../../convex/lib/analysis/handCommentator").HandCommentary;
-  }, [gameState, heroCards, heroSeatIndex, legalActions, handCatMemo, archetype, opponentStory, actionStories, advices]);
+    });
+  }, [gameState, heroCards, heroSeatIndex, legalActions, handCat, archetype, opponentStory, actionStories, advices]);
 
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
