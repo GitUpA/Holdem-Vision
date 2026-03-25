@@ -17,6 +17,7 @@ interface Contribution {
   seatIndex: number;
   amount: number;
   folded: boolean;
+  isAllIn?: boolean;
 }
 
 /**
@@ -30,16 +31,44 @@ export function calculatePotsFromContributions(
     return { mainPot: 0, sidePots: [], total: 0, explanation: "No contributions" };
   }
 
-  // Get unique commitment levels from non-folded players only.
-  // Folded players' chips still go into pots (they contributed),
-  // but their amounts don't create pot divisions (they can't win).
+  // Side pots only exist when a player is ALL-IN with a different
+  // commitment level than other players. Non-all-in players can always
+  // match any bet, so their different commitment amounts don't create pots.
+  //
+  // Thresholds come from all-in players only. If no one is all-in,
+  // there's one pot with all chips.
   const allInThresholds = [
     ...new Set(
       contributions
-        .filter((c) => !c.folded && c.amount > 0)
+        .filter((c) => !c.folded && c.amount > 0 && c.isAllIn)
         .map((c) => c.amount),
     ),
   ].sort((a, b) => a - b);
+
+  // If no all-ins, all chips go into one main pot
+  if (allInThresholds.length === 0) {
+    const total = contributions.reduce((sum, c) => sum + c.amount, 0);
+    const eligible = contributions
+      .filter((c) => !c.folded && c.amount > 0)
+      .map((c) => c.seatIndex);
+    return {
+      mainPot: total,
+      sidePots: [],
+      total,
+      explanation: `Pot: ${total}`,
+    };
+  }
+
+  // Add the maximum non-all-in commitment as the final threshold
+  // so remaining chips above the last all-in level go into a final pot
+  const maxNonAllIn = Math.max(
+    ...contributions.filter((c) => !c.folded && !c.isAllIn && c.amount > 0).map((c) => c.amount),
+    0,
+  );
+  if (maxNonAllIn > 0 && !allInThresholds.includes(maxNonAllIn)) {
+    allInThresholds.push(maxNonAllIn);
+    allInThresholds.sort((a, b) => a - b);
+  }
 
   if (allInThresholds.length === 0) {
     return { mainPot: 0, sidePots: [], total: 0, explanation: "No chips committed" };
@@ -108,6 +137,7 @@ export function calculatePots(state: GameState): PotState {
     seatIndex: p.seatIndex,
     amount: p.totalCommitted,
     folded: p.status === "folded",
+    isAllIn: p.status === "all_in",
   }));
 
   return calculatePotsFromContributions(contributions);

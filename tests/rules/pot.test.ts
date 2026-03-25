@@ -9,12 +9,13 @@ import type { GameState } from "../../convex/lib/state/gameState";
 // ─── Helper ───
 
 function makeContributions(
-  data: { seat: number; amount: number; folded?: boolean }[],
+  data: { seat: number; amount: number; folded?: boolean; allIn?: boolean }[],
 ) {
   return data.map((d) => ({
     seatIndex: d.seat,
     amount: d.amount,
     folded: d.folded ?? false,
+    isAllIn: d.allIn ?? false,
   }));
 }
 
@@ -90,7 +91,7 @@ describe("calculatePotsFromContributions", () => {
   it("one all-in short — creates main + side pot", () => {
     // A all-in 100, B and C call 300
     const contribs = makeContributions([
-      { seat: 0, amount: 100 },
+      { seat: 0, amount: 100, allIn: true },
       { seat: 1, amount: 300 },
       { seat: 2, amount: 300 },
     ]);
@@ -105,10 +106,10 @@ describe("calculatePotsFromContributions", () => {
   });
 
   it("cascading all-ins — three different commitment levels", () => {
-    // A: 50, B: 150, C: 300, D: 300
+    // A: all-in 50, B: all-in 150, C: 300, D: 300
     const contribs = makeContributions([
-      { seat: 0, amount: 50 },
-      { seat: 1, amount: 150 },
+      { seat: 0, amount: 50, allIn: true },
+      { seat: 1, amount: 150, allIn: true },
       { seat: 2, amount: 300 },
       { seat: 3, amount: 300 },
     ]);
@@ -149,6 +150,21 @@ describe("calculatePotsFromContributions", () => {
     const result = calculatePotsFromContributions(contribs);
     expect(result.total).toBe(150);
     expect(result.mainPot).toBe(150);
+  });
+
+  it("no side pots when no one is all-in despite different commitments", () => {
+    // Hero called 3, SB raised to 14, BB called 14, UTG raised 3 and folded
+    // No one is all-in — should be ONE pot
+    const contribs = makeContributions([
+      { seat: 0, amount: 3 },     // Hero — still has chips
+      { seat: 1, amount: 14 },    // SB — still has chips
+      { seat: 2, amount: 14 },    // BB — still has chips
+      { seat: 3, amount: 3, folded: true },  // UTG folded
+    ]);
+    const result = calculatePotsFromContributions(contribs);
+    expect(result.total).toBe(34);
+    expect(result.mainPot).toBe(34);
+    expect(result.sidePots).toHaveLength(0);
   });
 
   it("handles antes (small equal amounts from all)", () => {
