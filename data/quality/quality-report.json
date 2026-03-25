@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-03-25T15:32:21.879Z",
+  "summary": {
+    "scenarios": 10,
+    "totalErrors": 0,
+    "totalWarnings": 3,
+    "passRate": "100%"
+  },
+  "scenarios": [
+    {
+      "name": "AA_premium",
+      "errors": 0,
+      "warnings": 0,
+      "issues": [],
+      "snapshot": "=== PREFLOP | Small Blind | A♠ A♥ ===\nPot: 1.5 BB | Odds: 3.0:1\nHand: Pocket As (premium_pair, strength 1.00)\nArchetype: blind_vs_blind (confidence 0.85)\nActions: Fold | Call 0.5 | Raise 2.0-100.0\nGTO (preflop-handclass): call: 59%, bet_medium: 27%, fold: 14% → call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (leaning): You're on the Small Blind with A♠ A♥. No one has raised yet — you have the initiative.  Your Pocket As is strong. You have a clear story to tell. Call. The price is right to continue. GTO leans call (59%)."
+    },
+    {
+      "name": "72o_junk",
+      "errors": 0,
+      "warnings": 0,
+      "issues": [],
+      "snapshot": "=== PREFLOP | Small Blind | 7♥ 2♦ ===\nPot: 4.5 BB | Odds: 1.8:1\nHand: Weak offsuit hand (72o) (air, strength 0.10)\nArchetype: bb_defense_vs_rfi (confidence 0.90)\nActions: Fold | Call 2.5 | Raise 5.0-100.0\nGTO (category): fold: 95%, call: 5% → fold\nOpponent Big Blind (GTO (Balanced)): GTO (Balanced)'s range is moderate (~16% of hands). They could have a variety of made hands and draws.\n  Equity vs range: 27% | Adjusted: fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n    → Their story suggests strength. Without the right odds, folding is disciplined.\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n    → Their story says you're not getting the right price. Calling costs more than it's worth.\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n    → Raising changes the narrative. Their response will reveal whether their story was real.\n\nCOACH (clear): You're on the Small Blind with 7♥ 2♦. Hijack opened to 3 BB — you're deciding whether to enter this pot. Their story: narrow range (~16% of hands). GTO (Balanced) raised preflop — showing a strong hand or applying pressure. Your Weak offsuit hand (72o) is in trouble — only 27% equity against their likely range. You have no story to tell here. Fold. Their story suggests strength. Without the right odds, folding is disciplined. GTO confirms: fold 95% of the time."
+    },
+    {
+      "name": "AKs_strong",
+      "errors": 0,
+      "warnings": 0,
+      "issues": [],
+      "snapshot": "=== PREFLOP | Small Blind | A♣ K♣ ===\nPot: 1.5 BB | Odds: 3.0:1\nHand: AKs (overcards, strength 0.89)\nArchetype: blind_vs_blind (confidence 0.85)\nActions: Fold | Call 0.5 | Raise 2.0-100.0\nGTO (preflop-handclass): call: 62%, bet_medium: 31%, fold: 8% → call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (leaning): You're on the Small Blind with A♣ K♣. No one has raised yet — you have the initiative.  Your AKs is strong. You have a clear story to tell. Call. The price is right to continue. GTO leans call (62%)."
+    },
+    {
+      "name": "94s_suited_junk",
+      "errors": 0,
+      "warnings": 0,
+      "issues": [],
+      "snapshot": "=== PREFLOP | Small Blind | 9♣ 4♣ ===\nPot: 4.5 BB | Odds: 1.8:1\nHand: Weak suited hand (94s) (weak_draw, strength 0.17)\nArchetype: bb_defense_vs_rfi (confidence 0.90)\nActions: Fold | Call 2.5 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 78%, call: 11%, bet_large: 11% → fold\nOpponent Big Blind (GTO (Balanced)): GTO (Balanced)'s range is moderate (~23% of hands). They could have a variety of made hands and draws.\n  Equity vs range: 33% | Adjusted: fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n    → Their story suggests strength. Without the right odds, folding is disciplined.\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n    → Their story says you're not getting the right price. Calling costs more than it's worth.\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n    → Raising changes the narrative. Their response will reveal whether their story was real.\n\nCOACH (clear): You're on the Small Blind with 9♣ 4♣. Button opened to 3 BB — you're deciding whether to enter this pot. Their story: moderate range (~23% of hands). GTO (Balanced) raised preflop — showing a strong hand or applying pressure. Your Weak suited hand (94s) has 33% equity against their range — marginal. This is a spot where your story needs to be convincing or you fold. Fold. Their story suggests strength. Without the right odds, folding is disciplined. GTO confirms: fold 78% of the time."
+    },
+    {
+      "name": "QQ_overpair",
+      "errors": 0,
+      "warnings": 0,
+      "issues": [],
+      "snapshot": "=== PREFLOP | Small Blind | Q♠ Q♣ ===\nPot: 1.5 BB | Odds: 3.0:1\nHand: Pocket Qs (overpair, strength 0.90)\nArchetype: blind_vs_blind (confidence 0.85)\nActions: Fold | Call 0.5 | Raise 2.0-100.0\nGTO (preflop-handclass): call: 57%, bet_medium: 30%, fold: 13% → call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (leaning): You're on the Small Blind with Q♠ Q♣. No one has raised yet — you have the initiative.  Your Pocket Qs is strong. You have a clear story to tell. Call. The price is right to continue. GTO leans call (57%)."
+    },
+    {
+      "name": "T9s_connector",
+      "errors": 0,
+      "warnings": 1,
+      "issues": [
+        {
+          "severity": "warning",
+          "component": "consistency",
+          "message": "Commentary says \"call\" (passive) but GTO says \"fold\" (fold)"
+        }
+      ],
+      "snapshot": "=== PREFLOP | Small Blind | T♠ 9♠ ===\nPot: 7.5 BB | Odds: 3.0:1\nHand: T9s (straight_draw, strength 0.51)\nArchetype: bb_defense_vs_rfi (confidence 0.90)\nActions: Fold | Call 2.5 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 54%, bet_large: 38%, call: 8% → fold\nOpponent Big Blind (GTO (Balanced)): GTO (Balanced)'s range is narrow (~15% of hands). Their actions indicate a strong holding — top pair or better, or a strong draw.\n  Equity vs range: 36% | Adjusted: call\nOpponent Hijack (GTO (Balanced)): GTO (Balanced)'s range is narrow (~13% of hands). Their actions indicate a strong holding — top pair or better, or a strong draw.\n  Equity vs range: 40% | Adjusted: call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n    → Their story suggests strength. Without the right odds, folding is disciplined.\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n    → The math supports calling — you have enough equity against their estimated range.\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n    → Raising changes the narrative. Their response will reveal whether their story was real.\n\nCOACH (leaning): You're on the Small Blind with T♠ 9♠. Hijack opened to 3 BB — you're deciding whether to enter this pot. Their story: narrow range (~15% of hands). GTO (Balanced) raised preflop — showing a strong hand or applying pressure. Their story: narrow range (~13% of hands). GTO (Balanced) called preflop — entered with a playable hand but didn't raise. Your T9s has 36% equity against their range — marginal. This is a spot where your story needs to be convincing or you fold. Call. The math supports calling — you have enough equity against their estimated range. GTO leans fold (54%)."
+    },
+    {
+      "name": "KJo_broadway",
+      "errors": 0,
+      "warnings": 0,
+      "issues": [],
+      "snapshot": "=== PREFLOP | Small Blind | K♦ J♥ ===\nPot: 14.5 BB | Odds: 1.5:1\nHand: KJo (overcards, strength 0.77)\nArchetype: three_bet_pots (confidence 0.90)\nActions: Fold | Call 9.5 | Raise 17.0-100.0\nGTO (preflop-handclass): fold: 95%, call: 2%, bet_large: 2% → fold\nOpponent Big Blind (GTO (Balanced)): GTO (Balanced)'s range is narrow (~13% of hands). Their actions indicate a strong holding — top pair or better, or a strong draw.\n  Equity vs range: 39% | Adjusted: fold\nOpponent Hijack (GTO (Balanced)): GTO (Balanced)'s range is moderate (~21% of hands). They could have a variety of made hands and draws.\n  Equity vs range: 45% | Adjusted: call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n    → Their story suggests strength. Without the right odds, folding is disciplined.\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n    → Their story says you're not getting the right price. Calling costs more than it's worth.\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n    → Raising changes the narrative. Their response will reveal whether their story was real.\n\nCOACH (clear): You're on the Small Blind with K♦ J♥. There have been 2 raises — Button has 10 BB in. This is a three bet pots pot where stacks are on the line. Their story: narrow range (~13% of hands). GTO (Balanced) raised preflop — showing a strong hand or applying pressure. Their story: moderate range (~21% of hands). GTO (Balanced) raised preflop — showing a strong hand or applying pressure. Your KJo has 39% equity against their range — marginal. This is a spot where your story needs to be convincing or you fold. Fold. Their story suggests strength. Without the right odds, folding is disciplined. GTO confirms: fold 95% of the time."
+    },
+    {
+      "name": "55_small_pair",
+      "errors": 0,
+      "warnings": 1,
+      "issues": [
+        {
+          "severity": "warning",
+          "component": "consistency",
+          "message": "Commentary says \"call\" (passive) but GTO says \"fold\" (fold)"
+        }
+      ],
+      "snapshot": "=== PREFLOP | Small Blind | 5♥ 5♦ ===\nPot: 4.5 BB | Odds: 1.8:1\nHand: Pocket 5s (middle_pair, strength 0.49)\nArchetype: bb_defense_vs_rfi (confidence 0.90)\nActions: Fold | Call 2.5 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 71%, call: 14%, bet_large: 14% → fold\nOpponent Big Blind (GTO (Balanced)): GTO (Balanced)'s range is moderate (~19% of hands). They could have a variety of made hands and draws.\n  Equity vs range: 44% | Adjusted: call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n    → You might be ahead, but folding avoids a tough spot. Is discretion the right play here?\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n    → Borderline call. You barely have the odds, but position or implied odds might tip it.\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n    → Raising changes the narrative. Their response will reveal whether their story was real.\n\nCOACH (clear): You're on the Small Blind with 5♥ 5♦. Cutoff opened to 3 BB — you're deciding whether to enter this pot. Their story: narrow range (~19% of hands). GTO (Balanced) raised preflop — showing a strong hand or applying pressure. Your Pocket 5s has 44% equity against their range — marginal. This is a spot where your story needs to be convincing or you fold. Call. Borderline call. You barely have the odds, but position or implied odds might tip it. GTO confirms: fold 71% of the time."
+    },
+    {
+      "name": "A2o_weakace",
+      "errors": 0,
+      "warnings": 1,
+      "issues": [
+        {
+          "severity": "warning",
+          "component": "consistency",
+          "message": "Commentary says \"fold\" (fold) but GTO says \"call\" (passive)"
+        }
+      ],
+      "snapshot": "=== PREFLOP | Small Blind | A♦ 2♥ ===\nPot: 4.5 BB | Odds: 1.8:1\nHand: A2o (overcards, strength 0.44)\nArchetype: bb_defense_vs_rfi (confidence 0.90)\nActions: Fold | Call 2.5 | Raise 5.0-100.0\nGTO (category): call: 40%, fold: 40%, bet_large: 20% → call\nOpponent Big Blind (GTO (Balanced)): GTO (Balanced)'s range is narrow (~9% of hands). Their actions indicate a strong holding — top pair or better, or a strong draw.\n  Equity vs range: 32% | Adjusted: fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n    → Their story suggests strength. Without the right odds, folding is disciplined.\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n    → Their story says you're not getting the right price. Calling costs more than it's worth.\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n    → Raising changes the narrative. Their response will reveal whether their story was real.\n\nCOACH (close_spot): You're on the Small Blind with A♦ 2♥. Under the Gun opened to 3 BB — you're deciding whether to enter this pot. Their story: very narrow range (~9% of hands). GTO (Balanced) raised preflop — showing a strong hand or applying pressure. Your A2o has 32% equity against their range — marginal. This is a spot where your story needs to be convincing or you fold. Fold. Their story suggests strength. Without the right odds, folding is disciplined. GTO is mixed here — call 40%, close spot."
+    },
+    {
+      "name": "JTs_premium_connector",
+      "errors": 0,
+      "warnings": 0,
+      "issues": [],
+      "snapshot": "=== PREFLOP | Small Blind | J♥ T♥ ===\nPot: 7.5 BB | Odds: 3.0:1\nHand: JTs (overcards, strength 0.83)\nArchetype: bb_defense_vs_rfi (confidence 0.90)\nActions: Fold | Call 2.5 | Raise 5.0-100.0\nGTO (preflop-handclass): call: 63%, fold: 25%, bet_large: 13% → call\nOpponent Big Blind (GTO (Balanced)): GTO (Balanced)'s range is narrow (~9% of hands). Their actions indicate a strong holding — top pair or better, or a strong draw.\n  Equity vs range: 34% | Adjusted: call\nOpponent Under the Gun (GTO (Balanced)): GTO (Balanced)'s range is narrow (~13% of hands). Their actions indicate a strong holding — top pair or better, or a strong draw.\n  Equity vs range: 41% | Adjusted: call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n    → Their story suggests strength. Without the right odds, folding is disciplined.\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n    → Borderline call. You barely have the odds, but position or implied odds might tip it.\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n    → Raising changes the narrative. Their response will reveal whether their story was real.\n\nCOACH (leaning): You're on the Small Blind with J♥ T♥. Under the Gun opened to 3 BB — you're deciding whether to enter this pot. Their story: very narrow range (~9% of hands). GTO (Balanced) raised preflop — showing a strong hand or applying pressure. Their story: narrow range (~13% of hands). GTO (Balanced) called preflop — entered with a playable hand but didn't raise. Your JTs has 34% equity against their range — marginal. This is a spot where your story needs to be convincing or you fold. Call. Borderline call. You barely have the odds, but position or implied odds might tip it. GTO leans call (63%)."
+    }
+  ]
+}
