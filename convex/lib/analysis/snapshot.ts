@@ -29,6 +29,7 @@ import { lookupGtoFrequencies } from "../gto/frequencyLookup";
 import { buildOpponentStory } from "./opponentStory";
 import { buildActionStories } from "../gto/actionNarratives";
 import { commentateHand } from "./handCommentator";
+import { computeHeroPerceivedRange, type HeroPerceivedRange } from "./heroPerceivedRange";
 import { cardToDisplay } from "../primitives/card";
 import { positionDisplayName } from "../primitives/position";
 
@@ -112,6 +113,13 @@ export interface FullSnapshot {
     narrative: string;
     counterNarrative?: string;
   }>;
+
+  // ── Hero Perceived Range (Layer 3: what opponents think hero has) ──
+  heroPerceivedRange: {
+    rangePercent: number;
+    narrative: string;
+    implication: string;
+  } | null;
 
   // ── Hand Commentator ──
   commentary: {
@@ -263,6 +271,24 @@ export function captureFullSnapshot(
     }
   }
 
+  // ── Hero perceived range (Layer 3: what opponents think hero has) ──
+  let heroPerceivedRange: HeroPerceivedRange | null = null;
+  if (includeStories && heroCards.length >= 2) {
+    const heroActions: import("../types/opponents").PlayerAction[] = gameState.actionHistory
+      .filter((a) => a.seatIndex === heroSeat)
+      .map((a) => ({ street: a.street as Street, actionType: a.actionType, amount: a.amount }));
+    if (heroActions.length > 0) {
+      try {
+        heroPerceivedRange = computeHeroPerceivedRange(
+          heroActions,
+          hero.position,
+          [...heroCards, ...communityCards],
+          street,
+        );
+      } catch { /* best-effort */ }
+    }
+  }
+
   // ── Action stories ──
   const rawActionStories = legal && heroCards.length >= 2
     ? buildActionStories(
@@ -389,6 +415,12 @@ export function captureFullSnapshot(
       counterNarrative: s.counterNarrative,
     })),
 
+    heroPerceivedRange: heroPerceivedRange ? {
+      rangePercent: heroPerceivedRange.rangePercent,
+      narrative: heroPerceivedRange.narrative,
+      implication: heroPerceivedRange.implication,
+    } : null,
+
     commentary,
     players,
   };
@@ -463,6 +495,12 @@ export function formatSnapshot(snap: FullSnapshot): string {
       lines.push(`  ${s.action}: "${s.narrative}"`);
       if (s.counterNarrative) lines.push(`    → ${s.counterNarrative}`);
     }
+  }
+
+  // Hero perceived range (Layer 3)
+  if (snap.heroPerceivedRange) {
+    lines.push(`\nYOUR STORY (how opponents see you): ${snap.heroPerceivedRange.narrative}`);
+    lines.push(`  → ${snap.heroPerceivedRange.implication}`);
   }
 
   // Commentary
