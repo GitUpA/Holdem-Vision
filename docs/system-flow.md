@@ -211,17 +211,18 @@ COACH (clear): You're on the Button with A♠ K♥. ...
 | **Winner/Outcome** | ✅ In finalized record |
 | **Community Cards** | ✅ In finalized record |
 
-## DRY Status
+## DRY Status — All Clean
 
-| Data | Coaching Panel | Opponent Detail | Analysis Lenses | Snapshot | Status |
-|---|---|---|---|---|---|
-| **Opponent range** | Via opponentStory | Via opponentStory | Via opponentRead | ✅ | ✅ DRY — `estimateRange()` |
-| **Equity vs range** | Via opponentStory | Via opponentStory | Via opponentRead | ✅ | ✅ DRY — `equityVsRange()` |
-| **Archetype** | Badge in coaching | Not shown | Not shown | ✅ | ⚠️ Computed 2x — cache per decision |
-| **Hand category** | In commentator | Not shown | In hand strength | ✅ | ⚠️ Computed 3x — cache per decision |
-| **Board texture** | In commentator | In opponentStory | In engine | ✅ | ⚠️ Computed 3x — cache per decision |
-| **GTO frequencies** | In GTO row | Not shown | Not shown | ✅ | ✅ DRY — `lookupGtoFrequencies()` (unified) |
-| **Action narratives** | In "Stories" | Not shown | Not shown | ✅ | ✅ DRY — single function |
+| Data | Source of Truth | Consumers | How Shared |
+|---|---|---|---|
+| **Archetype** | `classifyArchetype()` | Coaching badge, Commentator, Snapshot | ✅ `useMemo` in CoachingSection, computed 1x |
+| **Hand category** | `categorizeHand()` | Commentator, Action stories, Hand strength lens | ✅ `useMemo` in CoachingSection, computed 1x |
+| **Opponent story** | `buildOpponentStory()` | Coaching panel, Opponent detail panel, Snapshot | ✅ Computed in coaching lens, passed via `precomputedStory` prop |
+| **Opponent range** | `estimateRange()` | Opponent story, Opponent read lens | ✅ Same function, called by opponentStory |
+| **Equity vs range** | `equityVsRange()` | Opponent story, Opponent read lens | ✅ Same function |
+| **GTO frequencies** | `lookupGtoFrequencies()` | Engine auto-play, Coaching GTO row, Snapshot | ✅ Unified lookup (one function, one path) |
+| **Action narratives** | `buildActionStories()` | "Your Possible Stories", Commentator | ✅ `useMemo` in CoachingSection, computed 1x |
+| **Board texture** | `analyzeBoard()` | Opponent story, Context analysis | ✅ Called inside opponentStory (single call per opponent) |
 
 ## Key Files
 
