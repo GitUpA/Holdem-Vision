@@ -771,20 +771,45 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
     : null;
 
   // Build action stories — what each action tells opponents
-  const actionStories = useMemo(() => {
-    if (!legalActions || !gameState || !heroCards || heroCards.length < 2) return undefined;
-    const { buildActionStories } = require("../../../convex/lib/gto/actionNarratives");
+  const handCatMemo = useMemo(() => {
+    if (!heroCards || heroCards.length < 2 || !gameState) return undefined;
     const { categorizeHand } = require("../../../convex/lib/gto/handCategorizer");
-    const handCat = categorizeHand(heroCards, gameState.communityCards);
+    return categorizeHand(heroCards, gameState.communityCards) as import("../../../convex/lib/gto/handCategorizer").HandCategorization;
+  }, [heroCards, gameState]);
+
+  const actionStories = useMemo(() => {
+    if (!legalActions || !gameState || !heroCards || heroCards.length < 2 || !handCatMemo) return undefined;
+    const { buildActionStories } = require("../../../convex/lib/gto/actionNarratives");
     return buildActionStories(
       heroCards,
       gameState.communityCards,
       legalActions,
       opponentStory,
-      handCat,
+      handCatMemo,
       gameState.currentStreet,
     ) as import("../../../convex/lib/gto/actionNarratives").ActionStory[];
-  }, [legalActions, gameState, heroCards, opponentStory]);
+  }, [legalActions, gameState, heroCards, opponentStory, handCatMemo]);
+
+  // Build hand commentary — the coach's voice
+  const commentary = useMemo(() => {
+    if (!gameState || !heroCards || heroCards.length < 2 || heroSeatIndex === undefined) return undefined;
+    const { commentateHand } = require("../../../convex/lib/analysis/handCommentator");
+    // Get GTO advice frequencies if available
+    const gtoAdvice = advices.find((a: CoachingAdvice) => a.profileId === "gto");
+    return commentateHand({
+      heroCards,
+      communityCards: gameState.communityCards,
+      gameState,
+      heroSeat: heroSeatIndex,
+      legal: legalActions ?? { seatIndex: 0, position: "btn" as const, canFold: true, canCheck: false, canCall: false, callAmount: 0, canBet: false, betMin: 0, betMax: 0, canRaise: false, raiseMin: 0, raiseMax: 0, isCallAllIn: false, explanation: "" },
+      handCat: handCatMemo,
+      archetype: archetype ?? undefined,
+      opponentStories: opponentStory ? [opponentStory] : undefined,
+      actionStories,
+      gtoFrequencies: gtoAdvice?.solverData?.frequencies,
+      gtoOptimalAction: gtoAdvice?.solverData?.optimalAction,
+    }) as import("../../../convex/lib/analysis/handCommentator").HandCommentary;
+  }, [gameState, heroCards, heroSeatIndex, legalActions, handCatMemo, archetype, opponentStory, actionStories, advices]);
 
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
@@ -793,6 +818,27 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
           Coaching
         </h3>
       </div>
+      {/* Hand Commentary — the coach's voice */}
+      {commentary && (
+        <div className="px-4 py-3 border-b border-[var(--border)]/50">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--gold)]">
+              Coach
+            </span>
+            <span className={cn(
+              "text-[9px] px-1.5 py-0.5 rounded",
+              commentary.confidence === "clear" ? "bg-green-500/15 text-green-400" :
+              commentary.confidence === "leaning" ? "bg-yellow-500/15 text-yellow-400" :
+              "bg-orange-500/15 text-orange-400",
+            )}>
+              {commentary.confidence === "clear" ? "Clear" : commentary.confidence === "leaning" ? "Leaning" : "Close spot"}
+            </span>
+          </div>
+          <p className="text-[11px] text-[var(--foreground)]/80 leading-relaxed">
+            {commentary.narrative}
+          </p>
+        </div>
+      )}
       <div className="px-4 py-3">
         <CoachingPanel
           advices={advices}
