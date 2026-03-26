@@ -1006,7 +1006,7 @@ export function useWorkspace(mode: WorkspaceMode) {
     drillScores: drillScoresRef.current,
     drillCurrentScore: drillCurrentScoreRef.current,
     drillCurrentDeal: drillDealRef.current,
-    drillSolution: drillSolutionRef.current,
+    drillSolution: drillSolutionRef.current ?? deriveSolutionFromCoaching(analysisResults),
     drillProgress: getDrillProgress(),
     drillNarrativeChoice: drillNarrativeChoiceRef.current,
     setDrillNarrativeChoice: (id: NarrativeIntentId) => {
@@ -1023,3 +1023,34 @@ export function useWorkspace(mode: WorkspaceMode) {
 
 /** Return type of useWorkspace for use in component props */
 export type WorkspaceState = ReturnType<typeof useWorkspace>;
+
+/**
+ * Derive a SpotSolution from coaching results (Free Play mode).
+ * In Archetype mode, the drill pipeline computes this at deal time.
+ * In Free Play, we extract it from the GTO coaching advice.
+ */
+function deriveSolutionFromCoaching(
+  results: Map<string, import("../../convex/lib/types/analysis").AnalysisResult>,
+): SpotSolution | null {
+  const cr = results.get("coaching");
+  if (!cr?.value) return null;
+  const cv = cr.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number; solverData?: any; explanation?: any }> };
+  if (!cv.advices) return null;
+  const gto = cv.advices.find((a) => a.profileId === "gto");
+  if (!gto?.solverData) return null;
+
+  const sd = gto.solverData;
+  return {
+    frequencies: sd.frequencies,
+    optimalAction: sd.optimalAction,
+    optimalFrequency: sd.optimalFrequency,
+    availableActions: sd.availableActions,
+    explanation: gto.explanation ?? { summary: "GTO solution", children: [] },
+    isExactMatch: sd.isExactMatch ?? false,
+    resolvedCategory: sd.resolvedCategory ?? "unknown",
+    bands: sd.bands,
+    archetypeAccuracy: sd.archetypeAccuracy,
+    accuracyImpact: sd.accuracyImpact,
+    preflopConfidence: sd.preflopConfidence,
+  };
+}
