@@ -234,62 +234,38 @@ export function PlayerList({
 
               {/* Current street bet amount */}
               {seat.streetCommitted > 0 && (
-                <span className="text-[10px] font-semibold tabular-nums text-amber-300">
+                <span className="text-[11px] font-semibold tabular-nums text-amber-300 mr-1">
                   {formatBB(seat.streetCommitted / bigBlind)}
                 </span>
               )}
 
-              {/* Action badges + reasoning indicator */}
-              {seat.actions.length > 0 && (() => {
-                const decision = decisions?.get(seat.seatIndex);
-                return (
-                  <div className="flex items-center gap-0.5">
-                    {seat.actions.slice(0, 4).map((action, j) => {
-                      const badge = ACTION_BADGE[action.actionType] ?? { bg: "bg-gray-400", label: action.actionType, short: "?" };
-                      const amountLabel = action.amount && action.amount > 0
-                        ? ` ${formatBB(action.amount / bigBlind)}`
-                        : "";
-                      return (
-                        <span
-                          key={j}
-                          className={cn(
-                            "h-4 rounded-sm flex items-center justify-center text-[8px] font-bold text-white leading-none px-1",
-                            badge.bg,
-                          )}
-                          title={`${action.street}: ${badge.label}${amountLabel}`}
-                        >
-                          {badge.short}{amountLabel && <span className="ml-0.5 font-mono">{amountLabel}</span>}
-                        </span>
-                      );
-                    })}
-                    {seat.actions.length > 4 && (
-                      <span className="text-[9px] text-[var(--muted-foreground)] ml-0.5">
-                        +{seat.actions.length - 4}
-                      </span>
-                    )}
-                    {/* Reasoning indicator — shows when engine decision is available */}
-                    {decision?.explanationNode && (
+              {/* Action badges */}
+              {seat.actions.length > 0 && (
+                <div className="flex items-center gap-1">
+                  {seat.actions.slice(0, 5).map((action, j) => {
+                    const badge = ACTION_BADGE[action.actionType] ?? { bg: "bg-gray-400", label: action.actionType, short: "?" };
+                    const amountLabel = action.amount && action.amount > 0
+                      ? formatBB(action.amount / bigBlind)
+                      : "";
+                    return (
                       <span
-                        className="ml-0.5 text-[var(--gold-dim)] opacity-70"
-                        title={decision.explanation}
+                        key={j}
+                        className={cn(
+                          "h-5 rounded flex items-center justify-center text-[10px] font-bold text-white leading-none px-1.5",
+                          badge.bg,
+                        )}
+                        title={`${action.street}: ${badge.label}${amountLabel ? " " + amountLabel : ""}`}
                       >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
+                        {badge.short}{amountLabel && <span className="ml-0.5 font-mono text-[9px]">{amountLabel}</span>}
                       </span>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Selection indicator */}
-              {!seat.isHero && (
-                <span className={cn(
-                  "w-1.5 h-1.5 rounded-full transition-colors",
-                  isSelected ? "bg-[var(--gold)]" : "bg-[var(--border)]",
-                )} />
+                    );
+                  })}
+                  {seat.actions.length > 5 && (
+                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                      +{seat.actions.length - 5}
+                    </span>
+                  )}
+                </div>
               )}
             </motion.button>
           );
