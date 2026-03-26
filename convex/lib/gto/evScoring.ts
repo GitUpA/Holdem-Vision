@@ -120,7 +120,12 @@ export function scoreAction(
   }
 
   // Get user's action frequency
-  const userActionFrequency = frequencies[userAction] ?? 0;
+  // Look up user action frequency — treat all bet/raise variants as equivalent
+  let userActionFrequency = frequencies[userAction] ?? 0;
+  if (userActionFrequency === 0 && isAggressive(userAction)) {
+    // User raised but solution uses bet_medium (or vice versa) — aggregate all aggressive freq
+    userActionFrequency = sumAggressiveFrequencies(frequencies);
+  }
 
   // Calculate EV loss
   const evLoss = calculateEvLoss(
@@ -284,6 +289,17 @@ function buildScoringExplanation(
   };
 }
 
+/** Check if an action is aggressive (any bet or raise variant) */
+function isAggressive(action: string): boolean {
+  return action.startsWith("bet") || action.startsWith("raise");
+}
+
+/** Sum all aggressive frequencies (bet_small + bet_medium + bet_large + raise_small + raise_large) */
+function sumAggressiveFrequencies(freq: ActionFrequencies): number {
+  return (freq.bet_small ?? 0) + (freq.bet_medium ?? 0) + (freq.bet_large ?? 0)
+    + (freq.raise_small ?? 0) + (freq.raise_large ?? 0);
+}
+
 // ═══════════════════════════════════════════════════════
 // ACTION NORMALIZATION
 // ═══════════════════════════════════════════════════════
@@ -303,16 +319,21 @@ export function normalizeToGtoAction(
       return "check";
     case "call":
       return "call";
-    case "bet":
-    case "raise": {
+    case "bet": {
       if (amount === undefined || potSize <= 0) return "bet_medium";
-      const ratio = amount / potSize;
-      if (ratio <= 0.45) return "bet_small";
-      if (ratio <= 0.9) return "bet_medium";
+      const betRatio = amount / potSize;
+      if (betRatio <= 0.45) return "bet_small";
+      if (betRatio <= 0.9) return "bet_medium";
       return "bet_large";
     }
+    case "raise": {
+      if (amount === undefined || potSize <= 0) return "raise_large";
+      const raiseRatio = amount / potSize;
+      if (raiseRatio <= 0.5) return "raise_small";
+      return "raise_large";
+    }
     case "all_in":
-      return "bet_large";
+      return "raise_large";
     default:
       return "check";
   }

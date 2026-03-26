@@ -162,14 +162,14 @@ describe("normalizeToGtoAction", () => {
     expect(normalizeToGtoAction("bet", 150, 100)).toBe("bet_large");
   });
 
-  it("maps raise with same sizing logic", () => {
-    expect(normalizeToGtoAction("raise", 30, 100)).toBe("bet_small");
-    expect(normalizeToGtoAction("raise", 75, 100)).toBe("bet_medium");
-    expect(normalizeToGtoAction("raise", 120, 100)).toBe("bet_large");
+  it("maps raise to raise_small or raise_large", () => {
+    expect(normalizeToGtoAction("raise", 30, 100)).toBe("raise_small");
+    expect(normalizeToGtoAction("raise", 75, 100)).toBe("raise_large");
+    expect(normalizeToGtoAction("raise", 120, 100)).toBe("raise_large");
   });
 
-  it("maps all_in to bet_large", () => {
-    expect(normalizeToGtoAction("all_in", undefined, 100)).toBe("bet_large");
+  it("maps all_in to raise_large", () => {
+    expect(normalizeToGtoAction("all_in", undefined, 100)).toBe("raise_large");
   });
 
   it("defaults to bet_medium when amount is undefined for bet/raise", () => {
