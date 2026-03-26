@@ -177,19 +177,19 @@ export function PlayerList({
                 isActive && "ring-1 ring-[var(--gold)]/60",
               )}
             >
-              {/* Player name first (fixed identity) */}
+              {/* Col 1: Player name (fixed identity) */}
               <span className={cn(
-                "text-xs font-medium min-w-[40px]",
+                "text-xs font-medium w-[48px] shrink-0",
                 seat.isHero ? "text-[var(--gold)]" : "text-[var(--foreground)]",
               )}>
                 {seat.label}
               </span>
 
-              {/* Position badge (rotates each hand) */}
+              {/* Col 2: Position badge (rotates each hand) */}
               <Term id="term:positions" position="bottom">
                 <span
                   className={cn(
-                    "text-[10px] font-bold px-1.5 py-0.5 rounded border min-w-[36px] text-center",
+                    "text-[10px] font-bold px-1.5 py-0.5 rounded border w-[36px] text-center shrink-0",
                     posColor,
                   )}
                 >
@@ -197,30 +197,26 @@ export function PlayerList({
                 </span>
               </Term>
 
-              {/* Stack (in BB) */}
-              <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums min-w-[40px]">
+              {/* Col 3: Status or Profile (no description) */}
+              <span className="text-[10px] text-[var(--muted-foreground)] w-[80px] shrink-0 truncate">
+                {statusInfo
+                  ? <span className={cn("font-bold", statusInfo.cls)}>{statusInfo.label}</span>
+                  : seat.profile
+                    ? seat.profile.name.replace(/ \(.*\)/, "")
+                    : ""
+                }
+              </span>
+
+              {/* Col 4: Stack (in BB) */}
+              <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums w-[50px] shrink-0 text-right">
                 {formatBB(seat.stack / bigBlind)} BB
               </span>
 
               {/* Hole cards (visible villains) */}
               {!seat.isHero && seat.cardVisibility !== "hidden" && seat.holeCards.length === 2 && (
-                <span className="inline-flex gap-0.5 text-[11px] font-mono">
+                <span className="inline-flex gap-0.5 text-[11px] font-mono shrink-0">
                   <CardText card={seat.holeCards[0]} />
                   <CardText card={seat.holeCards[1]} />
-                </span>
-              )}
-
-              {/* Status badge */}
-              {statusInfo && (
-                <span className={cn("text-[9px] font-bold", statusInfo.cls)}>
-                  {statusInfo.label}
-                </span>
-              )}
-
-              {/* Profile name */}
-              {seat.profile && (
-                <span className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[60px]">
-                  {seat.profile.name}
                 </span>
               )}
 
