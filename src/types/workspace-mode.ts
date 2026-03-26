@@ -101,8 +101,8 @@ export function buildMode(source: BoardSource, opts?: { quiz?: boolean }): Works
         action: { style: "gto" },
         deal: { style: "constrained", archetypeSelector: true },
         opponents: { editable: false, randomizable: false },
-        setup: { enabled: false, blindsEditable: false, stackEditable: false, playerCountEditable: false },
-        postHand: { replay: false, revealAll: false, dealNext: false, drillNext: true, drillSummary: true },
+        setup: { enabled: true, blindsEditable: true, stackEditable: true, playerCountEditable: true },
+        postHand: { replay: true, revealAll: true, dealNext: true, drillNext: true, drillSummary: true },
         layout: "two-column",
       };
     case "custom":
