@@ -377,7 +377,9 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
 
   // ── Drill: show solution based on mode ──
   const showDrillSolution = drillQuizMode === "learn" || ws.drillPhase === "acted";
-  const isDrillActive = boardSource === "archetype" && ws.drillPhase !== "idle";
+  // Archetype mode tracks session progress (hand count, scoring).
+  // But ALL features are available in ALL modes — no isArchetypeSession gating.
+  const isArchetypeSession = boardSource === "archetype" && ws.drillPhase !== "idle";
 
   // ── Extract opponent story from coaching results (DRY — shared with coaching panel + opponent detail) ──
   const coachingOpponentStory = useMemo(() => {
@@ -470,7 +472,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
 
               <>
               {/* ── Opponent detail panel ── */}
-              <PanelWrapper enabled={mode.opponents.editable || isDrillActive}>
+              <PanelWrapper enabled={true}>
                 <AnimatePresence>
                   {selectedSeat && !selectedSeat.isHero && (
                     <motion.div
@@ -489,7 +491,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                         onStartCardAssign={() => ws.setSelectionTarget(`villain-${selectedSeat.seatIndex}`)}
                         selectionTarget={ws.selectionTarget}
                         villainCardBuffer={ws.villainCardBuffer.get(selectedSeat.seatIndex)}
-                        readOnly={isDrillActive}
+                        readOnly={isArchetypeSession}
                         heroCards={ws.heroCards}
                         communityCards={ws.communityCards}
                         street={ws.street}
@@ -501,9 +503,8 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                 </AnimatePresence>
               </PanelWrapper>
 
-              {/* ── Game setup panel (vision mode only) ── */}
-              {!isDrillActive && (
-              <PanelWrapper enabled={mode.setup.enabled} hint="Switch to Vision mode for hand setup">
+              {/* ── Game setup panel ── */}
+              <PanelWrapper enabled={mode.setup.enabled}>
                 {!ws.isHandActive && !ws.isHandOver && (
                   <GameSetupPanel
                     blinds={ws.blinds}
@@ -514,11 +515,9 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                   />
                 )}
               </PanelWrapper>
-              )}
 
-              {/* ── Hand-over result (vision mode only) ── */}
-              {!isDrillActive && (
-              <PanelWrapper enabled={mode.postHand.dealNext || mode.postHand.revealAll} hint="Finish hand to see results">
+              {/* ── Hand-over result ── */}
+              <PanelWrapper enabled={mode.postHand.dealNext || mode.postHand.revealAll}>
                 {!ws.isHandActive && ws.isHandOver && (
                   <HandOverPanel
                     ws={ws}
@@ -528,7 +527,6 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                   />
                 )}
               </PanelWrapper>
-              )}
 
               {/* ── Board display ── */}
               <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
@@ -550,8 +548,6 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                         </span>
                       ))}
                     </div>
-                    {!isDrillActive && (
-                    <>
                     <div className="h-4 w-px bg-[var(--border)]" />
                     <PanelWrapper enabled={mode.setup.enabled}>
                       <TableControls
@@ -562,11 +558,9 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                         isHandActive={ws.isHandActive}
                       />
                     </PanelWrapper>
-                    </>
-                    )}
                   </div>
                   <button
-                    onClick={() => isDrillActive ? setDrillGuideOpen(true) : setGuideOpen(true)}
+                    onClick={() => setGuideOpen(true)}
                     className="w-7 h-7 rounded-full border border-[var(--border)] bg-[var(--muted)]/40 text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)]/40 transition-colors flex items-center justify-center text-xs font-bold shrink-0"
                     title="How to use"
                   >
@@ -631,7 +625,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                 results={ws.analysisResults}
                 drillSolution={showDrillSolution && ws.drillSolution ? ws.drillSolution : undefined}
                 drillScore={ws.drillCurrentScore ?? undefined}
-                isDrill={isDrillActive}
+                isDrill={true} /* converged: scoring always available */
                 gameState={ws.gameState}
                 heroSeatIndex={ws.heroSeatIndex}
                 onArchetypeClick={setTutorialArchetype}
@@ -661,7 +655,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
               )}
 
               {/* ── Card selector (52-card grid) ── */}
-              <PanelWrapper enabled={mode.cards.heroEditable || mode.cards.communityEditable || isDrillActive}>
+              <PanelWrapper enabled={true}>
                 <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3">
                   <CardSelector
                     cards={ws.deckVisionCards}
@@ -669,7 +663,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                     selectionMode={cardGridMode}
                     onCardClick={ws.toggleCard}
                     onModeChange={handleModeChange}
-                    readOnly={isDrillActive || (!ws.isHandActive && !ws.isHandOver)}
+                    readOnly={isArchetypeSession || (!ws.isHandActive && !ws.isHandOver)}
                   />
                 </div>
               </PanelWrapper>
