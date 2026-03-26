@@ -79,6 +79,7 @@ export class HandRecorder {
     source: "engine" | "manual" | "system",
     decision?: RecordableDecision,
     coachingSnapshot?: HandEvent["coachingSnapshot"],
+    scoreSnapshot?: HandEvent["score"],
   ): void {
     if (this.finalized) return;
 
@@ -99,6 +100,10 @@ export class HandRecorder {
 
     if (coachingSnapshot) {
       event.coachingSnapshot = coachingSnapshot;
+    }
+
+    if (scoreSnapshot) {
+      event.score = scoreSnapshot;
     }
 
     this.record.events.push(event);

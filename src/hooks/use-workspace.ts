@@ -603,11 +603,13 @@ export function useWorkspace(mode: WorkspaceMode) {
 
   const act = useCallback(
     (actionType: ActionType, amount?: number) => {
-      // Capture coaching snapshot for audit
+      const gs = session.state;
+      // Capture coaching snapshot + score for audit
       const coachingResult = analysisResults.get("coaching");
       let coachingSnapshot: import("../../convex/lib/audit/types").HandEvent["coachingSnapshot"];
+      let scoreSnapshot: import("../../convex/lib/audit/types").HandEvent["score"];
       if (coachingResult?.value) {
-        const cv = coachingResult.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number }> };
+        const cv = coachingResult.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number; solverData?: any }> };
         if (cv.advices) {
           const gtoAdvice = cv.advices.find((a) => a.profileId === "gto");
           coachingSnapshot = {
@@ -619,9 +621,23 @@ export function useWorkspace(mode: WorkspaceMode) {
               amount: a.amount,
             })),
           };
+          // Score hero's action against GTO
+          if (gtoAdvice && gs) {
+            const heroGtoAction = normalizeToGtoAction(actionType, amount, gs.pot.total);
+            const gtoAction = gtoAdvice.actionType;
+            const isMatch = heroGtoAction === gtoAction ||
+              (heroGtoAction.startsWith("bet") && gtoAction.startsWith("bet")) ||
+              (heroGtoAction.startsWith("raise") && gtoAction.startsWith("raise"));
+            const isClose = heroGtoAction !== "fold" && gtoAction !== "fold"; // both continue
+            scoreSnapshot = {
+              verdict: isMatch ? "optimal" : isClose ? "acceptable" : "mistake",
+              gtoAction,
+              heroAction: heroGtoAction,
+            };
+          }
         }
       }
-      session.act(actionType, amount, coachingSnapshot);
+      session.act(actionType, amount, coachingSnapshot, scoreSnapshot);
     },
     [session, analysisResults],
   );
@@ -700,19 +716,28 @@ export function useWorkspace(mode: WorkspaceMode) {
           };
         }
       }
-      sess.act(actionType, amount, coachingSnapshot);
-
       // Map game action to GTO action for scoring
-      const gtoAction = normalizeToGtoAction(actionType, amount, state.pot.total);
+      const heroGtoAction = normalizeToGtoAction(actionType, amount, state.pot.total);
       const drillStreet = streetFromCommunityCount(deal.communityCards.length);
       const score = scoreAction(
         deal.archetype,
         deal.handCategory,
-        gtoAction,
+        heroGtoAction,
         state.pot.total / DEFAULT_DRILL_BLINDS.big,
         deal.isInPosition,
         drillStreet,
       );
+
+      // Build score snapshot for audit
+      const gtoAdvice = (coachingResult?.value as any)?.advices?.find((a: any) => a.profileId === "gto");
+      const scoreSnapshot: import("../../convex/lib/audit/types").HandEvent["score"] = score ? {
+        verdict: score.verdict,
+        gtoAction: gtoAdvice?.actionType ?? heroGtoAction,
+        heroAction: heroGtoAction,
+        evLoss: score.evLoss,
+      } : undefined;
+
+      sess.act(actionType, amount, coachingSnapshot, scoreSnapshot);
 
       drillCurrentScoreRef.current = score;
       if (score) drillScoresRef.current = [...drillScoresRef.current, score];

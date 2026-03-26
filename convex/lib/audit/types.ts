@@ -89,6 +89,13 @@ export interface HandEvent {
     /** All profile recommendations */
     profileActions?: Array<{ profileId: string; action: string; amount?: number }>;
   };
+  /** Scoring verdict — how hero's action compared to GTO */
+  score?: {
+    verdict: "optimal" | "acceptable" | "mistake" | "blunder";
+    gtoAction: string;
+    heroAction: string;
+    evLoss?: number;
+  };
 }
 
 // ═══════════════════════════════════════════════════════

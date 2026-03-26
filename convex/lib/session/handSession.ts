@@ -256,7 +256,7 @@ export class HandSession {
   /**
    * Hero acts — apply action, record, advance opponents.
    */
-  act(actionType: ActionType, amount?: number, coachingSnapshot?: import("../audit/types").HandEvent["coachingSnapshot"]): void {
+  act(actionType: ActionType, amount?: number, coachingSnapshot?: import("../audit/types").HandEvent["coachingSnapshot"], scoreSnapshot?: import("../audit/types").HandEvent["score"]): void {
     if (!this._gameState) return;
 
     // Verify it's hero's turn
@@ -277,7 +277,7 @@ export class HandSession {
       // Record hero action for audit
       const lastAction = state.actionHistory[state.actionHistory.length - 1];
       if (lastAction && this._recorder) {
-        this._recorder.recordEvent(lastAction, state.pot.total, "manual", undefined, coachingSnapshot);
+        this._recorder.recordEvent(lastAction, state.pot.total, "manual", undefined, coachingSnapshot, scoreSnapshot);
       }
 
       // Detect street change after hero action
