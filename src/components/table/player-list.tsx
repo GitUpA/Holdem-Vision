@@ -71,6 +71,17 @@ function CardText({ card }: { card: CardIndex }) {
   );
 }
 
+/** Extract short profile code (max 3 chars) from full profile name. */
+function shortProfileName(name: string): string {
+  if (name.startsWith("GTO")) return "GTO";
+  if (name.startsWith("TAG")) return "TAG";
+  if (name.startsWith("LAG")) return "LAG";
+  if (name.startsWith("Nit") || name.startsWith("NIT")) return "NIT";
+  if (name.startsWith("Fish") || name.startsWith("FISH")) return "FSH";
+  // Unknown profile — take first 3 chars uppercase
+  return name.slice(0, 3).toUpperCase();
+}
+
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   folded: { label: "FOLD", cls: "text-gray-500" },
   all_in: { label: "ALL-IN", cls: "text-red-400" },
@@ -177,15 +188,15 @@ export function PlayerList({
                 isActive && "ring-1 ring-[var(--gold)]/60",
               )}
             >
-              {/* Col 1: Player name (fixed identity) */}
+              {/* Col 1: Player (max 4 chars: HERO, V2, V3...) */}
               <span className={cn(
-                "text-xs font-medium w-[48px] shrink-0",
+                "text-[11px] font-bold uppercase w-[32px] shrink-0",
                 seat.isHero ? "text-[var(--gold)]" : "text-[var(--foreground)]",
               )}>
                 {seat.label}
               </span>
 
-              {/* Col 2: Position badge (rotates each hand) */}
+              {/* Col 2: Position (max 4 chars: BTN, SB, BB, UTG, HJ, CO) */}
               <Term id="term:positions" position="bottom">
                 <span
                   className={cn(
@@ -197,18 +208,13 @@ export function PlayerList({
                 </span>
               </Term>
 
-              {/* Col 3: Status or Profile (no description) */}
-              <span className="text-[10px] text-[var(--muted-foreground)] w-[80px] shrink-0 truncate">
-                {statusInfo
-                  ? <span className={cn("font-bold", statusInfo.cls)}>{statusInfo.label}</span>
-                  : seat.profile
-                    ? seat.profile.name.replace(/ \(.*\)/, "")
-                    : ""
-                }
+              {/* Col 3: Profile (always show, max 3 chars: GTO, TAG, LAG, NIT, FSH) */}
+              <span className="text-[10px] text-[var(--muted-foreground)] w-[28px] shrink-0">
+                {seat.isHero ? "" : seat.profile ? shortProfileName(seat.profile.name) : ""}
               </span>
 
-              {/* Col 4: Stack (in BB) */}
-              <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums w-[50px] shrink-0 text-right">
+              {/* Col 4: Stack (max 6 chars: XXX BB) */}
+              <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums w-[42px] shrink-0 text-right">
                 {formatBB(seat.stack / bigBlind)} BB
               </span>
 
