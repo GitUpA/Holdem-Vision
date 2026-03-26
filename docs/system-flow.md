@@ -44,6 +44,11 @@ flowchart TD
     OPP_STORY_ENGINE --> EQ_VS_RANGE[equityVsRange]
     OPP_STORY_ENGINE --> BOARD_TEX[analyzeBoard]
 
+    %% ═══ HERO PERCEIVED RANGE (Layer 3) ═══
+    COACHING --> HERO_RANGE[Hero Perceived Range — Layer 3]
+    HERO_RANGE --> |reversed| RANGE_EST
+    HERO_RANGE --> |"what opponents think you have"| HERO_STORY_TEXT[Your Story to Them]
+
     %% ═══ ANALYSIS LENSES ═══
     ANALYSIS --> HAND_STR[Hand Strength]
     ANALYSIS --> EQUITY[Equity vs Random — Monte Carlo]
@@ -131,6 +136,7 @@ const snapshot: FullSnapshot = captureFullSnapshot(gameState, heroSeat, heroCard
 | **GTO Data** | gtoFrequencies, gtoSource, gtoOptimalAction | lookupGtoFrequencies() — unified |
 | **Opponent Stories** | per-opponent: equity, rangePercent, confidence, narratives, adjustedAction | buildOpponentStory() |
 | **Action Narratives** | per-action: narrative, counterNarrative | buildActionStories() |
+| **Hero Perceived Range** | rangePercent, narrative ("opponents see you as ~15%"), implication | computeHeroPerceivedRange() |
 | **Commentary** | narrative (full paragraph), summary, recommendedAction, confidence | commentateHand() |
 | **Players** | per-seat: position, stack, status, committed, actionHistory | GameState |
 | **Debug** (optional) | rawHandCat, rawArchetype, rawBoardTexture, rawGtoLookup, rawOpponentStories, rawLegal | Raw types |
@@ -220,7 +226,10 @@ COACH (clear): You're on the Button with A♠ K♥. ...
 | **Opponent story** | `buildOpponentStory()` | Coaching panel, Opponent detail panel, Snapshot | ✅ Computed in coaching lens, passed via `precomputedStory` prop |
 | **Opponent range** | `estimateRange()` | Opponent story, Opponent read lens | ✅ Same function, called by opponentStory |
 | **Equity vs range** | `equityVsRange()` | Opponent story, Opponent read lens | ✅ Same function |
-| **GTO frequencies** | `lookupGtoFrequencies()` | Engine auto-play, Coaching GTO row, Snapshot | ✅ Unified lookup (one function, one path) |
+| **GTO frequencies** | `lookupGtoFrequencies()` | Engine auto-play, Coaching GTO row, Snapshot, autoAct | ✅ Unified lookup — ONE ENGINE for hero + villains |
+| **Preflop ranges** | `preflopRanges.ts` | All 5 preflop archetypes | ✅ Validated GTO ranges replace noisy PokerBench data |
+| **Hero perceived range** | `computeHeroPerceivedRange()` | Snapshot, Coaching display | ✅ Reversed estimateRange() — Layer 3 thinking |
+| **Facing-bet decision** | `mapGtoActionToLegal()` + hand strength | Engine (hero + villain) | ✅ DRY — same code path for hero autoAct and villain engine |
 | **Action narratives** | `buildActionStories()` | "Your Possible Stories", Commentator | ✅ `useMemo` in CoachingSection, computed 1x |
 | **Board texture** | `analyzeBoard()` | Opponent story, Context analysis | ✅ Called inside opponentStory (single call per opponent) |
 
@@ -239,7 +248,10 @@ COACH (clear): You're on the Button with A♠ K♥. ...
 | `gto/narrativeContext.ts` | `buildBoardNarrative()` — board scene-setting |
 | `gto/archetypeClassifier.ts` | `classifyArchetype()` — spot classification |
 | `gto/handCategorizer.ts` | `categorizeHand()` — hand strength assessment |
-| `opponents/engines/modifiedGtoEngine.ts` | Unified engine — all profiles use same GTO lookup |
+| `opponents/engines/modifiedGtoEngine.ts` | ONE engine — hero autoAct + villain auto-play + coaching all use this |
+| `gto/tables/preflopRanges.ts` | Validated GTO preflop ranges for all 5 archetypes |
+| `gto/facingBetDecision.ts` | Hand strength + pot odds framework for facing bets |
+| `analysis/heroPerceivedRange.ts` | Layer 3: what opponents think hero has |
 | `opponents/engines/narrativeEngine.ts` | Narrative generation for profile decisions |
 | `opponents/rangeEstimator.ts` | `estimateRange()` — range narrowing from actions |
 | `analysis/opponentRead.ts` | `equityVsRange()` — equity against estimated range |
@@ -267,8 +279,52 @@ COACH (clear): You're on the Button with A♠ K♥. ...
 | `tests/scenarios/batchValidation.test.ts` | 100-hand batch validation |
 | `tests/scenarios/learnerSimulation.test.ts` | Educational effectiveness simulation |
 | `tests/scenarios/agentBaseline.test.ts` | AI agent student baseline |
+| `tests/scenarios/outcomeAnalysis.test.ts` | 500-hand showdown + postflop/preflop fold analysis |
+| `tests/scenarios/streetAnalysis.test.ts` | Per-street action distributions + convergence metrics |
+| `tests/scenarios/preflopTuning.test.ts` | 1000-hand preflop position/strength analysis |
 
-### Test Count: 1269 across 62 files. Zero tsc/lint errors.
+### Test Count: 1274 across 66 files. Zero tsc/lint errors.
+
+## Engine Architecture — ONE Engine, One Path
+
+```
+Hero autoAct → chooseActionFromProfile(GTO_PROFILE) → modifiedGtoEngine.decide()
+Villain auto  → chooseActionFromProfile(NIT/FISH/etc) → modifiedGtoEngine.decide()
+Coaching GTO  → lookupGtoFrequencies() (same lookup the engine uses)
+```
+
+All three paths share:
+- `lookupGtoFrequencies()` — unified solver lookup
+- `preflopRanges.ts` — validated GTO ranges for all 5 preflop archetypes
+- `mapGtoActionToLegal()` — hand-strength-aware facing-bet mapping
+- `sampleFromModifiedFrequencies()` — weighted action sampling
+
+Profile modifiers are the ONLY difference between hero (GTO = identity) and villains.
+
+## Preflop Data — Validated GTO Ranges
+
+All 5 preflop archetypes use established GTO ranges (not PokerBench):
+
+| Archetype | Data Source | Key Feature |
+|---|---|---|
+| RFI Opening | Static 169-grid per position | UTG 15% → BTN 44% |
+| BB Defense | Per-raiser-position call + 3-bet sets | vs UTG 30%, vs BTN 50% |
+| 3-Bet Pots | Per-position 3-bet range | Value + suited bluffs |
+| Blind vs Blind | SB open + BB defense/3-bet | Very wide ranges |
+| 4-Bet / 5-Bet | Value (AA/KK/AK) + bluffs (A5s-A2s) | Very narrow |
+
+## System Quality Metrics (validated)
+
+| Metric | Value | Source |
+|---|---|---|
+| Preflop position gradient | UTG 89%→BTN 65% fold | 1000-hand test |
+| Premium hands folded | <15% | All runs |
+| Junk hands played | <5% | All runs |
+| Showdown win rate | 34-55% (variance) | 500-hand tests |
+| P&L | Consistently positive on avg | Multiple runs |
+| Missed opponent stories | 0 | All runs |
+| Facing-bet strength separation | 26%→57% preflop, 4%→78% river | Per-street analysis |
+| Hero bets postflop | 20-23% | Street analysis |
 
 ## Base-Level Issues — All Resolved
 
@@ -276,10 +332,12 @@ COACH (clear): You're on the Button with A♠ K♥. ...
 |---|---|---|---|
 | **1. Game State** | False side pots when no all-in | Only create side pots when `isAllIn` | `81fd9b8` |
 | **2. Classification** | Suited vs offsuit not distinguished | `weak_draw` for suited junk, `air` for offsuit | `fa49527` |
-| **3. Analysis** | Opponent story hidden preflop (speculative) | Range < 20% → "moderate" confidence even with 1 action | `fa49527` |
-| **3. Analysis** | Board texture computed per-opponent | Accept optional pre-computed `boardTexture` param | `fa49527` |
-| **4. Coaching** | Opponent story only adjusted GTO row | Adjust ALL profile rows when hero is behind | `fa49527` |
-| **5. Programmatic** | Auto-play ignores opponent story | Check stories in `autoAct()`, fold when clearly behind | `fa49527` |
+| **3. Analysis** | Opponent story hidden preflop (speculative) | Range < 20% → "moderate" confidence | `fa49527` |
+| **3. Analysis** | Board texture computed per-opponent | Accept pre-computed `boardTexture` param | `fa49527` |
+| **4. Coaching** | Opponent story only adjusted GTO row | Adjust ALL profile rows when behind | `fa49527` |
+| **5. Programmatic** | autoAct was separate engine | Replaced with `chooseActionFromProfile(GTO)` | `cb5d081` |
+| **6. Preflop** | Noisy PokerBench RFI data (T8o=87% raise) | Validated GTO ranges for all 5 archetypes | `35719b5` |
+| **7. Facing bet** | check→call mapping for all hands | Hand-strength-aware: strong→call, weak→fold | `b45dc9f` |
+| **8. Commentator** | Opponent story overrode GTO (MDF contradiction) | GTO is primary, story is narrative context | `a7267b4` |
 
-All issues that would affect what the user sees or what we capture are now resolved.
-The system is ready for quality iteration.
+System is validated at scale and ready for next phase.
