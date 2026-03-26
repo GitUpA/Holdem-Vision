@@ -224,11 +224,10 @@ describe("Archetype Automation", () => {
     for (const r of classResults) {
       // BB can be bb_defense or blind_vs_blind (depends on who raised)
       // Non-BB should NEVER be bb_defense
-      const ok = r.pos === "bb" || r.pos === "sb"
-        ? true // blinds can have various archetypes
-        : r.arch !== "bb_defense_vs_rfi";
-      console.log(`    ${r.pos.padEnd(12)}: ${r.arch.padEnd(25)} ${ok ? "✓" : "✗ WRONG"}`);
-      if (r.pos !== "bb" && r.pos !== "sb") {
+      const isBlind = r.pos.toLowerCase().includes("blind") || r.pos === "bb" || r.pos === "sb";
+      const ok = isBlind ? true : r.arch !== "bb_defense_vs_rfi";
+      console.log(`    ${r.pos.padEnd(15)}: ${r.arch.padEnd(25)} ${ok ? "✓" : "✗ WRONG"}`);
+      if (!isBlind) {
         expect(r.arch).not.toBe("bb_defense_vs_rfi");
       }
     }
