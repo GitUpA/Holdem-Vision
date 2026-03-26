@@ -177,7 +177,15 @@ export function PlayerList({
                 isActive && "ring-1 ring-[var(--gold)]/60",
               )}
             >
-              {/* Position badge */}
+              {/* Player name first (fixed identity) */}
+              <span className={cn(
+                "text-xs font-medium min-w-[40px]",
+                seat.isHero ? "text-[var(--gold)]" : "text-[var(--foreground)]",
+              )}>
+                {seat.label}
+              </span>
+
+              {/* Position badge (rotates each hand) */}
               <Term id="term:positions" position="bottom">
                 <span
                   className={cn(
@@ -188,14 +196,6 @@ export function PlayerList({
                   {posShort}
                 </span>
               </Term>
-
-              {/* Label */}
-              <span className={cn(
-                "text-xs font-medium min-w-[40px]",
-                seat.isHero ? "text-[var(--gold)]" : "text-[var(--foreground)]",
-              )}>
-                {seat.label}
-              </span>
 
               {/* Stack (in BB) */}
               <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums min-w-[40px]">
