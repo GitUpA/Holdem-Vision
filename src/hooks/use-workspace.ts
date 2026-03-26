@@ -55,8 +55,8 @@ import { estimateRange } from "../../convex/lib/opponents/rangeEstimator";
 
 // Drill / GTO
 import type { ConstrainedDeal } from "../../convex/lib/gto/constrainedDealer";
-import { gtoActionToGameAction } from "../../convex/lib/gto/actionMapping";
-import { scoreAction, type ActionScore } from "../../convex/lib/gto/evScoring";
+// gtoActionToGameAction no longer needed — drillAct takes game actions directly
+import { scoreAction, normalizeToGtoAction, type ActionScore } from "../../convex/lib/gto/evScoring";
 import {
   executeDrillPipeline,
   streetFromCommunityCount,
@@ -673,7 +673,7 @@ export function useWorkspace(mode: WorkspaceMode) {
   );
 
   const drillAct = useCallback(
-    (gtoAction: GtoAction) => {
+    (actionType: ActionType, amount?: number) => {
       const sess = sessionRef.current;
       const deal = drillDealRef.current;
       const state = sess?.state;
@@ -682,9 +682,28 @@ export function useWorkspace(mode: WorkspaceMode) {
       const legal = currentLegalActions(state);
       if (!legal) return;
 
-      const { actionType, amount } = gtoActionToGameAction(gtoAction, legal, state.pot.total);
-      sess.act(actionType, amount);
+      // Apply the game action
+      const coachingResult = analysisResults.get("coaching");
+      let coachingSnapshot: import("../../convex/lib/audit/types").HandEvent["coachingSnapshot"];
+      if (coachingResult?.value) {
+        const cv = coachingResult.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number }> };
+        if (cv.advices) {
+          const gtoAdvice = cv.advices.find((a) => a.profileId === "gto");
+          coachingSnapshot = {
+            gtoAction: gtoAdvice?.actionType ?? "unknown",
+            gtoAmount: gtoAdvice?.amount,
+            profileActions: cv.advices.map((a) => ({
+              profileId: a.profileId,
+              action: a.actionType,
+              amount: a.amount,
+            })),
+          };
+        }
+      }
+      sess.act(actionType, amount, coachingSnapshot);
 
+      // Map game action to GTO action for scoring
+      const gtoAction = normalizeToGtoAction(actionType, amount, state.pot.total);
       const drillStreet = streetFromCommunityCount(deal.communityCards.length);
       const score = scoreAction(
         deal.archetype,
@@ -706,7 +725,7 @@ export function useWorkspace(mode: WorkspaceMode) {
       }
       forceRender();
     },
-    [forceRender],
+    [forceRender, analysisResults],
   );
 
   const drillNextHand = useCallback(() => {

@@ -602,17 +602,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                         pot={ws.pot}
                         heroStack={heroStack}
                         blinds={ws.blinds}
-                        onAct={ws.act}
-                        gtoMode={
-                          mode.action.style === "gto" &&
-                          ws.drillPhase === "ready" &&
-                          ws.drillSolution
-                            ? {
-                                availableActions: ws.drillSolution.availableActions,
-                                onAct: ws.drillAct,
-                              }
-                            : undefined
-                        }
+                        onAct={isArchetypeSession ? ws.drillAct : ws.act}
                       />
                     </div>
                   )}
