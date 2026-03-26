@@ -353,18 +353,28 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
     if (evaluations.length === 0) return null;
 
     const inHandEvals = evaluations.filter((e) => e.status === "active" || e.status === "all_in");
-    let winnerEval = inHandEvals[0];
+    let bestEval = inHandEvals[0];
     for (const e of inHandEvals.slice(1)) {
-      if (compareHandRanks(e.evaluated.rank, winnerEval.evaluated.rank) > 0) winnerEval = e;
+      if (compareHandRanks(e.evaluated.rank, bestEval.evaluated.rank) > 0) bestEval = e;
     }
 
+    // Detect split pot — all players tied with the best hand
+    const winners = inHandEvals.filter(
+      (e) => compareHandRanks(e.evaluated.rank, bestEval.evaluated.rank) === 0,
+    );
+    const isSplit = winners.length > 1;
+    const heroInSplit = isSplit && winners.some((w) => w.isHero);
+
     return {
-      type: "showdown" as const,
-      winnerSeatIndex: winnerEval.seatIndex,
-      winnerLabel: winnerEval.label,
-      winnerIsHero: winnerEval.isHero,
-      winnerHand: winnerEval.evaluated.rank.name,
+      type: isSplit ? "split" as const : "showdown" as const,
+      winnerSeatIndex: bestEval.seatIndex,
+      winnerLabel: isSplit
+        ? winners.map((w) => w.label).join(" & ")
+        : bestEval.label,
+      winnerIsHero: isSplit ? heroInSplit : bestEval.isHero,
+      winnerHand: bestEval.evaluated.rank.name,
       potWon: gs.pot.total,
+      splitCount: isSplit ? winners.length : undefined,
       evaluations,
     };
   }, [ws.isHandOver, ws.gameState, ws.seats]);
@@ -920,12 +930,13 @@ function HandOverPanel({
 }) {
   // Type the showdown result properly
   const result = showdownResult as {
-    type: "fold" | "showdown";
+    type: "fold" | "showdown" | "split";
     winnerSeatIndex: number;
     winnerLabel: string;
     winnerIsHero: boolean;
     potWon: number;
     winnerHand?: string;
+    splitCount?: number;
     evaluations?: {
       seatIndex: number; label: string; isHero: boolean;
       holeCards: CardIndex[]; evaluated: EvaluatedHand; status: string;
@@ -938,21 +949,33 @@ function HandOverPanel({
       {result && (
         <div className={cn(
           "px-4 py-3 text-center border-b border-[var(--border)]",
-          result.winnerIsHero ? "bg-[var(--gold)]/15" : "bg-red-500/10",
+          result.type === "split" ? "bg-blue-500/10"
+            : result.winnerIsHero ? "bg-[var(--gold)]/15"
+            : "bg-red-500/10",
         )}>
           <div className="flex items-center justify-center gap-2">
-            {result.winnerIsHero ? <TrophyIcon className="text-[var(--gold)]" /> : <DefeatIcon className="text-red-400" />}
+            {result.type === "split"
+              ? <TrophyIcon className="text-blue-400" />
+              : result.winnerIsHero ? <TrophyIcon className="text-[var(--gold)]" /> : <DefeatIcon className="text-red-400" />}
             <span className={cn(
               "text-sm font-bold uppercase tracking-wider",
-              result.winnerIsHero ? "text-[var(--gold)]" : "text-red-400",
+              result.type === "split" ? "text-blue-400"
+                : result.winnerIsHero ? "text-[var(--gold)]"
+                : "text-red-400",
             )}>
-              {result.winnerIsHero ? "You Win!" : `${result.winnerLabel} Wins`}
+              {result.type === "split"
+                ? `Split Pot — ${result.winnerLabel}`
+                : result.winnerIsHero ? "You Win!" : `${result.winnerLabel} Wins`}
             </span>
-            {result.winnerIsHero ? <TrophyIcon className="text-[var(--gold)]" /> : <DefeatIcon className="text-red-400" />}
+            {result.type === "split"
+              ? <TrophyIcon className="text-blue-400" />
+              : result.winnerIsHero ? <TrophyIcon className="text-[var(--gold)]" /> : <DefeatIcon className="text-red-400" />}
           </div>
           <p className="text-xs text-[var(--muted-foreground)] mt-1">
-            {result.type === "fold" ? "All opponents folded" : result.winnerHand}
-            {" · "}{(result.potWon / ws.blinds.big).toFixed(1)} BB pot
+            {result.type === "fold" ? "All opponents folded"
+              : result.type === "split" ? `${result.winnerHand} — each gets ${(result.potWon / (result.splitCount ?? 2) / ws.blinds.big).toFixed(1)} BB`
+              : result.winnerHand}
+            {result.type !== "split" && ` · ${(result.potWon / ws.blinds.big).toFixed(1)} BB pot`}
           </p>
         </div>
       )}
