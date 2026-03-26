@@ -726,6 +726,7 @@ export function useWorkspace(mode: WorkspaceMode) {
         state.pot.total / DEFAULT_DRILL_BLINDS.big,
         deal.isInPosition,
         drillStreet,
+        drillSolutionRef.current?.frequencies, // DRY: use pre-computed solution (validated ranges for preflop)
       );
 
       // Build score snapshot for audit

@@ -23,6 +23,8 @@ import type {
   AccuracyImpact,
 } from "./tables/types";
 import type { ConstrainedDeal, DrillConstraints } from "./constrainedDealer";
+import { getRfiFrequencies, getBbDefenseFrequencies, get3BetFrequencies, getBvbFrequencies, get4BetFrequencies } from "./tables/preflopRanges";
+import { comboToHandClass, cardsToCombo } from "../opponents/combos";
 import type { HandSessionConfig } from "../session/types";
 
 import { HandSession } from "../session/handSession";
@@ -123,12 +125,71 @@ export function streetFromCommunityCount(
  * This is a pure function — no side effects, no React, no session state.
  * Returns null if no frequency data exists for this archetype/category.
  */
+/**
+ * Compute preflop solution using validated GTO ranges.
+ * Same data as coaching + engine — DRY.
+ */
+function computePreflopSolution(deal: ConstrainedDeal): SpotSolution | null {
+  const heroCards = deal.heroCards;
+  if (heroCards.length < 2) return null;
+
+  const combo = cardsToCombo(heroCards[0], heroCards[1]);
+  const handClass = comboToHandClass(combo);
+  const archId = deal.archetype.archetypeId;
+  const position = deal.heroPosition;
+
+  let freqs: { fold: number; call: number; raise: number } | null = null;
+
+  switch (archId) {
+    case "rfi_opening": freqs = getRfiFrequencies(handClass, position); break;
+    case "bb_defense_vs_rfi": freqs = getBbDefenseFrequencies(handClass, "btn"); break;
+    case "three_bet_pots": freqs = get3BetFrequencies(handClass, position); break;
+    case "blind_vs_blind": freqs = getBvbFrequencies(handClass, position); break;
+    case "four_bet_five_bet": freqs = get4BetFrequencies(handClass, 2); break;
+  }
+
+  if (!freqs) return null;
+
+  const raiseAction: GtoAction = archId === "rfi_opening" || archId === "blind_vs_blind"
+    ? "bet_medium" : "raise_large";
+  const frequencies: ActionFrequencies = {
+    fold: freqs.fold,
+    call: freqs.call,
+    [raiseAction]: freqs.raise,
+  };
+
+  let optimalAction: GtoAction = "fold";
+  let optimalFrequency = 0;
+  for (const [action, freq] of Object.entries(frequencies)) {
+    if ((freq ?? 0) > optimalFrequency) {
+      optimalFrequency = freq ?? 0;
+      optimalAction = action as GtoAction;
+    }
+  }
+
+  const explanation = explainArchetype(deal.archetype, deal.handCategory, deal.isInPosition, undefined, "preflop");
+
+  return {
+    frequencies,
+    optimalAction,
+    optimalFrequency,
+    availableActions: ["fold", "call", raiseAction],
+    explanation,
+    isExactMatch: true,
+    resolvedCategory: deal.handCategory.category,
+  };
+}
+
 export function computeSolution(deal: ConstrainedDeal): SpotSolution | null {
-  // For postflop principles, use textureArchetypeId for solver lookup
   const lookupId = deal.archetype.textureArchetypeId ?? deal.archetype.archetypeId;
   const street = streetFromCommunityCount(deal.communityCards.length);
 
-  // Look up frequencies (with bands if available)
+  // For preflop: use validated GTO ranges (same as coaching + engine)
+  if (street === "preflop") {
+    return computePreflopSolution(deal);
+  }
+
+  // For postflop: use solver tables (real TexasSolver data)
   const lookup = lookupFrequencies(lookupId, deal.handCategory.category, deal.isInPosition, street);
   if (!lookup) return null;
 

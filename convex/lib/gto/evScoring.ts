@@ -85,18 +85,28 @@ export function scoreAction(
   potSize: number,
   isInPosition: boolean,
   street: "preflop" | "flop" | "turn" | "river" = "flop",
+  /** Pre-computed frequencies from SpotSolution (avoids re-lookup, ensures DRY) */
+  precomputedFrequencies?: ActionFrequencies,
 ): ActionScore | null {
-  // For turn/river, use textureArchetypeId for solver lookup
-  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
-  const lookup = lookupFrequencies(
-    lookupArchetypeId,
-    handCat.category,
-    isInPosition,
-    street,
-  );
-  if (!lookup) return null;
+  let frequencies: ActionFrequencies;
 
-  const frequencies = lookup.frequencies;
+  if (precomputedFrequencies) {
+    // Use pre-computed (from computeSolution, which uses validated ranges for preflop)
+    frequencies = precomputedFrequencies;
+  } else {
+    // Fallback: direct lookup (postflop solver tables)
+    const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
+    const lookup = lookupFrequencies(
+      lookupArchetypeId,
+      handCat.category,
+      isInPosition,
+      street,
+    );
+    if (!lookup) return null;
+    frequencies = lookup.frequencies;
+  }
+
+  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
   const table = getTable(lookupArchetypeId, street);
 
   // Find optimal action (highest frequency)
