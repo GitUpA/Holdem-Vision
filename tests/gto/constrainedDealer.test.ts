@@ -68,14 +68,16 @@ describe("constrainedDealer preflop", () => {
   });
 
   it("bb_defense_vs_rfi: hero is BB", () => {
-    // BB is seat index 2 in 6-player with dealer at 0
+    // Hero always at seat 0, dealer moves to put hero in BB position
     const deal = dealWith("bb_defense_vs_rfi");
-    expect(deal.heroSeatIndex).toBe(2); // BTN=0, SB=1, BB=2
+    expect(deal.heroSeatIndex).toBe(0); // fixed seat
+    expect(deal.heroPosition).toBe("bb");
   });
 
   it("blind_vs_blind: hero is SB", () => {
     const deal = dealWith("blind_vs_blind");
-    expect(deal.heroSeatIndex).toBe(1); // SB
+    expect(deal.heroSeatIndex).toBe(0); // fixed seat
+    expect(deal.heroPosition).toBe("sb");
   });
 
   it("preflop has frequency data for registered tables", () => {

@@ -34,6 +34,7 @@ export interface DrillConstraints {
 export interface ConstrainedDeal {
   heroSeatIndex: number;
   dealerSeatIndex: number;
+  heroPosition: Position;
   heroCards: CardIndex[];
   communityCards: CardIndex[];
   numPlayers: number;
@@ -573,17 +574,17 @@ function seatIndicesForPosition(
   heroPosition: Position,
   numPlayers: number,
 ): { heroSeatIndex: number; dealerSeatIndex: number } {
-  // positions[0] = dealer (BTN). Find which offset gives hero the desired position.
+  // Hero always stays at seat 0 (fixed seat, like real poker).
+  // Move the dealer button so hero gets the desired position.
   const positions = positionsForTableSize(numPlayers);
   const posIndex = positions.indexOf(heroPosition);
   if (posIndex === -1) {
-    // Position not available at this table size — default to BTN
     return { heroSeatIndex: 0, dealerSeatIndex: 0 };
   }
-  // dealerSeatIndex is 0, hero is at offset posIndex
-  // To make hero at seatIndex posIndex with dealer at 0:
-  const dealerSeatIndex = 0;
-  const heroSeatIndex = posIndex;
+  // If hero is at seat 0 and needs to be at position index posIndex,
+  // dealer must be at seat (numPlayers - posIndex) % numPlayers
+  const heroSeatIndex = 0;
+  const dealerSeatIndex = (numPlayers - posIndex) % numPlayers;
   return { heroSeatIndex, dealerSeatIndex };
 }
 
@@ -598,11 +599,16 @@ function buildDeal(params: {
   isInPosition: boolean;
   textureArchetypeId?: ArchetypeId;
 }): ConstrainedDeal {
-  const { archetypeId, heroSeatIndex, heroCards, textureArchetypeId } = params;
+  const { archetypeId, heroSeatIndex, dealerSeatIndex, numPlayers, heroCards, textureArchetypeId } = params;
+  // Derive hero's position from seat indices
+  const positions = positionsForTableSize(numPlayers);
+  const heroOffset = (heroSeatIndex - dealerSeatIndex + numPlayers) % numPlayers;
+  const heroPosition: Position = positions[heroOffset] ?? "btn";
   const category = ARCHETYPE_CATEGORY[archetypeId];
 
   return {
     ...params,
+    heroPosition,
     archetype: {
       archetypeId,
       confidence: 1.0,
