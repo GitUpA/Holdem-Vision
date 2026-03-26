@@ -136,12 +136,8 @@ export function useWorkspace(mode: WorkspaceMode) {
   const [numPlayers, setNumPlayersRaw] = useState(6);
   const [dealerSeatIndex, setDealerSeatIndex] = useState(0);
   const [heroSeatIndex, setHeroSeatIndex] = useState(0);
-  const [blinds, setBlinds] = useState<BlindStructure>(
-    mode.deal.style === "constrained" ? DEFAULT_DRILL_BLINDS : { small: 0.5, big: 1 },
-  );
-  const [startingStack, setStartingStack] = useState(
-    mode.deal.style === "constrained" ? DEFAULT_DRILL_STACK : 100,
-  );
+  const [blinds, setBlinds] = useState<BlindStructure>({ small: 0.5, big: 1 });
+  const [startingStack, setStartingStack] = useState(100);
 
   // ─── Card selection (UI-only) ───
   const [selectionTarget, setSelectionTarget] = useState<SelectionTarget>("hero");
@@ -164,19 +160,17 @@ export function useWorkspace(mode: WorkspaceMode) {
   const getSession = useCallback((): HandSession => {
     if (!sessionRef.current) {
       const profiles = new Map<number, OpponentProfile>();
-      if (mode.deal.style === "constrained") {
-        // Drill mode: TAG villains
-        for (let i = 1; i < 6; i++) {
-          profiles.set(i, PRESET_PROFILES.tag);
-        }
+      // Default: GTO villains (user can change via Profiles dropdown)
+      for (let i = 1; i < 6; i++) {
+        profiles.set(i, PRESET_PROFILES.gto);
       }
       sessionRef.current = new HandSession(
         {
-          numPlayers: mode.deal.style === "constrained" ? 6 : 6,
+          numPlayers: 6,
           dealerSeatIndex: 0,
           heroSeatIndex: 0,
-          blinds: mode.deal.style === "constrained" ? DEFAULT_DRILL_BLINDS : { small: 0.5, big: 1 },
-          startingStack: mode.deal.style === "constrained" ? DEFAULT_DRILL_STACK : 100,
+          blinds: { small: 0.5, big: 1 },
+          startingStack: 100,
           seatProfiles: profiles,
           seed: Date.now(),
         },
@@ -346,9 +340,7 @@ export function useWorkspace(mode: WorkspaceMode) {
 
   const [activeLensIds, setActiveLensIds] = useState<string[]>(
     mode.analysis.enabled
-      ? mode.id === "drill"
-        ? ["raw-equity", "threats", "outs", "draws", "coaching"]
-        : ["raw-equity", "threats", "outs", "draws"]
+      ? ["raw-equity", "threats", "outs", "draws", "coaching"]
       : [],
   );
   const availableLenses = useMemo(() => getLensInfo(), []);

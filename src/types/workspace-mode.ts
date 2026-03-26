@@ -92,15 +92,15 @@ export function buildMode(source: BoardSource, opts?: { quiz?: boolean }): Works
   switch (source) {
     case "archetype":
       return {
-        id: "drill",
+        id: "vision",
         source: "archetype",
         label: "Archetype",
-        cards: { enabled: true, heroEditable: false, communityEditable: false, villainEditable: false },
-        analysis: { enabled: true, coaching: false, lenses: true, lensSelector: true },
+        cards: { enabled: true, heroEditable: true, communityEditable: true, villainEditable: true },
+        analysis: { enabled: true, coaching: true, lenses: true, lensSelector: true },
         scoring: { enabled: true, showSolution: opts?.quiz === false ? "always" : "after_act" },
-        action: { style: "gto" },
+        action: { style: "game" },
         deal: { style: "constrained", archetypeSelector: true },
-        opponents: { editable: false, randomizable: false },
+        opponents: { editable: true, randomizable: true },
         setup: { enabled: true, blindsEditable: true, stackEditable: true, playerCountEditable: true },
         postHand: { replay: true, revealAll: true, dealNext: true, drillNext: true, drillSummary: true },
         layout: "two-column",
