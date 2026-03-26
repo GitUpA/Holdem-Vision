@@ -46,7 +46,7 @@ import { ScoreDisplay } from "../drill/score-display";
 import { DrillGuideDrawer } from "../drill/drill-guide-drawer";
 import { ArchetypeTutorialDrawer } from "../drill/archetype-tutorial-drawer";
 import { NarrativeBoardContext } from "../drill/narrative-board-context";
-import { NarrativePrompt } from "../drill/narrative-prompt";
+// NarrativePrompt removed — narratives now integrated into ActionPanel
 import { NarrativeFeedbackDisplay } from "../drill/narrative-feedback";
 import { buildNarrativeSummary } from "../../../convex/lib/gto/narrativeSummary";
 
@@ -390,6 +390,22 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
     return (cv.data as { opponentStory?: import("../../../convex/lib/analysis/opponentStory").OpponentStory }).opponentStory;
   }, [ws.analysisResults]);
 
+  // ── Action stories (computed here so both ActionPanel and CoachingSection can use them) ──
+  const topLevelActionStories = useMemo(() => {
+    const gs = ws.gameState;
+    const heroCards = ws.seats.find(s => s.isHero)?.holeCards;
+    if (!gs || !heroCards || heroCards.length < 2 || !ws.legalActions) return undefined;
+    const handCat = categorizeHand(heroCards as CardIndex[], gs.communityCards);
+    return buildActionStories(
+      heroCards as CardIndex[],
+      gs.communityCards,
+      ws.legalActions,
+      coachingOpponentStory,
+      handCat,
+      gs.currentStreet,
+    );
+  }, [ws.gameState, ws.seats, ws.legalActions, coachingOpponentStory]);
+
   // ── Layout ──
   const isTwoColumn = mode.layout === "two-column";
 
@@ -580,21 +596,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                     onCardClick={() => {}}
                   />
 
-                  {/* Narrative prompt — quiz mode only, before acting */}
-                  {ws.drillPhase === "ready" && drillQuizMode === "quiz" && ws.drillSolution && ws.drillCurrentDeal && (
-                    <div className="mt-4">
-                      <NarrativePrompt
-                        handCategory={ws.drillCurrentDeal.handCategory}
-                        isInPosition={ws.drillCurrentDeal.isInPosition}
-                        isPreflop={ws.drillCurrentDeal.archetype.category === "preflop"}
-                        frequencies={ws.drillSolution.frequencies}
-                        selectedIntent={ws.drillNarrativeChoice}
-                        onSelect={ws.setDrillNarrativeChoice}
-                      />
-                    </div>
-                  )}
-
-                  {/* Action buttons — mode selects game vs GTO style */}
+                  {/* Action buttons with integrated narratives */}
                   {ws.isHeroTurn && ws.legalActions && (
                     <div className="mt-4">
                       <ActionPanel
@@ -603,6 +605,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                         heroStack={heroStack}
                         blinds={ws.blinds}
                         onAct={isArchetypeSession ? ws.drillAct : ws.act}
+                        actionStories={topLevelActionStories}
                       />
                     </div>
                   )}

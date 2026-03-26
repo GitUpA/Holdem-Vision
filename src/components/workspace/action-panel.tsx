@@ -14,6 +14,12 @@ interface GtoMode {
   onAct: (action: GtoAction) => void;
 }
 
+interface ActionStoryProp {
+  action: string;
+  narrative: string;
+  counterNarrative?: string;
+}
+
 interface ActionPanelProps {
   legalActions: LegalActions;
   pot: PotState;
@@ -22,6 +28,8 @@ interface ActionPanelProps {
   onAct: (actionType: ActionType, amount?: number) => void;
   /** When set, renders GTO bucket buttons instead of free-form sizing */
   gtoMode?: GtoMode;
+  /** Per-action narrative descriptions — what each action communicates */
+  actionStories?: ActionStoryProp[];
 }
 
 const SIZING_PRESETS = [
@@ -49,6 +57,7 @@ export function ActionPanel({
   blinds,
   onAct,
   gtoMode,
+  actionStories,
 }: ActionPanelProps) {
   const [showSizing, setShowSizing] = useState(false);
   const [sizingAction, setSizingAction] = useState<"bet" | "raise">("bet");
@@ -134,43 +143,48 @@ export function ActionPanel({
         </div>
       )}
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Action buttons with narratives */}
+      <div className="space-y-1.5">
         {legalActions.canFold && (
-          <ActionButton
+          <ActionRow
             label="Fold"
             color="text-gray-400 border-gray-600 hover:bg-gray-800"
             onClick={() => onAct("fold")}
+            narrative={findStory(actionStories, "fold")}
           />
         )}
         {legalActions.canCheck && (
-          <ActionButton
+          <ActionRow
             label="Check"
             color="text-blue-300 border-blue-600 hover:bg-blue-900/40"
             onClick={() => onAct("check")}
+            narrative={findStory(actionStories, "check")}
           />
         )}
         {legalActions.canCall && (
-          <ActionButton
+          <ActionRow
             label={`Call ${formatBB(legalActions.callAmount)}${legalActions.isCallAllIn ? " (AI)" : ""}`}
             color="text-green-300 border-green-600 hover:bg-green-900/40"
             onClick={() => onAct("call")}
+            narrative={findStory(actionStories, "call")}
           />
         )}
         {legalActions.canBet && (
-          <ActionButton
+          <ActionRow
             label="Bet"
             color="text-amber-300 border-amber-600 hover:bg-amber-900/40"
             onClick={() => openSizing("bet")}
             active={showSizing && sizingAction === "bet"}
+            narrative={findStory(actionStories, "bet")}
           />
         )}
         {legalActions.canRaise && (
-          <ActionButton
+          <ActionRow
             label="Raise"
             color="text-red-300 border-red-600 hover:bg-red-900/40"
             onClick={() => openSizing("raise")}
             active={showSizing && sizingAction === "raise"}
+            narrative={findStory(actionStories, "raise")}
           />
         )}
       </div>
@@ -267,6 +281,7 @@ export function ActionPanel({
   );
 }
 
+/** Action button (used in GTO mode) */
 function ActionButton({
   label,
   color,
@@ -295,4 +310,47 @@ function ActionButton({
       {label}
     </motion.button>
   );
+}
+
+/** Action row: button + narrative description */
+function ActionRow({
+  label,
+  color,
+  onClick,
+  active,
+  narrative,
+}: {
+  label: string;
+  color: string;
+  onClick: () => void;
+  active?: boolean;
+  narrative?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <motion.button
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onClick}
+        className={cn(
+          "font-semibold rounded-lg border transition-colors px-3 py-1.5 text-xs w-[80px] shrink-0 text-center",
+          color,
+          active && "ring-1 ring-[var(--gold)]/40",
+        )}
+      >
+        {label}
+      </motion.button>
+      {narrative && (
+        <span className="text-[10px] text-[var(--muted-foreground)] italic leading-tight">
+          {narrative}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Find narrative for an action type */
+function findStory(stories: ActionStoryProp[] | undefined, action: string): string | undefined {
+  if (!stories) return undefined;
+  return stories.find((s) => s.action === action)?.narrative;
 }
