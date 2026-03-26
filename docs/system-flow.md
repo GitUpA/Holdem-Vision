@@ -4,7 +4,16 @@
 
 ```mermaid
 flowchart TD
-    DEAL[Deal Hand] --> SM[State Machine Init]
+    %% ═══ ONE SYSTEM — board source is the only variable ═══
+    SOURCE{Board Source} --> |Free Play| RANDOM[Random Deal]
+    SOURCE --> |Archetype| CONSTRAINED[Constrained Deal — matches archetype]
+    SOURCE --> |Custom| CUSTOM[User-set cards]
+
+    RANDOM --> DEAL[Deal Hand]
+    CONSTRAINED --> DEAL
+    CUSTOM --> DEAL
+
+    DEAL --> SM[State Machine Init]
     SM --> BLINDS[Post Blinds]
     BLINDS --> AUTOPLAY_PRE[Auto-play to Hero's Turn]
 
@@ -285,21 +294,38 @@ COACH (clear): You're on the Button with A♠ K♥. ...
 
 ### Test Count: 1274 across 66 files. Zero tsc/lint errors.
 
-## Engine Architecture — ONE Engine, One Path
+## Architecture — ONE System
+
+### Board Source is the Only Variable
+
+```
+Free Play  → random cards  ─┐
+Archetype  → constrained   ─┤──→ SAME system ──→ SAME coaching ──→ SAME scoring
+Custom     → user-set      ─┘
+```
+
+After cards are dealt, everything is identical regardless of board source:
+coaching, scoring, narratives, feedback, analysis, opponent stories, hand-over.
+There is no "drill mode" or "vision mode" — just one experience with options
+for how the board is generated.
+
+### ONE Engine, One Path
 
 ```
 Hero autoAct → chooseActionFromProfile(GTO_PROFILE) → modifiedGtoEngine.decide()
 Villain auto  → chooseActionFromProfile(NIT/FISH/etc) → modifiedGtoEngine.decide()
 Coaching GTO  → lookupGtoFrequencies() (same lookup the engine uses)
+Scoring       → deriveSolutionFromCoaching() OR drill pipeline (same GTO data)
 ```
 
-All three paths share:
+All paths share:
 - `lookupGtoFrequencies()` — unified solver lookup
 - `preflopRanges.ts` — validated GTO ranges for all 5 preflop archetypes
 - `mapGtoActionToLegal()` — hand-strength-aware facing-bet mapping
 - `sampleFromModifiedFrequencies()` — weighted action sampling
 
 Profile modifiers are the ONLY difference between hero (GTO = identity) and villains.
+Board source is the ONLY difference between Free Play and Archetype.
 
 ## Preflop Data — Validated GTO Ranges
 
