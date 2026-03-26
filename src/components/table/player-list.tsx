@@ -179,7 +179,7 @@ export function PlayerList({
               transition={{ delay: i * 0.03 }}
               onClick={() => !seat.isHero && onSeatClick(seat.seatIndex)}
               className={cn(
-                "w-full flex items-center gap-2 px-3 py-2 text-left transition-all",
+                "w-full flex items-center px-3 py-2 text-left transition-all",
                 seat.isHero
                   ? "bg-[var(--gold)]/5 cursor-default"
                   : isSelected
@@ -188,35 +188,38 @@ export function PlayerList({
                 isActive && "ring-1 ring-[var(--gold)]/60",
               )}
             >
-              {/* Col 1: Player (max 4 chars: HERO, V2, V3...) */}
-              <span className={cn(
-                "text-[11px] font-bold uppercase w-[32px] shrink-0",
-                seat.isHero ? "text-[var(--gold)]" : "text-[var(--foreground)]",
-              )}>
-                {seat.label}
-              </span>
-
-              {/* Col 2: Position (max 4 chars: BTN, SB, BB, UTG, HJ, CO) */}
-              <Term id="term:positions" position="bottom">
-                <span
-                  className={cn(
-                    "text-[10px] font-bold px-1.5 py-0.5 rounded border w-[36px] text-center shrink-0",
-                    posColor,
-                  )}
-                >
-                  {posShort}
+              {/* Fixed columns: grid ensures perfect alignment */}
+              <div className="grid items-center shrink-0" style={{ gridTemplateColumns: "40px 44px 32px 52px", gap: "0px" }}>
+                {/* Player */}
+                <span className={cn(
+                  "text-[11px] font-bold uppercase",
+                  seat.isHero ? "text-[var(--gold)]" : "text-[var(--foreground)]",
+                )}>
+                  {seat.label}
                 </span>
-              </Term>
 
-              {/* Col 3: Profile (always show, max 3 chars: GTO, TAG, LAG, NIT, FSH) */}
-              <span className="text-[10px] text-[var(--muted-foreground)] w-[28px] shrink-0">
-                {seat.isHero ? "" : seat.profile ? shortProfileName(seat.profile.name) : ""}
-              </span>
+                {/* Position */}
+                <Term id="term:positions" position="bottom">
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold px-1.5 py-0.5 rounded border text-center inline-block w-[36px]",
+                      posColor,
+                    )}
+                  >
+                    {posShort}
+                  </span>
+                </Term>
 
-              {/* Col 4: Stack (max 6 chars: XXX BB) */}
-              <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums w-[42px] shrink-0 text-right">
-                {formatBB(seat.stack / bigBlind)} BB
-              </span>
+                {/* Profile */}
+                <span className="text-[10px] text-[var(--muted-foreground)]">
+                  {seat.isHero ? "" : seat.profile ? shortProfileName(seat.profile.name) : ""}
+                </span>
+
+                {/* Stack */}
+                <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums text-right">
+                  {formatBB(seat.stack / bigBlind)} BB
+                </span>
+              </div>
 
               {/* Hole cards (visible villains) */}
               {!seat.isHero && seat.cardVisibility !== "hidden" && seat.holeCards.length === 2 && (
