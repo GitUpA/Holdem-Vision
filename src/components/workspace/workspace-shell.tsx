@@ -618,7 +618,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
               <CoachingSection
                 results={ws.analysisResults}
                 drillSolution={showDrillSolution && ws.drillSolution ? ws.drillSolution : undefined}
-                drillScore={ws.lastScore ?? undefined}
+                drillScore={ws.isHeroTurn ? undefined : (ws.lastScore ?? undefined)}
                 isDrill={true} /* converged: scoring always available */
                 gameState={ws.gameState}
                 heroSeatIndex={ws.heroSeatIndex}

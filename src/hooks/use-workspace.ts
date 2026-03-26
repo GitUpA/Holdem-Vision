@@ -647,6 +647,11 @@ export function useWorkspace(mode: WorkspaceMode) {
 
         session.act(actionType, amount, coachingSnapshot, scoreSnapshot);
 
+        // Clear stale solution and score — next decision point gets fresh data
+        drillSolutionRef.current = null;
+        // Score persists briefly for feedback, then clears when coaching updates
+        // (the score is already captured in audit for permanent record)
+
         // Track session scores
         lastScoreRef.current = score;
         if (score) sessionScoresRef.current = [...sessionScoresRef.current, score];
