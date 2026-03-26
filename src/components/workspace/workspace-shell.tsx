@@ -376,10 +376,10 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
   };
 
   // ── Drill: show solution based on mode ──
-  const showDrillSolution = drillQuizMode === "learn" || ws.drillPhase === "acted";
+  const showDrillSolution = drillQuizMode === "learn" || ws.lastScore != null;
   // Archetype mode tracks session progress (hand count, scoring).
   // But ALL features are available in ALL modes — no isArchetypeSession gating.
-  const isArchetypeSession = boardSource === "archetype" && ws.drillPhase !== "idle";
+  const isArchetypeSession = boardSource === "archetype" && (ws.isHandActive || ws.isHandOver);
 
   // ── Extract opponent story from coaching results (DRY — shared with coaching panel + opponent detail) ──
   const coachingOpponentStory = useMemo(() => {
@@ -454,7 +454,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
               {/* ── Drill: Archetype selector / active / summary (TOP in drill mode) ── */}
               {mode.deal.archetypeSelector && (
                 <>
-                  {ws.drillPhase === "idle" && (
+                  {boardSource === "archetype" && !ws.isHandActive && !ws.isHandOver && (
                     <ArchetypeSelector
                       onStart={(id, count) => { setTutorialArchetype(null); ws.startDrill(id, count); }}
                       drillMode={drillQuizMode}
@@ -464,12 +464,12 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                     />
                   )}
 
-                  {ws.drillPhase !== "idle" && ws.drillPhase !== "summary" && (
+                  {(ws.isHandActive || ws.isHandOver) && !(ws.sessionHands >= ws.drillHandsTarget && ws.isHandOver) && (
                     <ActiveDrill ws={ws} drillQuizMode={drillQuizMode} onOpenGuide={() => setDrillGuideOpen(true)} />
                   )}
 
-                  {ws.drillPhase === "summary" && (
-                    <DrillSummary ws={ws} onNewDrill={ws.resetDrill} />
+                  {ws.sessionHands >= ws.drillHandsTarget && ws.isHandOver && (
+                    <DrillSummary ws={ws} onNewDrill={ws.resetSession} />
                   )}
                 </>
               )}
@@ -604,7 +604,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                         pot={ws.pot}
                         heroStack={heroStack}
                         blinds={ws.blinds}
-                        onAct={isArchetypeSession ? ws.drillAct : ws.act}
+                        onAct={ws.act}
                         actionStories={topLevelActionStories}
                       />
                     </div>
@@ -617,7 +617,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
               <CoachingSection
                 results={ws.analysisResults}
                 drillSolution={showDrillSolution && ws.drillSolution ? ws.drillSolution : undefined}
-                drillScore={ws.drillCurrentScore ?? undefined}
+                drillScore={ws.lastScore ?? undefined}
                 isDrill={true} /* converged: scoring always available */
                 gameState={ws.gameState}
                 heroSeatIndex={ws.heroSeatIndex}
@@ -626,19 +626,19 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                 heroCards={ws.heroCards}
               />
 
-              {/* ── Drill: Score feedback + next hand ── */}
-              {ws.drillPhase === "acted" && ws.drillCurrentScore && (
+              {/* ── Score feedback + next hand ── */}
+              {ws.lastScore != null && ws.lastScore && (
                 <ScoreDisplay
-                  score={ws.drillCurrentScore}
+                  score={ws.lastScore}
                   onNextHand={ws.drillNextHand}
-                  isLastHand={ws.drillHandsPlayed >= ws.drillHandsTarget}
+                  isLastHand={ws.sessionHands >= ws.drillHandsTarget}
                 />
               )}
 
-              {/* ── Drill: Narrative feedback (quiz mode, after acting) ── */}
-              {ws.drillPhase === "acted" && drillQuizMode === "quiz" && ws.drillCurrentScore && ws.drillSolution && (
+              {/* ── Narrative feedback (quiz mode, after acting) ── */}
+              {ws.lastScore != null && drillQuizMode === "quiz" && ws.lastScore && ws.drillSolution && (
                 <NarrativeFeedbackDisplay
-                  userAction={ws.drillCurrentScore.userAction}
+                  userAction={ws.lastScore.userAction}
                   narrativeChoice={ws.drillNarrativeChoice}
                   optimalAction={ws.drillSolution.optimalAction}
                   optimalFrequency={ws.drillSolution.optimalFrequency}
@@ -1162,7 +1162,7 @@ function ActiveDrill({
   onOpenGuide: () => void;
 }) {
   const progressPct = ws.drillHandsTarget > 0
-    ? (ws.drillHandsPlayed / ws.drillHandsTarget) * 100 : 0;
+    ? (ws.sessionHands / ws.drillHandsTarget) * 100 : 0;
 
   return (
     <div className="space-y-4">
@@ -1179,7 +1179,7 @@ function ActiveDrill({
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <button onClick={ws.resetDrill}
+              <button onClick={ws.resetSession}
                 className="px-2 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:text-red-400 hover:border-red-400/40 transition-colors"
                 title="Quit drill">
                 <span className="text-[9px] font-medium">Quit</span>
@@ -1193,8 +1193,8 @@ function ActiveDrill({
           </div>
         )}
         <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
-          <span>Hand {Math.min(ws.drillHandsPlayed + 1, ws.drillHandsTarget)} of {ws.drillHandsTarget}</span>
-          <span>{ws.drillProgress.optimal}W {ws.drillProgress.acceptable}A {ws.drillProgress.mistake}M {ws.drillProgress.blunder}B</span>
+          <span>Hand {Math.min(ws.sessionHands + 1, ws.drillHandsTarget)} of {ws.drillHandsTarget}</span>
+          <span>{ws.sessionProgress.optimal}W {ws.sessionProgress.acceptable}A {ws.sessionProgress.mistake}M {ws.sessionProgress.blunder}B</span>
         </div>
         <div className="h-1.5 rounded-full bg-[var(--muted)]/30 overflow-hidden">
           <motion.div className="h-full bg-[var(--gold)] rounded-full"
@@ -1213,7 +1213,7 @@ function ActiveDrill({
         />
       )}
 
-      {ws.drillPhase === "dealing" && (
+      {ws.isHandActive && !ws.isHeroTurn && ws.drillCurrentDeal && ws.heroCards.length === 0 && (
         <div className="text-center text-xs text-[var(--muted-foreground)] py-4">Dealing...</div>
       )}
     </div>
@@ -1222,7 +1222,7 @@ function ActiveDrill({
 
 /** Drill summary screen */
 function DrillSummary({ ws, onNewDrill }: { ws: WorkspaceState; onNewDrill: () => void }) {
-  const { drillProgress: progress, drillScores: scores } = ws;
+  const { sessionProgress: progress, sessionScores: scores } = ws;
   const total = scores.length;
   const avgEvLoss = total > 0 ? scores.reduce((sum, s) => sum + s.evLoss, 0) / total : 0;
 

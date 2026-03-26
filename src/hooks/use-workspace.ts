@@ -87,11 +87,9 @@ export interface UnifiedSeatConfig {
   label: string;
 }
 
-// ── Drill types ──
+// ── Session types ──
 
-export type DrillPhase = "idle" | "dealing" | "ready" | "acted" | "summary";
-
-export interface DrillProgress {
+export interface SessionProgress {
   optimal: number;
   acceptable: number;
   mistake: number;
@@ -195,13 +193,12 @@ export function useWorkspace(mode: WorkspaceMode) {
   const session = getSession();
   const gameState = session.state;
 
-  // ─── Drill state (always exists, idle when scoring disabled) ───
-  const drillPhaseRef = useRef<DrillPhase>("idle");
+  // ─── Session state (always exists, idle when scoring disabled) ───
   const drillArchetypeRef = useRef<ArchetypeId | null>(null);
-  const drillHandsPlayedRef = useRef(0);
+  const sessionHandsRef = useRef(0);
   const drillHandsTargetRef = useRef(10);
-  const drillScoresRef = useRef<ActionScore[]>([]);
-  const drillCurrentScoreRef = useRef<ActionScore | null>(null);
+  const sessionScoresRef = useRef<ActionScore[]>([]);
+  const lastScoreRef = useRef<ActionScore | null>(null);
   const drillDealRef = useRef<ConstrainedDeal | null>(null);
   const drillSolutionRef = useRef<SpotSolution | null>(null);
   const drillRngRef = useRef(() => Math.random());
@@ -527,8 +524,8 @@ export function useWorkspace(mode: WorkspaceMode) {
   // DRILL LOGIC (inlined from useDrillSession)
   // ═══════════════════════════════════════════════════════
 
-  const getDrillProgress = useCallback((): DrillProgress => {
-    const scores = drillScoresRef.current;
+  const getSessionProgress = useCallback((): SessionProgress => {
+    const scores = sessionScoresRef.current;
     return {
       optimal: scores.filter((s) => s.verdict === "optimal").length,
       acceptable: scores.filter((s) => s.verdict === "acceptable").length,
@@ -549,9 +546,6 @@ export function useWorkspace(mode: WorkspaceMode) {
 
     if (!archId || !sessionRef.current) return;
 
-    drillPhaseRef.current = "dealing";
-    forceRender();
-
     // Execute the canonical pipeline — same code path as tests
     const result = executeDrillPipeline(
       archId,
@@ -560,7 +554,7 @@ export function useWorkspace(mode: WorkspaceMode) {
     );
 
     drillDealRef.current = result.deal;
-    drillCurrentScoreRef.current = null;
+    lastScoreRef.current = null;
     drillNarrativeChoiceRef.current = null;
     drillSolutionRef.current = result.solution;
 
@@ -569,7 +563,6 @@ export function useWorkspace(mode: WorkspaceMode) {
     setDealerSeatIndex(result.deal.dealerSeatIndex);
     setNumPlayers(result.deal.numPlayers);
 
-    drillPhaseRef.current = "ready";
     forceRender();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- setNumPlayers defined later in hook; stable setState wrapper called at invocation time
   }, [forceRender]);
@@ -604,42 +597,95 @@ export function useWorkspace(mode: WorkspaceMode) {
   const act = useCallback(
     (actionType: ActionType, amount?: number) => {
       const gs = session.state;
+      if (!gs) return;
+
       // Capture coaching snapshot + score for audit
       const coachingResult = analysisResults.get("coaching");
       let coachingSnapshot: import("../../convex/lib/audit/types").HandEvent["coachingSnapshot"];
       let scoreSnapshot: import("../../convex/lib/audit/types").HandEvent["score"];
-      if (coachingResult?.value) {
-        const cv = coachingResult.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number; solverData?: any }> };
-        if (cv.advices) {
-          const gtoAdvice = cv.advices.find((a) => a.profileId === "gto");
-          coachingSnapshot = {
-            gtoAction: gtoAdvice?.actionType ?? "unknown",
-            gtoAmount: gtoAdvice?.amount,
-            profileActions: cv.advices.map((a) => ({
-              profileId: a.profileId,
-              action: a.actionType,
-              amount: a.amount,
-            })),
-          };
-          // Score hero's action against GTO
-          if (gtoAdvice && gs) {
-            const heroGtoAction = normalizeToGtoAction(actionType, amount, gs.pot.total);
-            const gtoAction = gtoAdvice.actionType;
-            const isMatch = heroGtoAction === gtoAction ||
-              (heroGtoAction.startsWith("bet") && gtoAction.startsWith("bet")) ||
-              (heroGtoAction.startsWith("raise") && gtoAction.startsWith("raise"));
-            const isClose = heroGtoAction !== "fold" && gtoAction !== "fold"; // both continue
-            scoreSnapshot = {
-              verdict: isMatch ? "optimal" : isClose ? "acceptable" : "mistake",
-              gtoAction,
-              heroAction: heroGtoAction,
+
+      const deal = drillDealRef.current;
+      const heroGtoAction = normalizeToGtoAction(actionType, amount, gs.pot.total);
+
+      if (deal) {
+        // Archetype mode: use drill pipeline scoring (precise solver-based scoring)
+        const drillStreet = streetFromCommunityCount(deal.communityCards.length);
+        const score = scoreAction(
+          deal.archetype,
+          deal.handCategory,
+          heroGtoAction,
+          gs.pot.total / (session.blinds?.big ?? 2),
+          deal.isInPosition,
+          drillStreet,
+          drillSolutionRef.current?.frequencies,
+        );
+
+        // Build coaching snapshot from analysis results
+        if (coachingResult?.value) {
+          const cv = coachingResult.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number }> };
+          if (cv.advices) {
+            const gtoAdvice = cv.advices.find((a) => a.profileId === "gto");
+            coachingSnapshot = {
+              gtoAction: gtoAdvice?.actionType ?? "unknown",
+              gtoAmount: gtoAdvice?.amount,
+              profileActions: cv.advices.map((a) => ({
+                profileId: a.profileId,
+                action: a.actionType,
+                amount: a.amount,
+              })),
             };
           }
         }
+
+        const gtoAdvice = (coachingResult?.value as any)?.advices?.find((a: any) => a.profileId === "gto");
+        scoreSnapshot = score ? {
+          verdict: score.verdict,
+          gtoAction: gtoAdvice?.actionType ?? heroGtoAction,
+          heroAction: heroGtoAction,
+          evLoss: score.evLoss,
+        } : undefined;
+
+        session.act(actionType, amount, coachingSnapshot, scoreSnapshot);
+
+        // Track session scores
+        lastScoreRef.current = score;
+        if (score) sessionScoresRef.current = [...sessionScoresRef.current, score];
+        sessionHandsRef.current++;
+        forceRender();
+      } else {
+        // Free play mode: score against coaching advice
+        if (coachingResult?.value) {
+          const cv = coachingResult.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number; solverData?: any }> };
+          if (cv.advices) {
+            const gtoAdvice = cv.advices.find((a) => a.profileId === "gto");
+            coachingSnapshot = {
+              gtoAction: gtoAdvice?.actionType ?? "unknown",
+              gtoAmount: gtoAdvice?.amount,
+              profileActions: cv.advices.map((a) => ({
+                profileId: a.profileId,
+                action: a.actionType,
+                amount: a.amount,
+              })),
+            };
+            // Score hero's action against GTO
+            if (gtoAdvice) {
+              const gtoAction = gtoAdvice.actionType;
+              const isMatch = heroGtoAction === gtoAction ||
+                (heroGtoAction.startsWith("bet") && gtoAction.startsWith("bet")) ||
+                (heroGtoAction.startsWith("raise") && gtoAction.startsWith("raise"));
+              const isClose = heroGtoAction !== "fold" && gtoAction !== "fold";
+              scoreSnapshot = {
+                verdict: isMatch ? "optimal" : isClose ? "acceptable" : "mistake",
+                gtoAction,
+                heroAction: heroGtoAction,
+              };
+            }
+          }
+        }
+        session.act(actionType, amount, coachingSnapshot, scoreSnapshot);
       }
-      session.act(actionType, amount, coachingSnapshot, scoreSnapshot);
     },
-    [session, analysisResults],
+    [session, analysisResults, forceRender],
   );
 
   // ── Drill actions ──
@@ -660,9 +706,9 @@ export function useWorkspace(mode: WorkspaceMode) {
       }
 
       drillHandsTargetRef.current = handsTarget;
-      drillHandsPlayedRef.current = 0;
-      drillScoresRef.current = [];
-      drillCurrentScoreRef.current = null;
+      sessionHandsRef.current = 0;
+      sessionScoresRef.current = [];
+      lastScoreRef.current = null;
       drillSolutionRef.current = null;
       drillNarrativeChoiceRef.current = null;
 
@@ -688,85 +734,19 @@ export function useWorkspace(mode: WorkspaceMode) {
     [dealNextDrillHand, forceRender],
   );
 
-  const drillAct = useCallback(
-    (actionType: ActionType, amount?: number) => {
-      const sess = sessionRef.current;
-      const deal = drillDealRef.current;
-      const state = sess?.state;
-      if (!sess || !deal || !state || drillPhaseRef.current !== "ready") return;
-
-      const legal = currentLegalActions(state);
-      if (!legal) return;
-
-      // Apply the game action
-      const coachingResult = analysisResults.get("coaching");
-      let coachingSnapshot: import("../../convex/lib/audit/types").HandEvent["coachingSnapshot"];
-      if (coachingResult?.value) {
-        const cv = coachingResult.value as { advices?: Array<{ profileId: string; actionType: string; amount?: number }> };
-        if (cv.advices) {
-          const gtoAdvice = cv.advices.find((a) => a.profileId === "gto");
-          coachingSnapshot = {
-            gtoAction: gtoAdvice?.actionType ?? "unknown",
-            gtoAmount: gtoAdvice?.amount,
-            profileActions: cv.advices.map((a) => ({
-              profileId: a.profileId,
-              action: a.actionType,
-              amount: a.amount,
-            })),
-          };
-        }
-      }
-      // Map game action to GTO action for scoring
-      const heroGtoAction = normalizeToGtoAction(actionType, amount, state.pot.total);
-      const drillStreet = streetFromCommunityCount(deal.communityCards.length);
-      const score = scoreAction(
-        deal.archetype,
-        deal.handCategory,
-        heroGtoAction,
-        state.pot.total / DEFAULT_DRILL_BLINDS.big,
-        deal.isInPosition,
-        drillStreet,
-        drillSolutionRef.current?.frequencies, // DRY: use pre-computed solution (validated ranges for preflop)
-      );
-
-      // Build score snapshot for audit
-      const gtoAdvice = (coachingResult?.value as any)?.advices?.find((a: any) => a.profileId === "gto");
-      const scoreSnapshot: import("../../convex/lib/audit/types").HandEvent["score"] = score ? {
-        verdict: score.verdict,
-        gtoAction: gtoAdvice?.actionType ?? heroGtoAction,
-        heroAction: heroGtoAction,
-        evLoss: score.evLoss,
-      } : undefined;
-
-      sess.act(actionType, amount, coachingSnapshot, scoreSnapshot);
-
-      drillCurrentScoreRef.current = score;
-      if (score) drillScoresRef.current = [...drillScoresRef.current, score];
-      drillHandsPlayedRef.current++;
-
-      if (drillHandsPlayedRef.current >= drillHandsTargetRef.current) {
-        drillPhaseRef.current = "summary";
-      } else {
-        drillPhaseRef.current = "acted";
-      }
-      forceRender();
-    },
-    [forceRender, analysisResults],
-  );
-
   const drillNextHand = useCallback(() => {
-    if (drillPhaseRef.current === "acted") {
+    // Allow next hand when we have a score and the hand is over
+    if (lastScoreRef.current && sessionHandsRef.current < drillHandsTargetRef.current) {
       dealNextDrillHand();
     }
   }, [dealNextDrillHand]);
 
-  const resetDrill = useCallback(() => {
-    drillPhaseRef.current = "idle";
+  const resetSession = useCallback(() => {
     drillArchetypeRef.current = null;
-    drillHandsPlayedRef.current = 0;
+    sessionHandsRef.current = 0;
     drillHandsTargetRef.current = 10;
-    drillScoresRef.current = [];
-    drillCurrentScoreRef.current = null;
+    sessionScoresRef.current = [];
+    lastScoreRef.current = null;
     drillDealRef.current = null;
     drillSolutionRef.current = null;
     drillNarrativeChoiceRef.current = null;
@@ -1043,16 +1023,17 @@ export function useWorkspace(mode: WorkspaceMode) {
     heavyComputing,
     deckVisionCards,
 
-    // Drill
-    drillPhase: drillPhaseRef.current,
+    // Session tracking (universal)
+    sessionHands: sessionHandsRef.current,
+    sessionScores: sessionScoresRef.current,
+    lastScore: lastScoreRef.current,
+    sessionProgress: getSessionProgress(),
+
+    // Archetype-specific
     drillArchetypeId: drillArchetypeRef.current,
-    drillHandsPlayed: drillHandsPlayedRef.current,
     drillHandsTarget: drillHandsTargetRef.current,
-    drillScores: drillScoresRef.current,
-    drillCurrentScore: drillCurrentScoreRef.current,
     drillCurrentDeal: drillDealRef.current,
     drillSolution: drillSolutionRef.current ?? deriveSolutionFromCoaching(analysisResults),
-    drillProgress: getDrillProgress(),
     drillNarrativeChoice: drillNarrativeChoiceRef.current,
     setDrillNarrativeChoice: (id: NarrativeIntentId) => {
       drillNarrativeChoiceRef.current = id;
@@ -1060,9 +1041,8 @@ export function useWorkspace(mode: WorkspaceMode) {
     },
     drillIsInterleaved: drillInterleavedRef.current,
     startDrill,
-    drillAct,
     drillNextHand,
-    resetDrill,
+    resetSession,
   };
 }
 
