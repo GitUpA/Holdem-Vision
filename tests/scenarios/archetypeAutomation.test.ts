@@ -10,6 +10,7 @@
  *    Does the narrative make sense? Does the score align?
  */
 import { describe, it, expect } from "vitest";
+import { HandStepper } from "../../convex/lib/analysis/handStepper";
 import { executeDrillPipeline } from "../../convex/lib/gto/drillPipeline";
 import { ALL_ARCHETYPE_IDS, type ArchetypeId } from "../../convex/lib/gto/archetypeClassifier";
 import { captureFullSnapshot, formatSnapshot } from "../../convex/lib/analysis/snapshot";
@@ -186,4 +187,50 @@ describe("Archetype Automation", () => {
     expect(results.length).toBeGreaterThan(ALL_ARCHETYPE_IDS.length); // at least 1 per archetype
     expect(issues.filter(i => i.includes("ERROR")).length).toBe(0); // no crashes
   }, 120_000);
+
+  it("classifier assigns correct archetype for common positions", () => {
+    // Validate the classifier doesn't misclassify (e.g., HJ facing raise ≠ BB Defense)
+    // Use HandStepper which sets up proper game state
+    const stepper = new HandStepper({ numPlayers: 6, heroSeat: 0, dealerSeat: 0 });
+    // Hero at seat 0, dealer at 0 → hero is BTN
+    const step = stepper.deal();
+    if (!step) return;
+
+    // The snapshot has archetype classification
+    const snap = step.snapshot;
+    const archetype = snap.archetype;
+    const heroPos = snap.heroPosition;
+
+    console.log(`  Hero at ${heroPos}: classified as "${archetype?.id}"`);
+
+    // BTN facing a raise should NOT be bb_defense
+    if (heroPos !== "bb" && archetype) {
+      expect(archetype.id).not.toBe("bb_defense_vs_rfi");
+    }
+
+    // Test multiple positions
+    const classResults: Array<{ pos: string; arch: string }> = [];
+    for (let seat = 0; seat < 6; seat++) {
+      const s = new HandStepper({ numPlayers: 6, heroSeat: seat, dealerSeat: 0 });
+      const st = s.deal();
+      if (!st) continue;
+      classResults.push({
+        pos: st.snapshot.heroPosition,
+        arch: st.snapshot.archetype?.id ?? "none",
+      });
+    }
+
+    console.log("  Classifier by position:");
+    for (const r of classResults) {
+      // BB can be bb_defense or blind_vs_blind (depends on who raised)
+      // Non-BB should NEVER be bb_defense
+      const ok = r.pos === "bb" || r.pos === "sb"
+        ? true // blinds can have various archetypes
+        : r.arch !== "bb_defense_vs_rfi";
+      console.log(`    ${r.pos.padEnd(12)}: ${r.arch.padEnd(25)} ${ok ? "✓" : "✗ WRONG"}`);
+      if (r.pos !== "bb" && r.pos !== "sb") {
+        expect(r.arch).not.toBe("bb_defense_vs_rfi");
+      }
+    }
+  });
 });
