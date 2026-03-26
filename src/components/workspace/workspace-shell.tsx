@@ -540,6 +540,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                     mode={mode}
                     showdownResult={showdownResult}
                     onReplay={(record) => setReplayRecord(record)}
+                    boardSource={boardSource}
                   />
                 )}
               </PanelWrapper>
@@ -630,8 +631,6 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
               {ws.lastScore != null && ws.lastScore && (
                 <ScoreDisplay
                   score={ws.lastScore}
-                  onNextHand={ws.drillNextHand}
-                  isLastHand={ws.sessionHands >= ws.drillHandsTarget}
                 />
               )}
 
@@ -911,10 +910,12 @@ function HandOverPanel({
   mode,
   showdownResult,
   onReplay,
+  boardSource,
 }: {
   ws: WorkspaceState;
   mode: WorkspaceMode;
   showdownResult: ReturnType<typeof Object> | null;
+  boardSource: BoardSource;
   onReplay: (record: HandRecord) => void;
 }) {
   // Type the showdown result properly
@@ -1031,7 +1032,7 @@ function HandOverPanel({
         )}
         {mode.postHand.dealNext && (
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={ws.startNextHand}
+            onClick={boardSource === "archetype" ? ws.drillNextHand : ws.startNextHand}
             className="px-5 py-2 rounded-lg bg-[var(--felt)] text-[var(--gold)] font-semibold text-sm border border-[var(--gold-dim)]/40 hover:border-[var(--gold)]/60 transition-colors">
             Deal Next Hand
           </motion.button>

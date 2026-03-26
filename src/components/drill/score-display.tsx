@@ -14,8 +14,8 @@ import { Term } from "../ui/term";
 
 interface ScoreDisplayProps {
   score: ActionScore;
-  onNextHand: () => void;
-  isLastHand: boolean;
+  onNextHand?: () => void;
+  isLastHand?: boolean;
 }
 
 const VERDICT_STYLES: Record<Verdict, { bg: string; text: string; label: string }> = {
@@ -114,13 +114,15 @@ export function ScoreDisplay({ score, onNextHand, isLastHand }: ScoreDisplayProp
         </div>
       )}
 
-      {/* Next hand button */}
-      <button
-        onClick={onNextHand}
-        className="w-full py-2 rounded-lg border border-[var(--border)] text-sm font-medium hover:bg-[var(--accent)] transition-colors"
-      >
-        {isLastHand ? "View Summary" : "Next Hand"}
-      </button>
+      {/* Next hand button (optional — hand-over panel has the primary one) */}
+      {onNextHand && (
+        <button
+          onClick={onNextHand}
+          className="w-full py-2 rounded-lg border border-[var(--border)] text-sm font-medium hover:bg-[var(--accent)] transition-colors"
+        >
+          {isLastHand ? "View Summary" : "Next Hand"}
+        </button>
+      )}
     </motion.div>
   );
 }
