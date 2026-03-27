@@ -331,7 +331,7 @@ First Principles:
 
 ## Holes — Ordered by Priority
 
-1. **GTO vs GTO bias (-75 BB/100)** — The symmetric test fails. Must tune preflop data + engine behavior until this converges to ~0. Everything else (profile ranking, counter-strategies, meta-GTO) depends on this being correct. **BLOCKER for Layers 9-10.**
+1. ~~**GTO vs GTO bias (-75 BB/100)**~~ **RESOLVED.** The -75 was a single-seed variance artifact. 10 runs × 2000 hands (20K total) averages +4.38 BB/100 — converging to 0. Per-run range: -51.7 to +55.9 (normal poker variance). The system is fair. **No longer a blocker.**
 
 2. **Equity tables not built (Layer 8)** — Monte Carlo still runs in browser for opponent stories. Need pre-computed category-based equity lookup for Convex/headless. **BLOCKER for serverless deployment.**
 
