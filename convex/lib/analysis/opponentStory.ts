@@ -13,6 +13,7 @@ import type { CardIndex, Position, Street } from "../types/cards";
 import type { OpponentProfile, PlayerAction, WeightedRange } from "../types/opponents";
 import type { ExplanationNode } from "../types/analysis";
 import { estimateRange, type RangeEstimation } from "../opponents/rangeEstimator";
+import { buildInferredProfile } from "../opponents/behaviorInference";
 import { equityVsRange } from "./opponentRead";
 import type { EquityResult } from "./monteCarlo";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
@@ -78,11 +79,18 @@ export function buildOpponentStory(
   deadCards: CardIndex[] = [],
   boardTexture?: BoardTexture,
   skipEquity = false,
+  /** When true, use inferred behavior instead of assigned profile (Layer 7: coach blind) */
+  inferFromActions = false,
 ): OpponentStory {
+  // Layer 7: if inferring, build a synthetic profile from actions
+  const effectiveProfile = inferFromActions
+    ? buildInferredProfile(opponentActions, opponentPosition)
+    : opponentProfile;
+
   // 1. Estimate opponent's range from their action sequence
   const knownCards = [...heroCards, ...communityCards, ...deadCards];
   const rangeEst = estimateRange(
-    opponentProfile,
+    effectiveProfile,
     opponentActions,
     knownCards,
     opponentPosition,
@@ -111,14 +119,14 @@ export function buildOpponentStory(
   // 5. Build street-by-street narratives
   const streetNarratives = buildStreetNarratives(
     opponentActions,
-    opponentProfile,
+    effectiveProfile,
     communityCards,
     boardTex,
   );
 
   // 6. Build range narrative
   const rangePctVal = rangeEst.rangePctOfAll;
-  const rangeNarrative = buildRangeNarrative(rangePctVal, opponentProfile.name, streetNarratives);
+  const rangeNarrative = buildRangeNarrative(rangePctVal, effectiveProfile.name, streetNarratives);
 
   // 7. Compute hero implication
   const potOddsNeeded = callCostBB > 0 ? callCostBB / (potBB + callCostBB) : 0;
@@ -156,7 +164,7 @@ export function buildOpponentStory(
     equityResult,
     potOddsNeeded,
     confidence,
-    opponentProfile.name,
+    effectiveProfile.name,
   );
 
   return {

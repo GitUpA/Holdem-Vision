@@ -265,6 +265,7 @@ export function captureFullSnapshot(
           street, opts.deadCards ?? [],
           boardTex ?? undefined,
           detailLevel === "lite", // skipEquity
+          true, // inferFromActions: coach is blind to setup (Layer 7)
         );
         rawOpponentStories.push(story);
       } catch { /* best-effort */ }
