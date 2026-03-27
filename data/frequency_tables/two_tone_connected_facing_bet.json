@@ -1,0 +1,128 @@
+{
+  "archetypeId": "two_tone_connected",
+  "boardsAnalyzed": 21,
+  "ip_facing_bet": {
+    "two_pair": {
+      "fold": 0.3867,
+      "call": 0.4893,
+      "raise": 0.124,
+      "count": 4320
+    },
+    "sets_plus": {
+      "fold": 0.0881,
+      "call": 0.5134,
+      "raise": 0.3985,
+      "count": 567
+    },
+    "middle_pair": {
+      "fold": 0.3722,
+      "call": 0.5744,
+      "raise": 0.0535,
+      "count": 1053
+    },
+    "top_pair_weak_kicker": {
+      "fold": 0.2635,
+      "call": 0.5927,
+      "raise": 0.1438,
+      "count": 522
+    },
+    "straight_draw": {
+      "fold": 0.2725,
+      "call": 0.4481,
+      "raise": 0.2794,
+      "count": 2214
+    },
+    "flush_draw": {
+      "fold": 0.2119,
+      "call": 0.4493,
+      "raise": 0.3387,
+      "count": 1656
+    },
+    "overcards": {
+      "fold": 0.6432,
+      "call": 0.303,
+      "raise": 0.0538,
+      "count": 7137
+    },
+    "top_pair_top_kicker": {
+      "fold": 0.3083,
+      "call": 0.6201,
+      "raise": 0.0717,
+      "count": 900
+    },
+    "bottom_pair": {
+      "fold": 0.3327,
+      "call": 0.5285,
+      "raise": 0.1389,
+      "count": 810
+    },
+    "air": {
+      "fold": 0.9895,
+      "call": 0.0068,
+      "raise": 0.0037,
+      "count": 549
+    }
+  },
+  "oop_facing_bet": {
+    "two_pair": {
+      "fold": 0.4105,
+      "call": 0.4542,
+      "raise": 0.1353,
+      "count": 3585
+    },
+    "sets_plus": {
+      "fold": 0.0063,
+      "call": 0.525,
+      "raise": 0.4687,
+      "count": 567
+    },
+    "middle_pair": {
+      "fold": 0.3768,
+      "call": 0.533,
+      "raise": 0.0903,
+      "count": 1413
+    },
+    "top_pair_weak_kicker": {
+      "fold": 0.3219,
+      "call": 0.5005,
+      "raise": 0.1776,
+      "count": 630
+    },
+    "straight_draw": {
+      "fold": 0.3071,
+      "call": 0.3911,
+      "raise": 0.3018,
+      "count": 2880
+    },
+    "flush_draw": {
+      "fold": 0.1985,
+      "call": 0.3678,
+      "raise": 0.4337,
+      "count": 1881
+    },
+    "overcards": {
+      "fold": 0.7365,
+      "call": 0.2378,
+      "raise": 0.0257,
+      "count": 8154
+    },
+    "top_pair_top_kicker": {
+      "fold": 0.3393,
+      "call": 0.6102,
+      "raise": 0.0505,
+      "count": 1053
+    },
+    "bottom_pair": {
+      "fold": 0.3213,
+      "call": 0.5566,
+      "raise": 0.122,
+      "count": 999
+    },
+    "air": {
+      "fold": 0.9999,
+      "call": 0,
+      "raise": 0.0001,
+      "count": 549
+    }
+  }
+}

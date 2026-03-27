@@ -1,0 +1,104 @@
+{
+  "archetypeId": "ace_high_dry_rainbow",
+  "boardsAnalyzed": 24,
+  "ip_facing_bet": {
+    "sets_plus": {
+      "fold": 0.0044,
+      "call": 0.4879,
+      "raise": 0.5076,
+      "count": 648
+    },
+    "two_pair": {
+      "fold": 0.3872,
+      "call": 0.5533,
+      "raise": 0.0595,
+      "count": 4626
+    },
+    "air": {
+      "fold": 0.7379,
+      "call": 0.1908,
+      "raise": 0.0713,
+      "count": 9528
+    },
+    "middle_pair": {
+      "fold": 0.3351,
+      "call": 0.5348,
+      "raise": 0.1301,
+      "count": 1467
+    },
+    "top_pair_weak_kicker": {
+      "fold": 0.24,
+      "call": 0.5236,
+      "raise": 0.2363,
+      "count": 3024
+    },
+    "top_pair_top_kicker": {
+      "fold": 0.1565,
+      "call": 0.4079,
+      "raise": 0.4356,
+      "count": 1728
+    },
+    "bottom_pair": {
+      "fold": 0.3409,
+      "call": 0.5335,
+      "raise": 0.1257,
+      "count": 585
+    },
+    "straight_draw": {
+      "fold": 0.3333,
+      "call": 0.3893,
+      "raise": 0.2773,
+      "count": 84
+    }
+  },
+  "oop_facing_bet": {
+    "sets_plus": {
+      "fold": 0.0002,
+      "call": 0.4396,
+      "raise": 0.5602,
+      "count": 432
+    },
+    "two_pair": {
+      "fold": 0.4162,
+      "call": 0.5402,
+      "raise": 0.0436,
+      "count": 4194
+    },
+    "air": {
+      "fold": 0.8627,
+      "call": 0.104,
+      "raise": 0.0333,
+      "count": 12840
+    },
+    "middle_pair": {
+      "fold": 0.3333,
+      "call": 0.5514,
+      "raise": 0.1152,
+      "count": 1629
+    },
+    "top_pair_weak_kicker": {
+      "fold": 0.2499,
+      "call": 0.5818,
+      "raise": 0.1683,
+      "count": 3024
+    },
+    "top_pair_top_kicker": {
+      "fold": 0.0484,
+      "call": 0.5147,
+      "raise": 0.4369,
+      "count": 1512
+    },
+    "bottom_pair": {
+      "fold": 0.3336,
+      "call": 0.5414,
+      "raise": 0.1249,
+      "count": 747
+    },
+    "straight_draw": {
+      "fold": 0.3333,
+      "call": 0.0816,
+      "raise": 0.5851,
+      "count": 84
+    }
+  }
+}
