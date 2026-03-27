@@ -18,6 +18,9 @@ import {
 } from "./archetypeClassifier";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
 import { hasTable, hasAnyTableForStreet } from "./tables/tableRegistry";
+import { lookupPreflopHandClass } from "./tables/preflopHandClass";
+import { isInRfiRange } from "./tables/preflopRanges";
+import { comboToHandClass, cardsToCombo } from "../opponents/combos";
 import { positionsForTableSize } from "../primitives/position";
 import { getPrototype } from "./archetypePrototypes";
 
@@ -121,8 +124,26 @@ const PREFLOP_HERO_POSITIONS: Record<string, Position[]> = {
  * Covers: pairs, suited aces, broadway combos, suited connectors/gappers,
  * offsuit broadways ATo+/KJo+/QJo.
  */
-function isReasonablePreflop(heroCards: CardIndex[]): boolean {
-  const rank0 = Math.floor(heroCards[0] / 4); // 0=2 .. 12=A
+/**
+ * Check if hero's hand is reasonable for the assigned position.
+ *
+ * Phase 6: uses PokerBench grid lookup first. If the hand has raise
+ * frequency > 10% for the position, it's in range. Falls back to
+ * validated GTO Sets, then to hardcoded heuristic.
+ */
+function isReasonablePreflop(heroCards: CardIndex[], heroPosition?: Position): boolean {
+  if (heroPosition) {
+    const combo = cardsToCombo(heroCards[0], heroCards[1]);
+    const handClass = comboToHandClass(combo);
+    // Primary: PokerBench data
+    const hcLookup = lookupPreflopHandClass("rfi_opening", heroPosition, handClass);
+    if (hcLookup) return hcLookup.raise > 0.10;
+    // Fallback: validated GTO ranges
+    if (isInRfiRange(handClass, heroPosition)) return true;
+  }
+
+  // Hardcoded fallback for missing data
+  const rank0 = Math.floor(heroCards[0] / 4);
   const rank1 = Math.floor(heroCards[1] / 4);
   const suited = (heroCards[0] % 4) === (heroCards[1] % 4);
 
@@ -130,17 +151,11 @@ function isReasonablePreflop(heroCards: CardIndex[]): boolean {
   const lo = Math.min(rank0, rank1);
   const gap = hi - lo;
 
-  // Any pair
   if (rank0 === rank1) return true;
-  // Suited ace
   if (suited && hi === 12) return true;
-  // Suited king (K2s+)
   if (suited && hi === 11) return true;
-  // Both broadway (T+ = rank >= 8)
   if (hi >= 8 && lo >= 8) return true;
-  // Suited with one broadway card
   if (suited && hi >= 8 && gap <= 4) return true;
-  // Suited connectors 54s+
   if (suited && gap === 1 && lo >= 3) return true;
   // Suited one-gappers 64s+
   if (suited && gap === 2 && lo >= 2) return true;
@@ -310,7 +325,7 @@ function dealFlopTexture(
     const heroCards = deal(deck, 2);
 
     // Filter: must be a reasonable preflop hand
-    if (!isReasonablePreflop(heroCards)) continue;
+    if (!isReasonablePreflop(heroCards, heroPosition)) continue;
 
     const handCategory = categorizeHand(heroCards, flop);
 
@@ -470,7 +485,7 @@ function dealPostflopPrinciple(
     const heroCards = deal(deck, 2);
 
     // Must be a playable preflop hand
-    if (!isReasonablePreflop(heroCards)) continue;
+    if (!isReasonablePreflop(heroCards, heroPosition)) continue;
 
     const handCategory = categorizeHand(heroCards, communityCards);
 
@@ -509,7 +524,7 @@ function dealPostflopPrinciple(
   for (let i = 0; i < 10; i++) {
     const lastDeck = createShuffledDeck(communityCards, random);
     const heroCards = deal(lastDeck, 2);
-    if (isReasonablePreflop(heroCards)) {
+    if (isReasonablePreflop(heroCards, heroPosition)) {
       const handCategory = categorizeHand(heroCards, communityCards);
       return buildDeal({
         heroSeatIndex, dealerSeatIndex, heroCards,
