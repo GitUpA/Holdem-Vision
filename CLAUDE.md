@@ -55,13 +55,26 @@ pnpm test:watch    # watch mode
 - Core pipeline: `AnalysisContext` -> `AnalysisLens` -> `AnalysisResult`
 - Decision engine: `buildDecisionContext()` -> `engine.decide(ctx)` -> `EngineDecision`
 - Single unified engine (`modified-gto`) outputs `ActionFrequencies` in `reasoning.frequencies`.
+- **First principles**: `docs/first-principles.md` — 10-layer architecture from poker mechanics to meta-GTO.
+- **Hand pipeline**: `docs/plans/hand_pipeline_plan.md` — 9-phase implementation plan.
 
 ## Key Patterns
 
 - Domain logic is pure TS in `convex/lib/` — no React, no Convex runtime.
 - Opponent profiles use situation-based model (11 SituationKeys x BehavioralParams).
 - 1 unified decision engine (`modified-gto`): GTO solver base + profile-specific frequency modifiers (NIT/FISH/TAG/LAG/GTO).
-- `/vision` is public (no auth required). Drill mode lives at `/vision?mode=drill` (no separate `/drill` route).
+- **One system**: Free Play and Archetype mode are identical except board generation (random vs constrained).
+- **Every seat is a player**: hero is the seat that pauses for human input. Headless mode auto-plays hero.
+- **Coach is blind**: coaching infers opponent behavior from actions, never reads assigned profile labels.
+- **Pre-compute strategy**: preflop uses PokerBench data, postflop uses solver tables, equity uses lookup tables. Zero Monte Carlo in headless/Convex.
+- `/vision` is public (no auth required). Archetype mode at `/vision?mode=drill`.
+
+## Pipeline Modules (`convex/lib/pipeline/`)
+
+- `handContext.ts` — Seat-agnostic, observable-only context struct (funnel tracking).
+- `handPipeline.ts` — Builds/updates HandContext at each street transition.
+- `batchRunner.ts` — Deterministic headless runner for statistical validation.
+- Used by: `HandSession` (UI), `HandStepper` (headless), payoff matrix tests.
 
 ## Knowledge Base (`convex/lib/knowledge/`)
 
