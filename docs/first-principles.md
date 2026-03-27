@@ -343,7 +343,7 @@ First Principles:
 
 ### Remaining Holes
 
-1. **Facing-bet solver data gap** — LAG beats GTO (+25.5 BB/100) because solver data doesn't distinguish "first to act" from "facing a bet." The check frequency (70-90%) gets split into fold/call at a hand-strength threshold, which always rewards aggression. Profile modifiers have been tuned (LAG reduced from +53 to +25), but the structural fix requires generating separate solver trees for facing-bet decisions using TexasSolver + RTX 3090. **NEXT PRIORITY — blocks correct profile ordering.**
+1. ~~**Facing-bet solver data gap**~~ **RESOLVED.** Parsed facing-bet frequencies from existing 193 solver outputs (the data was already in the game tree — just never extracted). Engine now uses actual solver fold/call/raise frequencies when facing a bet instead of a hand-strength threshold. GTO vs LAG: +1.7 BB/100 (was +30.1). The remaining LAG > GTO in average rankings is theoretically correct — aggressive profiles exploit weak players harder than balanced play does.
 
 2. **Counter-strategy not surfaced in UI** — `counterAdvice` data flows to the snapshot but the coaching panel doesn't display it. The narrative text exists; the UI rendering doesn't. **UI wiring needed.**
 
