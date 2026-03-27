@@ -272,9 +272,9 @@ function mapGtoActionToLegal(
       return null;
     case "check":
       if (legal.canCheck) return { actionType: "check" };
-      // Facing a bet: solver "check" includes both weak (check-fold) and strong (check-call).
-      // Use hand strength to decide: strong hands call, weak hands fold.
-      if (handStrength !== undefined && handStrength >= 0.35) {
+      // Facing a bet: use hand strength with balanced threshold.
+      // 0.25 = overcards and better call, weak draws and air fold.
+      if (handStrength !== undefined && handStrength >= 0.25) {
         if (legal.canCall) return { actionType: "call", amount: legal.callAmount };
       } else {
         if (legal.canFold) return { actionType: "fold" };

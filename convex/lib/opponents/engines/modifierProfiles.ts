@@ -271,14 +271,14 @@ export const TAG_MODIFIERS: ProfileModifierMap = {
 
 export const LAG_MODIFIERS: ProfileModifierMap = {
   "preflop.open": sm(
-    0.6, 1.3, 0.15, 0.1, 0.75,
-    { hand: 0.5, position: 0.9, foldEq: 0.6 },
-    "LAGs play many hands aggressively (~35% vs GTO ~27%). They put constant pressure with raises, especially late position.",
+    0.7, 1.2, 0.1, 0.1, 0.6,
+    { hand: 0.5, position: 0.9, foldEq: 0.5 },
+    "LAGs play more hands than GTO (~32% vs ~27%). They open wider, especially in position.",
   ),
   "preflop.facing_raise": sm(
-    0.7, 1.4, 0.2, 0.1, 0.75,
-    { hand: 0.5, position: 0.9, foldEq: 0.7 },
-    "LAGs 3-bet light frequently. Their wide 3-bet range includes many bluffs alongside premiums.",
+    0.8, 1.3, 0.15, 0.1, 0.6,
+    { hand: 0.5, position: 0.9, foldEq: 0.6 },
+    "LAGs 3-bet light occasionally. Their 3-bet range includes bluffs but is not reckless.",
   ),
   "preflop.facing_3bet": sm(
     0.7, 1.3, 0.15, 0.0, 0.7,
@@ -291,19 +291,19 @@ export const LAG_MODIFIERS: ProfileModifierMap = {
     "Facing 4-bets, LAGs tighten significantly but still shove wider than most.",
   ),
   "postflop.aggressor.ip": sm(
-    0.3, 1.8, 0.2, 0.2, 0.8,
-    { hand: 0.5, texture: 0.5, foldEq: 0.8, position: 0.9, spr: 0.5, draw: 0.7 },
-    "LAGs c-bet very frequently (80%) with high bluff frequency. If you check, they bet. If you call, they barrel again.",
+    0.5, 1.5, 0.15, 0.15, 0.7,
+    { hand: 0.5, texture: 0.5, foldEq: 0.7, position: 0.9, spr: 0.5, draw: 0.7 },
+    "LAGs c-bet frequently (70%) with moderate bluff frequency. Aggressive but not reckless.",
   ),
   "postflop.aggressor.oop": sm(
-    0.4, 1.6, 0.15, 0.15, 0.75,
-    { hand: 0.5, texture: 0.5, foldEq: 0.7, draw: 0.6 },
-    "Even OOP, LAGs maintain high aggression. They lead and barrel frequently, using unpredictability as a weapon.",
+    0.6, 1.3, 0.1, 0.1, 0.65,
+    { hand: 0.5, texture: 0.5, foldEq: 0.6, draw: 0.6 },
+    "OOP, LAGs are still aggressive but more selective. They barrel when the board favors their range.",
   ),
   "postflop.caller.ip": sm(
-    0.5, 1.5, 0.15, 0.15, 0.75,
-    { hand: 0.5, texture: 0.5, foldEq: 0.7, draw: 0.6 },
-    "As a caller in position, LAGs attack weakness aggressively. They float wide and fire on later streets.",
+    0.6, 1.3, 0.1, 0.1, 0.65,
+    { hand: 0.5, texture: 0.5, foldEq: 0.6, draw: 0.6 },
+    "As a caller in position, LAGs attack weakness but don't overdo it. They pick good spots to float.",
   ),
   "postflop.caller.oop": sm(
     0.6, 1.3, 0.1, 0.1, 0.7,
