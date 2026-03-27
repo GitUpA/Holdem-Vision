@@ -39,6 +39,9 @@ import { categorizeHand } from "./handCategorizer";
 import {
   lookupFrequencies,
   hasTable,
+  lookupPreflopHandClass,
+  handClassToActionFrequencies,
+  getPreflopConfidence,
   lookupPostflopHandClass,
   postflopHandClassToActionFrequencies,
 } from "./tables";
@@ -106,49 +109,58 @@ export function lookupGtoFrequencies(
     const position = gameState.players[heroSeat].position;
     const handCat = categorizeHand(heroCards, communityCards);
 
-    // Use validated GTO preflop ranges for all archetypes.
-    // These are well-established and more reliable than PokerBench small-sample data.
+    // ── Primary: PokerBench per-hand-class data (solver-derived, position-aware) ──
     const openerPos = findPreflopOpener(gameState, heroSeat);
-    let preflopFreqs: { fold: number; call: number; raise: number } | null = null;
+    const hcLookup = lookupPreflopHandClass(
+      archetype.archetypeId,
+      position,
+      handClass,
+      openerPos,
+    );
 
+    if (hcLookup) {
+      return {
+        frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
+        source: "preflop-handclass",
+        archetype,
+        handCat,
+        preflopConfidence: getPreflopConfidence(hcLookup),
+        isExactMatch: true,
+      };
+    }
+
+    // ── Fallback: validated GTO ranges for hands missing from PokerBench data ──
+    let fallbackFreqs: { fold: number; call: number; raise: number } | null = null;
     switch (archetype.archetypeId) {
       case "rfi_opening":
-        preflopFreqs = getRfiFrequencies(handClass, position);
-        break;
+        fallbackFreqs = getRfiFrequencies(handClass, position); break;
       case "bb_defense_vs_rfi":
-        preflopFreqs = getBbDefenseFrequencies(handClass, openerPos ?? "btn");
-        break;
+        fallbackFreqs = getBbDefenseFrequencies(handClass, openerPos ?? "btn"); break;
       case "three_bet_pots":
-        preflopFreqs = get3BetFrequencies(handClass, position);
-        break;
+        fallbackFreqs = get3BetFrequencies(handClass, position); break;
       case "blind_vs_blind":
-        preflopFreqs = getBvbFrequencies(handClass, position);
-        break;
+        fallbackFreqs = getBvbFrequencies(handClass, position); break;
       case "four_bet_five_bet": {
-        // Count raises in action history to determine 3-bet vs 4-bet
         const raises = gameState.actionHistory.filter(
           (a) => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet"),
         );
-        preflopFreqs = get4BetFrequencies(handClass, raises.length);
-        break;
+        fallbackFreqs = get4BetFrequencies(handClass, raises.length); break;
       }
     }
 
-    if (preflopFreqs) {
-      // Map raise to appropriate action key per archetype
+    if (fallbackFreqs) {
       const raiseAction = archetype.archetypeId === "rfi_opening" || archetype.archetypeId === "blind_vs_blind"
-        ? "bet_medium"  // Open raise
-        : "raise_large"; // 3-bet, 4-bet, 5-bet
+        ? "bet_medium" : "raise_large";
       return {
         frequencies: {
-          fold: preflopFreqs.fold,
-          call: preflopFreqs.call,
-          [raiseAction]: preflopFreqs.raise,
+          fold: fallbackFreqs.fold,
+          call: fallbackFreqs.call,
+          [raiseAction]: fallbackFreqs.raise,
         },
         source: "preflop-handclass",
         archetype,
         handCat,
-        isExactMatch: true,
+        isExactMatch: false, // fallback, not primary data
       };
     }
   }
