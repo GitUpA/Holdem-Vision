@@ -548,6 +548,11 @@ export function formatSnapshot(snap: FullSnapshot): string {
     lines.push(`  → ${snap.heroPerceivedRange.implication}`);
   }
 
+  // Counter-strategy advice (Layer 10)
+  if (snap.counterAdvice && snap.counterAdvice.confidence > 0.3) {
+    lines.push(`\nEXPLOIT (${snap.counterAdvice.confidenceLabel}): ${snap.counterAdvice.narrative}`);
+  }
+
   // Commentary
   if (snap.commentary) {
     lines.push(`\nCOACH (${snap.commentary.confidence}): ${snap.commentary.narrative}`);
