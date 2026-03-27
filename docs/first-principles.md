@@ -322,11 +322,11 @@ First Principles:
 ├── ⚠️ Small sample problem (type exists, not wired into coaching narrative)
 ├── ✅ Every seat is a player (HandStepper, batchRunner, deterministic)
 ├── ✅ Coach is blind to setup (inferBehavior, snapshot path blind)
-├── ⚠️ Pre-compute everything (preflop ✅, postflop ✅, equity tables ❌)
-├── ⚠️ Payoff matrix (infrastructure ✅, results show bias, not calibrated)
-├── ❌ Counter-strategies (not built — needs calibrated matrix first)
-├── ❌ Confidence model (not built — needs Phase 9a)
-└── ❌ Meta-GTO emergence (not built — needs Phases 9a + 9b)
+├── ✅ Pre-compute everything (preflop ✅, postflop ✅, equity tables ✅)
+├── ✅ Payoff matrix (infrastructure ✅, GTO vs GTO converges to ~0, full K×K matrix runs)
+├── ✅ Counter-strategies (counterStrategyMap.ts — per-pattern adjustments + narratives)
+├── ✅ Confidence model (Bayesian: N observations × deviation → confidence 0-1)
+└── ✅ Meta-GTO foundation (counter-strategy map + exploitative coaching builder)
 ```
 
 ## Holes — Ordered by Priority
