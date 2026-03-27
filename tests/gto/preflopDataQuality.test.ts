@@ -144,5 +144,21 @@ describe("Preflop Data Quality", () => {
 
     // At least some data should exist
     expect(hasCells).toBeGreaterThan(100);
+
+    // FLAG: PokerBench preflop data has known quality issues:
+    // - 0 reliable cells (n>=30) — all frequencies are approximate
+    // - Range sizes run 9-16% above GTO targets (data is loose)
+    // - Small samples (n=1-3) produce noisy frequencies (e.g., T8o raise 87% from BTN)
+    // - Laplace smoothing inflates raise frequencies for low-sample hands
+    //
+    // We moved FROM PokerBench to hardcoded Sets (preflopRanges.ts) because of this noise.
+    // We moved BACK because the Sets have no frequency granularity (binary in/out).
+    // The correct resolution: Phase 9 (payoff matrix) will empirically validate
+    // which frequencies produce correct outcomes. Until then, PokerBench is "best
+    // available" with known limitations.
+    //
+    // VALIDATION NEEDED: When Phase 2 (deterministic engine) is complete, run
+    // GTO vs GTO symmetric test. If the result isn't ~50/50, the preflop data
+    // is biasing outcomes and needs correction.
   });
 });
