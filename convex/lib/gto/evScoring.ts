@@ -42,6 +42,12 @@ export interface ActionScore {
   handCategory: HandCategorization;
   /** Rating of the user's action */
   verdict: Verdict;
+  /** Conditional verdict: correct given you're in this spot (may differ from verdict if preflop was -EV) */
+  conditionalVerdict?: Verdict;
+  /** EV contribution from preflop entry (negative = entered with a hand GTO folds) */
+  preflopContribution?: number;
+  /** Cumulative EV loss across all streets so far */
+  cumulativeEVLoss?: number;
   /** Teaching explanation */
   explanation: ExplanationNode;
 }
