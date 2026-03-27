@@ -19,7 +19,7 @@
 export const GTO_RFI_RANGES: Record<string, Set<string>> = {
   utg: new Set([
     // ~15% of hands
-    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77",
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", "66",
     "AKs", "AQs", "AJs", "ATs", "A5s", "A4s",
     "AKo", "AQo", "AJo",
     "KQs", "KJs", "KTs",
@@ -38,7 +38,9 @@ export const GTO_RFI_RANGES: Record<string, Set<string>> = {
     "AKs", "AQs", "AJs", "ATs", "A9s", "A5s", "A4s", "A3s",
     "AKo", "AQo", "AJo", "ATo",
     "KQs", "KJs", "KTs", "K9s",
+    "KQo",
     "QJs", "QTs", "Q9s",
+    "QJo",
     "JTs", "J9s",
     "T9s", "T8s",
     "98s", "97s",
@@ -50,17 +52,19 @@ export const GTO_RFI_RANGES: Record<string, Set<string>> = {
 
   co: new Set([
     // ~27% of hands — HJ range + extras
-    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", "66", "55",
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", "66", "55", "44",
     "AKs", "AQs", "AJs", "ATs", "A9s", "A8s", "A7s", "A6s", "A5s", "A4s", "A3s", "A2s",
-    "AKo", "AQo", "AJo", "ATo", "A9o",
-    "KQs", "KJs", "KTs", "K9s", "K8s",
-    "KQo", "KJo",
+    "AKo", "AQo", "AJo", "ATo", "A9o", "A8o",
+    "KQs", "KJs", "KTs", "K9s", "K8s", "K7s",
+    "KQo", "KJo", "KTo",
     "QJs", "QTs", "Q9s", "Q8s",
-    "QJo",
+    "QJo", "QTo",
     "JTs", "J9s", "J8s",
     "JTo",
     "T9s", "T8s", "T7s",
+    "T9o",
     "98s", "97s", "96s",
+    "98o",
     "87s", "86s", "85s",
     "76s", "75s", "74s",
     "65s", "64s", "63s",
