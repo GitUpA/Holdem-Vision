@@ -533,13 +533,25 @@ def normalize_action(action_str):
 
 
 def parse_solver_output(filepath, board_cards):
-    """Parse a single solver output into categorized + hand-class frequencies."""
+    """Parse a single solver output into categorized + hand-class frequencies.
+
+    Extracts:
+    - oop: OOP's first-to-act strategy (root node)
+    - ip: IP's strategy after OOP checks (check node)
+    - ip_facing_bet: IP's response to OOP's bet (BET nodes) — FOLD/CALL/RAISE
+    - oop_facing_bet: OOP's response to IP's bet after check (CHECK→BET nodes)
+    """
     with open(filepath) as f:
         data = json.load(f)
 
-    result = {"oop": {}, "ip": {}, "oop_hand_class": {}, "ip_hand_class": {}}
+    result = {
+        "oop": {}, "ip": {},
+        "oop_hand_class": {}, "ip_hand_class": {},
+        "ip_facing_bet": {}, "ip_facing_bet_hand_class": {},
+        "oop_facing_bet": {}, "oop_facing_bet_hand_class": {},
+    }
 
-    # Root node is OOP's action
+    # Root node is OOP's action (first to act)
     oop_actions = data.get('actions', [])
     oop_strategy = data.get('strategy', {}).get('strategy', {})
 
@@ -548,8 +560,10 @@ def parse_solver_output(filepath, board_cards):
         result['oop'] = cat_data
         result['oop_hand_class'] = hc_data
 
-    # IP acts after OOP checks
-    check_node = data.get('childrens', {}).get('CHECK', {})
+    children = data.get('childrens', {})
+
+    # IP acts after OOP checks (first to act for IP)
+    check_node = children.get('CHECK', {})
     if check_node:
         ip_actions = check_node.get('actions', [])
         ip_strategy = check_node.get('strategy', {}).get('strategy', {})
@@ -558,7 +572,43 @@ def parse_solver_output(filepath, board_cards):
             result['ip'] = cat_data
             result['ip_hand_class'] = hc_data
 
+        # OOP facing IP's bet after check→bet (OOP's facing-bet response)
+        check_children = check_node.get('childrens', {})
+        for child_key, child_node in check_children.items():
+            if child_key.startswith('BET') and child_node.get('strategy', {}).get('strategy'):
+                fb_actions = child_node.get('actions', [])
+                fb_strategy = child_node['strategy']['strategy']
+                cat_data, hc_data = aggregate_by_category(fb_strategy, fb_actions, board_cards)
+                # Merge into oop_facing_bet (average across bet sizes)
+                merge_facing_bet(result['oop_facing_bet'], cat_data)
+                merge_facing_bet(result['oop_facing_bet_hand_class'], hc_data)
+
+    # IP facing OOP's bet (IP's facing-bet response)
+    for child_key, child_node in children.items():
+        if child_key.startswith('BET') and child_node.get('strategy', {}).get('strategy'):
+            fb_actions = child_node.get('actions', [])
+            fb_strategy = child_node['strategy']['strategy']
+            cat_data, hc_data = aggregate_by_category(fb_strategy, fb_actions, board_cards)
+            # Merge into ip_facing_bet (average across bet sizes)
+            merge_facing_bet(result['ip_facing_bet'], cat_data)
+            merge_facing_bet(result['ip_facing_bet_hand_class'], hc_data)
+
     return result
+
+
+def merge_facing_bet(target, source):
+    """Merge facing-bet data from multiple bet sizes by averaging."""
+    for key, freqs in source.items():
+        if key not in target:
+            target[key] = {'_merge_count': 0}
+        target[key]['_merge_count'] = target[key].get('_merge_count', 0) + 1
+        n = target[key]['_merge_count']
+        for action, prob in freqs.items():
+            if action == '_count' or action == '_merge_count':
+                continue
+            old = target[key].get(action, 0)
+            # Running average
+            target[key][action] = old + (prob - old) / n
 
 
 def aggregate_by_category(strategy, actions, board_cards):
