@@ -171,7 +171,7 @@ function isArchetypeAvailable(arch: ArchetypeEntry): boolean {
   return hasAnyTableForStreet(street);
 }
 
-const HAND_COUNT_OPTIONS = [5, 10, 20];
+// Hand count options removed — session runs until user views stats or ends
 
 /** Look up the user-friendly label for an archetype ID */
 function archetypeLabel(id: ArchetypeId): string {
@@ -232,6 +232,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
   const [tutorialArchetype, setTutorialArchetype] = useState<ArchetypeId | null>(null);
   const [replayRecord, setReplayRecord] = useState<HandRecord | null>(null);
   const [drillQuizMode, setDrillQuizMode] = useState<DrillMode>(drillParams?.mode ?? "quiz");
+  const [showSessionStats, setShowSessionStats] = useState(false);
 
   // Auto-start drill from URL params
   const drillAutoStarted = useRef(false);
@@ -466,7 +467,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                 <>
                   {boardSource === "archetype" && !ws.isHandActive && !ws.isHandOver && (
                     <ArchetypeSelector
-                      onStart={(id, count) => { setTutorialArchetype(null); ws.startDrill(id, count); }}
+                      onStart={(id) => { setTutorialArchetype(null); setShowSessionStats(false); ws.startDrill(id); }}
                       drillMode={drillQuizMode}
                       onModeChange={setDrillQuizMode}
                       onOpenGuide={() => setDrillGuideOpen(true)}
@@ -474,12 +475,14 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                     />
                   )}
 
-                  {(ws.isHandActive || ws.isHandOver) && !(ws.sessionHands >= ws.drillHandsTarget && ws.isHandOver) && (
-                    <ActiveDrill ws={ws} drillQuizMode={drillQuizMode} onOpenGuide={() => setDrillGuideOpen(true)} />
+                  {(ws.isHandActive || ws.isHandOver) && !showSessionStats && (
+                    <ActiveDrill ws={ws} drillQuizMode={drillQuizMode}
+                      onOpenGuide={() => setDrillGuideOpen(true)}
+                      onViewStats={() => setShowSessionStats(true)} />
                   )}
 
-                  {ws.sessionHands >= ws.drillHandsTarget && ws.isHandOver && (
-                    <DrillSummary ws={ws} onNewDrill={ws.resetSession} />
+                  {showSessionStats && (
+                    <DrillSummary ws={ws} onNewDrill={() => { setShowSessionStats(false); ws.resetSession(); }} />
                   )}
                 </>
               )}
@@ -1080,14 +1083,13 @@ function ArchetypeSelector({
   onOpenGuide,
   onArchetypeSelect,
 }: {
-  onStart: (id: ArchetypeId | typeof INTERLEAVED_SENTINEL, count?: number) => void;
+  onStart: (id: ArchetypeId | typeof INTERLEAVED_SENTINEL) => void;
   drillMode: DrillMode;
   onModeChange: (mode: DrillMode) => void;
   onOpenGuide: () => void;
   onArchetypeSelect?: (id: ArchetypeId) => void;
 }) {
   const [selected, setSelected] = useState<ArchetypeId | typeof INTERLEAVED_SENTINEL | null>(null);
-  const [handCount, setHandCount] = useState(10);
   const categories: ArchetypeCategory[] = ["preflop", "flop_texture", "postflop_principle"];
 
   return (
@@ -1146,29 +1148,10 @@ function ArchetypeSelector({
       ))}
 
       <div className="flex items-center gap-3 pt-2 flex-wrap">
-        <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
-          <button onClick={() => onModeChange("learn")}
-            className={`px-3 py-1 text-xs transition-colors ${drillMode === "learn" ? "bg-[var(--gold)]/15 text-[var(--gold)] font-medium" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
-            Learn
-          </button>
-          <button onClick={() => onModeChange("quiz")}
-            className={`px-3 py-1 text-xs transition-colors border-l border-[var(--border)] ${drillMode === "quiz" ? "bg-[var(--gold)]/15 text-[var(--gold)] font-medium" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
-            Quiz
-          </button>
-        </div>
-        <span className="text-xs text-[var(--muted-foreground)]">Hands:</span>
-        <div className="flex gap-1">
-          {HAND_COUNT_OPTIONS.map((n) => (
-            <button key={n} onClick={() => setHandCount(n)}
-              className={`px-3 py-1 rounded text-xs border transition-colors ${handCount === n ? "border-[var(--gold)] text-[var(--gold)]" : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--gold-dim)]"}`}>
-              {n}
-            </button>
-          ))}
-        </div>
         <div className="flex-1" />
-        <button disabled={!selected} onClick={() => selected && onStart(selected, handCount)}
+        <button disabled={!selected} onClick={() => { if (selected) onStart(selected); }}
           className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${selected ? "bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90 cursor-pointer" : "bg-[var(--muted)] text-[var(--muted-foreground)] cursor-not-allowed"}`}>
-          Start Drill
+          Start
         </button>
       </div>
     </div>
@@ -1180,50 +1163,49 @@ function ActiveDrill({
   ws,
   drillQuizMode,
   onOpenGuide,
+  onViewStats,
 }: {
   ws: WorkspaceState;
   drillQuizMode: DrillMode;
   onOpenGuide: () => void;
+  onViewStats: () => void;
 }) {
-  const progressPct = ws.drillHandsTarget > 0
-    ? (ws.sessionHands / ws.drillHandsTarget) * 100 : 0;
-
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        {/* Drill header — archetype name prominently displayed */}
+        {/* Header — archetype + running tally */}
         {ws.drillArchetypeId && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-[var(--foreground)]">
-                {ws.drillIsInterleaved ? "Mixed Drill" : archetypeLabel(ws.drillArchetypeId)}
+                {ws.drillIsInterleaved ? "Mixed" : archetypeLabel(ws.drillArchetypeId)}
               </h2>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20 font-medium">
                 {ws.drillIsInterleaved ? archetypeLabel(ws.drillArchetypeId) : archetypeCategoryLabel(ws.drillArchetypeId)}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
+              {/* Running tally */}
+              {ws.sessionHands > 0 && (
+                <span className="text-[10px] text-[var(--muted-foreground)] tabular-nums">
+                  {ws.sessionHands} hands · {ws.sessionProgress.optimal}✓ {ws.sessionProgress.mistake + ws.sessionProgress.blunder > 0 ? `${ws.sessionProgress.mistake + ws.sessionProgress.blunder}✗` : ""}
+                </span>
+              )}
+              {ws.sessionHands > 0 && (
+                <button onClick={onViewStats}
+                  className="px-2 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors"
+                  title="View session stats">
+                  <span className="text-[9px] font-medium">Stats</span>
+                </button>
+              )}
               <button onClick={ws.resetSession}
                 className="px-2 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:text-red-400 hover:border-red-400/40 transition-colors"
-                title="Quit drill">
-                <span className="text-[9px] font-medium">Quit</span>
-              </button>
-              <button onClick={onOpenGuide}
-                className="w-5 h-5 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--gold)] hover:border-[var(--gold-dim)] transition-colors"
-                title="How to use Drill Mode">
-                <span className="text-[9px] font-bold">?</span>
+                title="End session">
+                <span className="text-[9px] font-medium">End</span>
               </button>
             </div>
           </div>
         )}
-        <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
-          <span>Hand {Math.min(ws.sessionHands + 1, ws.drillHandsTarget)} of {ws.drillHandsTarget}</span>
-          <span>{ws.sessionProgress.optimal}W {ws.sessionProgress.acceptable}A {ws.sessionProgress.mistake}M {ws.sessionProgress.blunder}B</span>
-        </div>
-        <div className="h-1.5 rounded-full bg-[var(--muted)]/30 overflow-hidden">
-          <motion.div className="h-full bg-[var(--gold)] rounded-full"
-            initial={{ width: 0 }} animate={{ width: `${progressPct}%` }} transition={{ duration: 0.3 }} />
-        </div>
       </div>
 
       {/* Board narrative — sets the scene for the decision */}
