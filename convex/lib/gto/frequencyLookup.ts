@@ -111,11 +111,13 @@ export function lookupGtoFrequencies(
 
     const openerPos = findPreflopOpener(gameState, heroSeat);
 
-    // ── For 3-bet and 4-bet pots, use validated ranges (PokerBench data conflates perspectives) ──
-    // PokerBench 3-bet data shows KK call 81% which is wrong — KK 3-bets nearly always.
-    // The validated ranges in preflopRanges.ts are correct for these archetypes.
+    // ── For 3-bet, 4-bet, and BvB, use validated ranges (PokerBench data conflates perspectives) ──
+    // PokerBench shows premiums calling 70-95% in spots where they should raise.
+    // The data conflates "facing a raise" with "facing a 3-bet" perspective.
+    // Validated ranges in preflopRanges.ts are correct for these archetypes.
     const useValidatedRanges = archetype.archetypeId === "three_bet_pots"
-      || archetype.archetypeId === "four_bet_five_bet";
+      || archetype.archetypeId === "four_bet_five_bet"
+      || archetype.archetypeId === "blind_vs_blind";
 
     if (!useValidatedRanges) {
       // ── Primary: PokerBench per-hand-class data (solver-derived, position-aware) ──
