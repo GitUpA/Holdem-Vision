@@ -47,23 +47,22 @@ The correct decision depends on BOTH. "Should I bet?" depends on what villain th
 
 GTO (Game Theory Optimal) defines the mathematically correct action for each hand at each decision point, assuming the opponent also plays optimally. It produces **frequency distributions**: "with AKo from CO, raise 70%, fold 25%, call 5%."
 
-GTO is not "always right" — it's the baseline that can't be exploited. A human player deviates from GTO to exploit opponent weaknesses. But to deviate intelligently, you must first understand the baseline.
+GTO is not "always right" — it's the baseline that can't be exploited. It is the **defense**. A human player deviates from GTO to exploit opponent weaknesses — that's the **offense**.
 
 ### Profiles as GTO Deviations
 
 Every player profile is a **deviation from GTO**, not a separate system:
 
-- **GTO**: the identity (no modification)
-- **NIT**: folds more than GTO recommends (high foldScale modifier)
+- **GTO**: the identity modifier (no deviation — unexploitable baseline)
+- **NIT**: folds more than GTO recommends (high foldScale)
 - **FISH**: calls more than GTO recommends (low foldScale, call-heavy)
-- **TAG**: plays tighter preflop than GTO, more aggressive postflop
-- **LAG**: plays wider than GTO preflop, aggressive postflop
+- **TAG**: tighter preflop, more aggressive postflop (selective modifier)
+- **LAG**: wider preflop, aggressive postflop (low fold, high aggression)
 
-Because every profile is a GTO deviation, **one engine handles all profiles**. The modifier vector is the only variable. This also means:
-
-- **Custom profiles** are possible — any behavioral deviation can be expressed as a modifier
-- **Every modifier dimension is tunable** — if it affects behavior, it gets a control
-- **Profiles compose** — "like a NIT but calls more on the river" is a modified NIT modifier
+One engine handles all profiles. The modifier vector is the only variable:
+- Custom profiles are any modifier vector
+- Every dimension is tunable
+- Profiles compose ("NIT but calls more on rivers")
 
 ### Exploitative Play as Threshold Testing
 
@@ -71,13 +70,13 @@ Exploitative play is not "do the opposite of GTO." It's **testing the story**:
 
 > "I have a great hand but not the nuts. If I represent a hand closer to the nuts, they should fold unless they have the nuts or don't believe me. If they continue, I'm invested and willing to fold."
 
-This is a narrative decision, not a frequency calculation. The coaching must show:
-1. What GTO says (the baseline)
-2. Why you might deviate (the exploit)
+The coaching shows:
+1. What GTO says (the baseline / defense)
+2. Why you might deviate (the exploit / offense)
 3. What their response tells you (the read)
 4. When to stop pressing (the threshold)
 
-Each action in an exploitative line is **conditional on the response** — not independent.
+Each action is **conditional on the response** — not independent.
 
 ## Layer 6: Every Seat is a Player
 
@@ -86,126 +85,148 @@ Each action in an exploitative line is **conditional on the response** — not i
 Every seat at the table is a **profile-driven player**. The human hero is the seat where the system **pauses for human input**. Everything else is identical:
 
 ```
-Seat 0 (Hero):   GTO coaching → PAUSE → human decides → record
-Seat 1 (Villain): GTO coaching + NIT modifier → auto-decide → record
-Seat 2 (Villain): GTO coaching + TAG modifier → auto-decide → record
+Seat 0 (Hero):   coaching → PAUSE → human decides → record
+Seat 1 (Villain): coaching + NIT modifier → auto-decide → record
+Seat 2 (Villain): coaching + TAG modifier → auto-decide → record
 ...
 ```
 
-The human hero receives coaching (narrative, GTO recommendation, opponent stories). Villains receive the same coaching internally but always follow it (with their modifier applied). The difference is:
-- Hero sees the coaching and chooses
-- Villains see the coaching and obey
-
-This means the system can run **with or without a human**:
+The system runs **with or without a human**:
 - **With human**: hero seat pauses, human plays, system teaches
 - **Without human**: hero seat auto-plays (another profile), system self-validates
 
+The UI is the human interface. Headless mode is the testing harness.
+
 ### Villain Coaching Interpretation
 
-Villains don't blindly follow frequencies. They receive the same coaching the hero would get, then interpret it through their profile modifier:
-
-- **NIT receives**: "GTO says call here, 60% frequency" → NIT modifier: fold more → NIT folds
-- **FISH receives**: "GTO says fold here, 80% frequency" → FISH modifier: call more → FISH calls
-- **TAG receives**: "GTO says raise here, 45% frequency" → TAG modifier: slightly more aggressive → TAG raises
-
-Variability comes from the sampling — the modifier warps the distribution, then an action is sampled. A NIT folds MOST of the time but occasionally calls (unpredictable, realistic).
+Villains receive the same coaching the hero gets. The profile modifier determines how they interpret it:
+- Good villain (TAG): follows coaching closely
+- Bad villain (FISH): ignores parts of it
+- Great villain (adaptive TAG): follows coaching AND adjusts based on reads
 
 **Tuning levers:**
-- **Intensity** — how far the modifier deviates from GTO (0 = pure GTO, 1 = extreme)
-- **Variance** — how random the sampling is within the modified distribution
-- **Situation sensitivity** — different deviations per situation (preflop vs river, facing bet vs first to act)
+- **Intensity** — how far from GTO (0 = pure GTO, 1 = extreme deviation)
+- **Variance** — randomness in sampling (predictable vs chaotic)
+- **Situation sensitivity** — different deviations per spot
 
-## Layer 7: The Coaching Architecture
+## Layer 7: The Coach is Blind
 
-### The Coach is Blind to Setup
+The coaching engine **does not know what profiles were assigned**. It observes actions and interprets — just like a real coach watching tape.
 
-The coaching engine **does not know what profiles were assigned to villains**. It observes actions and interprets — just like a real coach watching tape:
+- **Setup** = profile assignment for training scenarios
+- **Coaching** = behavior interpretation for learning to think
+- The coach says "V3 appears tight based on 3 folds in a row" not "V3 is a NIT"
 
-- **Setup** (profile assignment) is for creating training scenarios
-- **Coaching** (behavior interpretation) is for learning to think
-- The coach says "V3 has folded 3 times in a row — they appear tight" not "V3 is a NIT"
+This is the skill being taught: read behavior, not labels.
 
-This is the skill being taught: read the behavior, not the label.
+## Layer 8: Computation Strategy
 
-### The System's Full Stack
+### Two Paths
+
+**Fast path** (always available): pre-computed lookups from build-time data.
+- Preflop: 169-grid with per-hand frequencies per position
+- Postflop: solver tables (TexasSolver, 193 boards across 8 archetypes)
+- Equity: pre-computed category lookup tables (~1,400 entries)
+- Zero Monte Carlo. Runs on Convex, in browser, or headless.
+
+**Precision path** (optional, user-activated): real-time Monte Carlo in browser.
+- User clicks "Run precise analysis" on a specific hand
+- 3,000 trials, ~1-2 seconds
+- Shows exact equity vs estimated range
+- Enhancement, not dependency
+
+Both paths produce the same interface: `{equity: number, confidence: "estimate" | "precise"}`. Consumers don't care which generated it.
+
+**Runtime constraints:**
+- Browser: JavaScript only, no GPU
+- Convex: JavaScript, limited execution time
+- Build time: RTX 3090, TexasSolver, unlimited batch processing
+
+Pre-compute at build time → ship as static data → runtime is pure lookups.
+
+## Layer 9: Statistical Validation — The Payoff Matrix
+
+### Symmetric Validation (null hypothesis)
+
+All 6 seats run identical GTO profiles. Over N hands, each seat should win ~1/6 of total chips. Deviation = system bug. This proves **fairness**.
+
+### Profile Strength Ranking
+
+Replace one seat with a different profile, keep 5 as GTO:
+- GTO vs 5 GTOs → ~1/6 (no edge against itself)
+- TAG vs 5 GTOs → above 1/6 (exploits GTO's balance)
+- NIT vs 5 GTOs → below 1/6 (bleeds blinds)
+- FISH vs 5 GTOs → well below 1/6 (calls too much)
+
+### Full Interaction Matrix
+
+K profiles → K×K payoff matrix (zero-sum). For 5 profiles: 15 unique matchups. ~10,000 hands each for significance. ~30 minutes headless for the full matrix.
+
+### What the Matrix Reveals
+
+The payoff matrix doesn't just validate — it **discovers optimal counter-strategies**.
+
+For each observed behavior pattern, the matrix shows which modifier vector wins the most against it. This is computable:
+
+1. Run profile A against all others → find A's weaknesses
+2. Generate counter-profiles that exploit A's weaknesses
+3. Run the counter-profiles against A → find the optimal counter
+4. The optimal counter IS the coaching recommendation
+
+## Layer 10: The Meta-Game — Emergent Knowledge Base
+
+### From Validation to Discovery
+
+The payoff matrix is a validation tool. But its higher purpose is **knowledge generation**:
+
+**Step 1: Calibrate.** Run all-GTO symmetric test. Confirm fairness. Adjust until each seat wins ~1/6.
+
+**Step 2: Rank.** Run each profile against GTO baseline. Confirm expected ordering: TAG > GTO > LAG > NIT > FISH. Adjust modifier values until this ordering is stable.
+
+**Step 3: Map.** Run full K×K matrix. For each profile pair, record the win rate delta. This produces a **counter-strategy map**:
 
 ```
-GTO Range Data (data layer — 169-grid, solver tables)
-    ↓ feeds
-Funnel Tracking (context layer — HandContext carries ranges forward)
-    ↓ informs
-Engine (decision layer — GTO base + profile modifier + sampling)
-    ↓ produces
-Coaching (interpretation layer — blind to setup, reads behavior)
-    ↓ presents
-Narrative + Scoring (teaching layer — story-based, threshold-aware)
-    ↓ displayed via
-UI (presentation layer — or headless for testing)
+If opponent behaves like NIT → optimal counter: increase bluff frequency +30%
+If opponent behaves like FISH → optimal counter: value bet thinner, never bluff
+If opponent behaves like LAG → optimal counter: tighten up, trap with strong hands
+If opponent behaves like TAG → optimal counter: mixed strategy (close to GTO)
 ```
 
-## Layer 8: Statistical Validation
+**Step 4: Discover.** The counter-strategies are themselves profiles (modifier vectors). Run THEM against the matrix. Do they create new vulnerabilities? What beats the NIT-counter? This recursive process converges to a **meta-GTO** — the strategy that accounts for opponent adaptation.
 
-### The Payoff Matrix
+### The Coaching Application
 
-Because every seat is a profile-driven player and the system runs headless, we can validate the entire system mathematically:
+Once the counter-strategy map exists, the coaching becomes:
 
-**Test 1: Symmetric Validation (null hypothesis)**
-All 6 seats run identical GTO profiles. Over N hands, each seat should win ~1/6 of the total chips. If any seat wins significantly more or less, the system has a bug (position bias, dealing bias, engine asymmetry). This proves the system is FAIR.
+> "V2 has been behaving like a NIT over the last 12 hands (folded 9 times, only continued with premium hands). Our statistical models show that against this behavior pattern, you should shift your profile toward more aggressive bluffing. Specifically: raise your c-bet frequency from 60% to 80% on dry boards. If they start adjusting (calling more), the system will detect the shift and recommend a counter-adjustment."
 
-**Test 2: Profile Strength Ranking**
-Replace one seat with a different profile, keep 5 as GTO. Run N hands:
-- GTO vs 5 GTOs → ~1/6 win rate (no edge against itself)
-- TAG vs 5 GTOs → slightly above 1/6 (TAG exploits GTO's balance in spots)
-- NIT vs 5 GTOs → below 1/6 (bleeds blinds by folding too much)
-- FISH vs 5 GTOs → well below 1/6 (calls too much, loses to value)
+This is not hardcoded advice. It's **empirically derived from the payoff matrix** and expressed as narrative. The system has PROVEN through thousands of simulated hands that this adjustment wins against NIT behavior.
 
-This validates that each profile behaves as expected AND that the coaching correctly identifies which profiles are stronger.
+### What This Means
 
-**Test 3: Full Interaction Matrix (M+1 problem)**
-With K profiles, test each pair: how does profile A perform against profile B? This is a K×K payoff matrix (zero-sum: every chip won = chip lost).
+We've built:
+1. **GTO** — the defensive baseline (can't be exploited)
+2. **Profiles** — deviations from GTO (behavioral patterns)
+3. **Payoff matrix** — how every profile performs against every other
+4. **Counter-strategy map** — the optimal response to each observed behavior
+5. **Meta-GTO** — the strategy that accounts for opponent adaptation
 
-For 5 profiles: 15 unique matchups. Each needs ~10,000 hands for statistical significance (p < 0.05 given poker's high variance).
+The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but V2 is behaving like Y, and the statistically proven winning adjustment is Z. Here's the specific hand where you apply it."
 
-**Properties the matrix should exhibit:**
-- GTO should have the highest MINIMUM payoff (can't be exploited)
-- TAG should beat NIT (punishes folding)
-- FISH should lose to everyone (calling too much is -EV)
-- LAG should beat NIT but lose to TAG (aggression works vs passive, loses to selective aggression)
-- The dominant strategy against a mixed population should be close to GTO
+**This is a GTO of narratives.** Not just what to do, but what story to tell, to whom, and when to change the story based on how they respond.
 
-**What this enables:**
-1. **System validation** — symmetric test proves fairness
-2. **Profile validation** — each profile's win rate matches theory
-3. **Coaching validation** — if GTO-coached auto-hero doesn't beat FISH, coaching is broken
-4. **Modifier tuning** — adjust foldScale until NIT-vs-GTO produces the expected loss rate
-5. **Custom profile testing** — create a profile, run the matrix, see where it lands
-6. **Self-tuning** — run matrix → find anomalies → adjust modifiers → re-run → converge
+## Summary
 
-### Sample Size and Feasibility
-
-Poker has high variance. Required sample: ~10,000 hands per matchup for significance.
-- 6 players × 10,000 hands × 15 matchups = 900,000 hands
-- HandStepper runs ~500 hands/second headless
-- Full matrix: ~30 minutes
-- Entirely feasible for automated CI/tuning runs
-
-## Archetype vs Free Play
-
-Same system, different dealing:
-
-- **Archetype mode**: Board is constrained. Funnel is strict — only hands that survived preflop reach the flop. Scenario is defined.
-- **Free play**: Board is random. Funnel is observed — system detects archetype and coaches accordingly. If hero entered with junk, coaching says so but lets them play.
-
-The coaching, scoring, engine, and narrative are identical in both modes.
-
-## Common Misconceptions
-
-1. **"Each street can be analyzed independently"** — No. The preflop action defines the story for all later streets.
-2. **"GTO is one number per hand"** — No. It's a frequency distribution with mixed strategies at edges.
-3. **"Villain's range doesn't matter"** — It's the MOST important factor in hero's decision.
-4. **"Archetype mode is a separate system"** — Same system, constrained dealing.
-5. **"Profiles are separate engines"** — They are modifier vectors on one engine.
-6. **"Exploitative play = doing the opposite of GTO"** — It's testing thresholds through narrative.
-7. **"The coach should know the villain's profile"** — The coach should READ behavior, not labels.
-8. **"The system needs a human to test"** — Every seat is a player. Replace hero with an auto-player to validate headlessly.
-9. **"Headless mode is the product"** — The product is for humans. Headless mode is the testing harness that ensures the product works.
+```
+First Principles:
+├── Poker is a funnel (each street filters ranges)
+├── Two ranges always matter (hero's and villain's)
+├── GTO is the unexploitable baseline (defense)
+├── Profiles are GTO deviations (modifier vectors)
+├── Exploitative play tests thresholds (offense)
+├── Every seat is a player (hero = pause for human)
+├── Coach is blind to setup (reads behavior)
+├── Pre-compute everything (fast path + optional precision)
+├── Payoff matrix validates and discovers (statistical testing)
+└── Meta-GTO emerges (counter-strategy knowledge base)
+```
