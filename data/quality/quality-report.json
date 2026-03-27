@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-27T19:13:01.078Z",
+  "timestamp": "2026-03-27T19:41:40.258Z",
   "summary": {
     "scenarios": 10,
     "totalErrors": 0,
@@ -12,28 +12,28 @@
       "errors": 0,
       "warnings": 0,
       "issues": [],
-      "snapshot": "=== PREFLOP | Button | A♠ A♥ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: Pocket As (premium_pair, strength 1.00)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): call: 83%, bet_large: 16%, fold: 1% → call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with A♠ A♥. Under the Gun opened to 3 BB — you're deciding whether to enter this pot. Under the Gun raiseed 3 BB. Your Pocket As is strong. You have a clear story to tell. Call. The price is right to continue. GTO confirms: call 83% of the time."
+      "snapshot": "=== PREFLOP | Button | A♠ A♥ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: Pocket As (premium_pair, strength 1.00)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): call: 96%, fold: 2%, bet_large: 2% → call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with A♠ A♥. Cutoff opened to 3 BB — you're deciding whether to enter this pot. Cutoff raiseed 3 BB. Your Pocket As is strong. You have a clear story to tell. Call. The price is right to continue. GTO confirms: call 96% of the time."
     },
     {
       "name": "72o_junk",
       "errors": 0,
       "warnings": 0,
       "issues": [],
-      "snapshot": "=== PREFLOP | Button | 7♥ 2♦ ===\nPot: 1.5 BB | Odds: 1.5:1\nHand: Weak offsuit hand (72o) (air, strength 0.10)\nArchetype: rfi_opening (confidence 0.85)\nActions: Fold | Call 1.0 | Raise 2.0-100.0\nGTO (preflop-handclass): fold: 95%, call: 3%, bet_medium: 2% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with 7♥ 2♦. No one has raised yet — you have the initiative.  Your Weak offsuit hand (72o) is weak. You'll need a convincing story or the right price to continue. Fold. The math doesn't support continuing. GTO confirms: fold 95% of the time."
+      "snapshot": "=== PREFLOP | Button | 7♥ 2♦ ===\nPot: 2.5 BB | Odds: 2.5:1\nHand: Weak offsuit hand (72o) (air, strength 0.10)\nArchetype: rfi_opening (confidence 0.85)\nActions: Fold | Call 1.0 | Raise 2.0-100.0\nGTO (preflop-handclass): fold: 95%, call: 3%, bet_medium: 2% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with 7♥ 2♦. No one has raised yet — you have the initiative. Hijack called 1 BB. Your Weak offsuit hand (72o) is weak. You'll need a convincing story or the right price to continue. Fold. The math doesn't support continuing. GTO confirms: fold 95% of the time."
     },
     {
       "name": "AKs_strong",
       "errors": 0,
       "warnings": 0,
       "issues": [],
-      "snapshot": "=== PREFLOP | Button | A♣ K♣ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: AKs (overcards, strength 0.89)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): call: 88%, fold: 8%, bet_large: 4% → call\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with A♣ K♣. Cutoff opened to 3 BB — you're deciding whether to enter this pot. Cutoff raiseed 3 BB. Your AKs is strong. You have a clear story to tell. Call. The price is right to continue. GTO confirms: call 88% of the time."
+      "snapshot": "=== PREFLOP | Button | A♣ K♣ ===\nPot: 3.5 BB | Odds: 3.5:1\nHand: AKs (overcards, strength 0.89)\nArchetype: rfi_opening (confidence 0.85)\nActions: Fold | Call 1.0 | Raise 2.0-100.0\nGTO (preflop-handclass): bet_medium: 67%, fold: 17%, call: 17% → bet_medium\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (leaning): You're on the Button with A♣ K♣. No one has raised yet — you have the initiative. Under the Gun called 1 BB. Hijack called 1 BB. Your AKs is strong. You have a clear story to tell. Bet. You have a story worth telling. GTO leans bet medium (67%)."
     },
     {
       "name": "94s_suited_junk",
       "errors": 0,
       "warnings": 0,
       "issues": [],
-      "snapshot": "=== PREFLOP | Button | 9♣ 4♣ ===\nPot: 1.5 BB | Odds: 1.5:1\nHand: Weak suited hand (94s) (weak_draw, strength 0.17)\nArchetype: rfi_opening (confidence 0.85)\nActions: Fold | Call 1.0 | Raise 2.0-100.0\nGTO (preflop-handclass): fold: 95%, call: 3%, bet_medium: 2% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with 9♣ 4♣. No one has raised yet — you have the initiative.  Your Weak suited hand (94s) is weak. You'll need a convincing story or the right price to continue. Fold. The math doesn't support continuing. GTO confirms: fold 95% of the time."
+      "snapshot": "=== PREFLOP | Button | 9♣ 4♣ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: Weak suited hand (94s) (weak_draw, strength 0.17)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 67%, call: 17%, bet_large: 17% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (leaning): You're on the Button with 9♣ 4♣. Cutoff opened to 3 BB — you're deciding whether to enter this pot. Cutoff raiseed 3 BB. Your Weak suited hand (94s) is weak. You'll need a convincing story or the right price to continue. Fold. The math doesn't support continuing. GTO leans fold (67%)."
     },
     {
       "name": "QQ_overpair",
@@ -47,14 +47,14 @@
       "errors": 0,
       "warnings": 0,
       "issues": [],
-      "snapshot": "=== PREFLOP | Button | T♠ 9♠ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: T9s (straight_draw, strength 0.51)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 80%, call: 10%, bet_large: 10% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with T♠ 9♠. Cutoff opened to 3 BB — you're deciding whether to enter this pot. Cutoff raiseed 3 BB. Your T9s is playable but not premium. Choose your story carefully. Fold. The math doesn't support continuing. GTO confirms: fold 80% of the time."
+      "snapshot": "=== PREFLOP | Button | T♠ 9♠ ===\nPot: 2.5 BB | Odds: 2.5:1\nHand: T9s (straight_draw, strength 0.51)\nArchetype: rfi_opening (confidence 0.85)\nActions: Fold | Call 1.0 | Raise 2.0-100.0\nGTO (preflop-handclass): bet_medium: 71%, fold: 14%, call: 14% → bet_medium\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with T♠ 9♠. No one has raised yet — you have the initiative. Under the Gun called 1 BB. Your T9s is playable but not premium. Choose your story carefully. Bet. You have a story worth telling. GTO confirms: bet medium 71% of the time."
     },
     {
       "name": "KJo_broadway",
       "errors": 0,
       "warnings": 0,
       "issues": [],
-      "snapshot": "=== PREFLOP | Button | K♦ J♥ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: KJo (overcards, strength 0.77)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 96%, call: 2%, bet_large: 2% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with K♦ J♥. Hijack opened to 3 BB — you're deciding whether to enter this pot. Hijack raiseed 3 BB. Your KJo is strong. You have a clear story to tell. Fold. The math doesn't support continuing. GTO confirms: fold 96% of the time."
+      "snapshot": "=== PREFLOP | Button | K♦ J♥ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: KJo (overcards, strength 0.77)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 89%, call: 5%, bet_large: 5% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with K♦ J♥. Under the Gun opened to 3 BB — you're deciding whether to enter this pot. Under the Gun raiseed 3 BB. Your KJo is strong. You have a clear story to tell. Fold. The math doesn't support continuing. GTO confirms: fold 89% of the time."
     },
     {
       "name": "55_small_pair",
@@ -68,14 +68,14 @@
       "errors": 0,
       "warnings": 0,
       "issues": [],
-      "snapshot": "=== PREFLOP | Button | A♦ 2♥ ===\nPot: 1.5 BB | Odds: 1.5:1\nHand: A2o (overcards, strength 0.44)\nArchetype: rfi_opening (confidence 0.85)\nActions: Fold | Call 1.0 | Raise 2.0-100.0\nGTO (preflop-handclass): bet_medium: 90%, fold: 5%, call: 5% → bet_medium\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with A♦ 2♥. No one has raised yet — you have the initiative.  Your A2o is playable but not premium. Choose your story carefully. Bet. You have a story worth telling. GTO confirms: bet medium 90% of the time."
+      "snapshot": "=== PREFLOP | Button | A♦ 2♥ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: A2o (overcards, strength 0.44)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 92%, call: 5%, raise_large: 3% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with A♦ 2♥. Cutoff opened to 3 BB — you're deciding whether to enter this pot. Cutoff raiseed 3 BB. Your A2o is playable but not premium. Choose your story carefully. Fold. The math doesn't support continuing. GTO confirms: fold 92% of the time."
     },
     {
       "name": "JTs_premium_connector",
       "errors": 0,
       "warnings": 0,
       "issues": [],
-      "snapshot": "=== PREFLOP | Button | J♥ T♥ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: JTs (overcards, strength 0.83)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 95%, call: 3%, bet_large: 3% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with J♥ T♥. Hijack opened to 3 BB — you're deciding whether to enter this pot. Hijack raiseed 3 BB. Your JTs is strong. You have a clear story to tell. Fold. The math doesn't support continuing. GTO confirms: fold 95% of the time."
+      "snapshot": "=== PREFLOP | Button | J♥ T♥ ===\nPot: 4.5 BB | Odds: 1.5:1\nHand: JTs (overcards, strength 0.83)\nArchetype: three_bet_pots (confidence 0.85)\nActions: Fold | Call 3.0 | Raise 5.0-100.0\nGTO (preflop-handclass): fold: 87%, call: 7%, bet_large: 7% → fold\nAction stories:\n  fold: \"I'm stepping aside — this hand isn't worth playing from here.\"\n  call: \"I'm calling to see a flop. My hand plays well postflop but raising reveals too much.\"\n  raise: \"I'm raising to thin the field and build the pot with position or a strong hand.\"\n\nCOACH (clear): You're on the Button with J♥ T♥. Cutoff opened to 3 BB — you're deciding whether to enter this pot. Cutoff raiseed 3 BB. Your JTs is strong. You have a clear story to tell. Fold. The math doesn't support continuing. GTO confirms: fold 87% of the time."
     }
   ]
 }

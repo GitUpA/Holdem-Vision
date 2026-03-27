@@ -84,6 +84,17 @@ import "./preflopHandClassData";
 // Postflop per-hand-class tables (PokerBench 500k solver-optimal decisions)
 import "./postflopHandClassData";
 
+// Facing-bet solver tables (8 flop archetypes, fold/call/raise when facing a bet)
+// Auto-registered at import time via facingBetTables.ts
+import "./facingBetTables";
+
+export {
+  lookupFacingBetFrequencies,
+  hasFacingBetData,
+  facingBetToActionFrequencies,
+  type FacingBetFrequencies,
+} from "./facingBetTables";
+
 export {
   lookupPreflopHandClass,
   hasPreflopHandClassData,

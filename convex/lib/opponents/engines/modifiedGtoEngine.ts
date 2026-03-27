@@ -18,9 +18,14 @@ import type { DecisionEngine, DecisionContext, EngineDecision } from "./types";
 import type { ActionType, LegalActions } from "../../state/gameState";
 import type { ActionFrequencies, GtoAction } from "../../gto/tables/types";
 import { registerEngine } from "./engineRegistry";
-import { facingBetAction } from "../../gto/facingBetDecision";
 import { CATEGORY_STRENGTH } from "../../gto/categoryStrength";
 import { categorizeHand } from "../../gto/handCategorizer";
+
+// Facing-bet solver data
+import {
+  lookupFacingBetFrequencies,
+  facingBetToActionFrequencies,
+} from "../../gto/tables/facingBetTables";
 
 // GTO base frequency retrieval — shared lookup
 import type { ArchetypeClassification } from "../../gto/archetypeClassifier";
@@ -72,13 +77,17 @@ export const modifiedGtoEngine: DecisionEngine = {
     const modifiedFreqs = applyModifier(gtoFreqs, modifier, factors);
 
     // ── 5. Sample action from modified frequencies ──
-    // Pass hand strength so facing-bet mapping (check→fold vs check→call) uses it
     const { actionType, amount } = sampleFromModifiedFrequencies(
       modifiedFreqs,
       ctx.legal,
       ctx.potSize,
       ctx.random,
       factors.handStrength,
+      {
+        archetype,
+        handCat,
+        isInPosition: factors.isInPosition,
+      },
     );
 
     // ── 6. Build narrative explanation ──
@@ -203,9 +212,22 @@ function getGtoBaseFrequencies(
 // ACTION SAMPLING
 // ═══════════════════════════════════════════════════════
 
+/** Context needed for facing-bet solver lookup */
+interface FacingBetContext {
+  archetype?: ArchetypeClassification;
+  handCat?: HandCategorization;
+  isInPosition: boolean;
+}
+
 /**
  * Sample an action from modified frequency distribution,
  * mapping GtoActions to legal game actions with sizing.
+ *
+ * When facing a bet (canCheck=false, canCall=true) and the frequencies
+ * contain "check" weight, replaces that weight with solver-derived
+ * facing-bet frequencies (fold/call/raise) for the specific archetype
+ * and hand category. Falls back to the old hand-strength threshold
+ * if no facing-bet data exists.
  */
 function sampleFromModifiedFrequencies(
   frequencies: ActionFrequencies,
@@ -213,11 +235,45 @@ function sampleFromModifiedFrequencies(
   potSize: number,
   random: () => number,
   handStrength?: number,
+  fbCtx?: FacingBetContext,
 ): { actionType: ActionType; amount?: number } {
+  // ── Facing-bet replacement: swap "check" weight for solver fold/call/raise ──
+  // The solver "first to act" tables use "check" for passive actions.
+  // When we're facing a bet, we need to redistribute that "check" weight
+  // into fold/call/raise using the facing-bet solver data.
+  let effectiveFreqs = frequencies;
+  const isFacingBet = !legal.canCheck && legal.canCall;
+  const checkWeight = frequencies.check ?? 0;
+
+  if (isFacingBet && checkWeight > 0.001 && fbCtx?.archetype && fbCtx?.handCat) {
+    const textureId = fbCtx.archetype.textureArchetypeId ?? fbCtx.archetype.archetypeId;
+    const fbLookup = lookupFacingBetFrequencies(
+      textureId,
+      fbCtx.handCat.category,
+      fbCtx.isInPosition,
+    );
+
+    if (fbLookup) {
+      // Replace "check" with solver-derived facing-bet frequencies,
+      // scaled by the original check weight so the total stays normalized.
+      const fbFreqs = facingBetToActionFrequencies(fbLookup);
+      effectiveFreqs = { ...frequencies };
+      delete effectiveFreqs.check;
+
+      for (const [action, prob] of Object.entries(fbFreqs)) {
+        if (!prob) continue;
+        const key = action as GtoAction;
+        effectiveFreqs[key] = (effectiveFreqs[key] ?? 0) + checkWeight * prob;
+      }
+    }
+    // If no facing-bet data, fall through to mapGtoActionToLegal's
+    // hand-strength threshold fallback (existing behavior).
+  }
+
   // Build weighted options
   const options: { actionType: ActionType; amount?: number; weight: number }[] = [];
 
-  for (const [action, freq] of Object.entries(frequencies)) {
+  for (const [action, freq] of Object.entries(effectiveFreqs)) {
     if (!freq || freq < 0.001) continue;
 
     const mapped = mapGtoActionToLegal(action as GtoAction, legal, potSize, handStrength);
