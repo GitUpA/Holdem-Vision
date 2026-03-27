@@ -35,6 +35,8 @@ export interface HandRecord {
   streetSnapshots?: StreetSnapshot[];
   /** Analysis lens results the user saw (for engine tuning) */
   lensSnapshots?: LensSnapshot[];
+  /** Hand context — funnel tracking across streets (Layer 2) */
+  handContext?: import("../pipeline/handContext").HandContext;
 }
 
 export interface HandConfig {
