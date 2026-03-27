@@ -320,8 +320,8 @@ First Principles:
 ├── ✅ GTO is the unexploitable baseline (one engine, modifier vectors)
 ├── ✅ GTO does everything — difference is predictability (sampling)
 ├── ✅ Profiles are consistent GTO deviations (5 presets, custom possible)
-├── ⚠️ Exploitative play tests thresholds (NOT IMPLEMENTED — needs Phase 9b)
-├── ⚠️ Small sample problem (type exists, not wired into coaching narrative)
+├── ✅ Exploitative play (counterStrategyMap wired into commentator)
+├── ✅ Small sample problem (confidence surfaced in coaching narrative)
 ├── ✅ Every seat is a player (HandStepper, batchRunner, deterministic)
 ├── ✅ Coach is blind to setup (inferBehavior, snapshot path blind)
 ├── ✅ Pre-compute everything (preflop ✅, postflop ✅, equity tables ✅)
@@ -345,15 +345,15 @@ First Principles:
 
 1. ~~**Facing-bet solver data gap**~~ **RESOLVED.** Parsed facing-bet frequencies from existing 193 solver outputs (the data was already in the game tree — just never extracted). Engine now uses actual solver fold/call/raise frequencies when facing a bet instead of a hand-strength threshold. GTO vs LAG: +1.7 BB/100 (was +30.1). The remaining LAG > GTO in average rankings is theoretically correct — aggressive profiles exploit weak players harder than balanced play does.
 
-2. **Counter-strategy not surfaced in UI** — `counterAdvice` data flows to the snapshot but the coaching panel doesn't display it. The narrative text exists; the UI rendering doesn't. **UI wiring needed.**
+2. ~~**Counter-strategy not surfaced**~~ **RESOLVED.** Commentator appends counter-strategy narrative when confidence > 50%.
 
-3. **Confidence not surfaced in coaching narrative** — `inferBehavior()` produces confidence but the commentator doesn't say "75% confident this is a NIT." **Narrative enhancement needed.**
+3. ~~**Confidence not surfaced**~~ **RESOLVED.** Commentator includes inferred behavior pattern with confidence percentage.
 
-4. **Cross-street scoring not populated** — The `conditionalVerdict` and `preflopContribution` fields exist on `ActionScore` but are never set. Need `HandContext.heroPreflopFrequency` to flow into `scoreAction()`. **Wiring needed.**
+4. ~~**Cross-street scoring**~~ **RESOLVED.** `enrichScoreWithContext()` sets conditionalVerdict, preflopContribution, cumulativeEVLoss.
 
-5. **Villain hands not constrained in archetype mode** — Hero hands are position-aware but villain hands are still random. **Quality enhancement.**
+5. ~~**Villain hands not constrained**~~ **RESOLVED.** Postflop deal functions check primary villain passes `isReasonablePreflop` (best-effort, 10 attempts).
 
-6. **HandContext not populated in HandSession.act()** — The type and pipeline exist but `HandSession` doesn't build/update `HandContext` during live play. **Wiring needed.**
+6. ~~**HandContext not populated**~~ **RESOLVED.** HandSession builds/updates HandContext at startHand, act, advanceOpponents, finalize.
 
-7. **Adaptive villains** — Villains don't adjust to hero's behavior over a session. **Future enhancement.**
+7. **Adaptive villains** — Villains don't adjust to hero's behavior over a session. **Future enhancement — only remaining hole.**
 ```
