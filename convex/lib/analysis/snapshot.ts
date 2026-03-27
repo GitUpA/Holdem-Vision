@@ -30,6 +30,8 @@ import { buildOpponentStory } from "./opponentStory";
 import { buildActionStories } from "../gto/actionNarratives";
 import { commentateHand } from "./handCommentator";
 import { computeHeroPerceivedRange, type HeroPerceivedRange } from "./heroPerceivedRange";
+import { inferBehavior } from "../opponents/behaviorInference";
+import { getCounterAdvice } from "../pipeline/counterStrategyMap";
 import { cardToDisplay } from "../primitives/card";
 import { positionDisplayName } from "../primitives/position";
 
@@ -119,6 +121,14 @@ export interface FullSnapshot {
     rangePercent: number;
     narrative: string;
     implication: string;
+  } | null;
+
+  // ── Counter-Strategy Advice (Layer 10: exploitative coaching) ──
+  counterAdvice: {
+    pattern: string;
+    narrative: string;
+    confidence: number;
+    confidenceLabel: string;
   } | null;
 
   // ── Hand Commentator ──
@@ -290,6 +300,32 @@ export function captureFullSnapshot(
     }
   }
 
+  // ── Counter-strategy advice (Layer 10) ──
+  let counterAdviceResult: FullSnapshot["counterAdvice"] = null;
+  if (rawOpponentStories.length > 0) {
+    // Collect all opponent actions for behavior inference
+    const allOppActions = activeOpponents.flatMap(opp =>
+      gameState.actionHistory
+        .filter(a => a.seatIndex === opp.seatIndex)
+        .map(a => ({ street: a.street as Street, actionType: a.actionType, amount: a.amount }))
+    );
+    if (allOppActions.length > 0) {
+      const inferred = inferBehavior(allOppActions);
+      const gtoFoldRate = 0.5; // GTO baseline fold rate (approximate)
+      const actualFoldRate = allOppActions.filter(a => a.actionType === "fold").length / allOppActions.length;
+      const deviation = Math.abs(actualFoldRate - gtoFoldRate);
+      const advice = getCounterAdvice(inferred.pattern, allOppActions.length, deviation);
+      if (advice.confidence > 0.2) {
+        counterAdviceResult = {
+          pattern: advice.pattern,
+          narrative: advice.narrative,
+          confidence: advice.confidence,
+          confidenceLabel: advice.confidenceLabel,
+        };
+      }
+    }
+  }
+
   // ── Action stories ──
   const rawActionStories = legal && heroCards.length >= 2
     ? buildActionStories(
@@ -421,6 +457,8 @@ export function captureFullSnapshot(
       narrative: heroPerceivedRange.narrative,
       implication: heroPerceivedRange.implication,
     } : null,
+
+    counterAdvice: counterAdviceResult,
 
     commentary,
     players,

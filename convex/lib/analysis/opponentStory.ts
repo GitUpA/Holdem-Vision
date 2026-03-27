@@ -14,6 +14,15 @@ import type { OpponentProfile, PlayerAction, WeightedRange } from "../types/oppo
 import type { ExplanationNode } from "../types/analysis";
 import { estimateRange, type RangeEstimation } from "../opponents/rangeEstimator";
 import { buildInferredProfile } from "../opponents/behaviorInference";
+import { lookupEquityInterpolated } from "../gto/tables/equityLookup";
+import { categorizeHand } from "../gto/handCategorizer";
+
+/** Get hand category string for equity lookup */
+function heroStrengthCategory(heroCards: CardIndex[], communityCards: CardIndex[]): string {
+  if (heroCards.length < 2) return "air";
+  const cat = categorizeHand(heroCards, communityCards);
+  return cat.category;
+}
 import { equityVsRange } from "./opponentRead";
 import type { EquityResult } from "./monteCarlo";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
@@ -103,11 +112,17 @@ export function buildOpponentStory(
         isPaired: false, isTrips: false, hasConnectors: false, highCard: 12,
         flushPossible: false, straightHeavy: false, cardCount: 0, description: "preflop" } as BoardTexture);
 
-  // 3. Compute equity vs estimated range (skip in lite mode — Monte Carlo is expensive)
+  // 3. Compute equity vs estimated range
+  // Fast path: pre-computed lookup (Layer 8 — no MC for headless/Convex)
+  // Precision path: Monte Carlo (browser only, user-activated)
   let equityResult: EquityResult;
   if (skipEquity) {
-    equityResult = { win: 0.5, tie: 0, lose: 0.5, trials: 0, handDistribution: {} };
+    // Use pre-computed equity lookup tables (fast path)
+    const handCat = heroStrengthCategory(heroCards, communityCards);
+    const eqEst = lookupEquityInterpolated(handCat, rangeEst.rangePctOfAll);
+    equityResult = { win: eqEst.equity, tie: 0, lose: 1 - eqEst.equity, trials: 0, handDistribution: {} };
   } else if (heroCards.length === 2 && rangeEst.range.size > 0) {
+    // Precision path: full Monte Carlo (browser only)
     equityResult = equityVsRange(heroCards, communityCards, rangeEst.range, deadCards, 3000);
   } else {
     equityResult = { win: 0.5, tie: 0, lose: 0.5, trials: 0, handDistribution: {} };
