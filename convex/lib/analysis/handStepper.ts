@@ -16,6 +16,7 @@ import type { OpponentProfile } from "../types/opponents";
 import type { CardOverride } from "../state/gameState";
 import type { HandRecord } from "../audit/types";
 import { HandSession } from "../session/handSession";
+import { seededRandom } from "../primitives/deck";
 import { captureFullSnapshot, formatSnapshot, type FullSnapshot, type SnapshotOptions } from "./snapshot";
 import { currentLegalActions } from "../state/stateMachine";
 import { GTO_PROFILE } from "../opponents/presets";
@@ -34,10 +35,14 @@ export interface StepperConfig {
   heroCards?: [CardIndex, CardIndex];
   /** Community card overrides (deck stacking) */
   communityCards?: CardIndex[];
+  /** Profile for hero auto-play (default: GTO) */
+  heroProfile?: OpponentProfile;
   /** Profile for each villain seat */
   villainProfile?: OpponentProfile;
   /** Dealer seat (default 0). Hero position depends on heroSeat relative to dealer. */
   dealerSeat?: number;
+  /** Seed for deterministic play. If set, all RNG is reproducible. */
+  seed?: number;
   /** Enable debug data in snapshots */
   debug?: boolean;
 }
@@ -71,16 +76,24 @@ export interface HandResult {
 export class HandStepper {
   private session: HandSession;
   private profiles: Map<number, OpponentProfile>;
+  private heroProfile: OpponentProfile;
   private steps: StepResult[] = [];
   private heroActions: HandResult["heroActions"] = [];
   private decisionIndex = 0;
   private debugMode: boolean;
   private _heroCards: CardIndex[] = [];
+  private _random: () => number;
 
   constructor(config: StepperConfig = {}) {
     const numPlayers = config.numPlayers ?? 6;
     const heroSeat = config.heroSeat ?? 0;
     this.debugMode = config.debug ?? false;
+    this.heroProfile = config.heroProfile ?? GTO_PROFILE;
+
+    // Deterministic RNG: seeded if seed provided, Math.random otherwise
+    this._random = config.seed !== undefined
+      ? seededRandom(config.seed)
+      : Math.random;
 
     // Set up profiles for all villain seats
     this.profiles = new Map();
@@ -91,15 +104,17 @@ export class HandStepper {
       }
     }
 
-    // Create session
+    // Create session with same RNG
     this.session = new HandSession({
       numPlayers,
-      dealerSeatIndex: config.dealerSeat ?? 0, // fixed dealer; hero position varies with heroSeat
+      dealerSeatIndex: config.dealerSeat ?? 0,
       heroSeatIndex: heroSeat,
       blinds: { small: 0.5, big: 1 },
       startingStack: config.startingStack ?? 100,
       seatProfiles: this.profiles,
       verbose: false,
+      seed: config.seed,
+      random: this._random,
     });
   }
 
@@ -165,10 +180,10 @@ export class HandStepper {
     const decision = chooseActionFromProfile(
       state,
       this.session.heroSeatIndex,
-      GTO_PROFILE,
+      this.heroProfile,
       legal,
       () => undefined,
-      Math.random,
+      this._random,
       this.profiles,
     );
 
