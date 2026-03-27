@@ -261,8 +261,9 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 ✅ **IMPLEMENTED.** State machine models decision sequences. Each action produces consequences via `applyAction()`. `LegalActions` defines options at each point.
 
 ### Layer 2: The Funnel Property
-✅ **IMPLEMENTED (type).** `HandContext` (Phase 3) tracks the funnel across streets. `buildContextFromGameState()` reconstructs context from action history.
-⚠️ **PARTIAL (enforcement).** `constrainedDealer.ts` still uses `isReasonablePreflop()` hardcoded filter instead of the Phase 1 grid lookup. Villain hands in archetype drills are still random (not constrained to their preflop range). **→ Phase 6 needed.**
+✅ **IMPLEMENTED.** `HandContext` (Phase 3) tracks the funnel across streets. `buildContextFromGameState()` reconstructs context from action history.
+✅ **ENFORCED (hero).** `constrainedDealer.ts` uses position-aware PokerBench grid lookup (Phase 6). Hero hands must have >10% GTO raise frequency for their position.
+⚠️ **PARTIAL (villain).** Villain hands in archetype drills are still random (not constrained to their preflop range). Hero funnel is correct; villain funnel is approximate.
 
 ### Layer 3: Ranges, Not Hands
 ✅ **IMPLEMENTED.** `rangeEstimator.ts` narrows ranges action-by-action. `estimateRange()` produces `WeightedRange` with per-combo weights. `heroPerceivedRange.ts` shows hero's range from villain's perspective (Layer 3 thinking).
@@ -277,14 +278,15 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 
 **GTO Does Everything — Predictability:**
 ✅ **CONCEPTUALLY CORRECT.** Engine samples from frequency distributions — GTO profile uses identity modifier (pure frequencies), other profiles warp them.
-⚠️ **DATA QUALITY FLAG.** PokerBench preflop data has known issues: 67% low-sample cells, range sizes 9-16% above targets. Symmetric test shows GTO vs GTO = -75 BB/100 (should be ~0). **Preflop data needs tuning — the diagnostic tool (Phase 2) exists but the data isn't validated yet.**
+⚠️ **DATA QUALITY FLAG.** PokerBench preflop data has known issues: 67% low-sample cells, range sizes 9-16% above targets. However, GTO vs GTO converges to ~0 BB/100 over 20K hands (variance, not bias). Data is directionally correct but approximate.
 
 **The Small Sample Problem:**
 ✅ **TYPE EXISTS.** `PreflopConfidence` tracks sample counts and confidence levels.
 ⚠️ **NOT WIRED INTO COACHING.** `inferBehavior()` (Phase 5) computes confidence from action count, but coaching doesn't surface "confidence: 70% this is a real pattern" to the user yet. **→ Need to wire confidence into narrative.**
 
 **Exploitative Play as Threshold Testing:**
-⚠️ **NOT IMPLEMENTED.** Coaching shows GTO recommendation but does NOT show the 4-step framework: (1) baseline, (2) why deviate, (3) what response means, (4) when to stop. **→ Needs Phase 9b counter-strategy map to implement.**
+✅ **INFRASTRUCTURE BUILT.** `counterStrategyMap.ts` provides per-pattern adjustments with narratives. `buildExploitativeCoaching()` combines GTO baseline + exploit advice. `captureFullSnapshot()` computes counter-advice from opponent actions.
+⚠️ **NOT SURFACED IN UI.** The counter-advice data flows to the snapshot but the coaching panel doesn't display it yet. The 4-step framework (baseline → deviate → response → threshold) is in the data, not in the UI.
 
 ### Layer 6: Every Seat is a Player
 ✅ **IMPLEMENTED.** `HandStepper.autoAct()` runs hero as another profile-driven player. `batchRunner.ts` runs headless with any profile as hero. `heroProfile` config in StepperConfig.
@@ -296,15 +298,15 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 ⚠️ **PARTIAL (coaching lens).** `coachingLens.ts` still passes profile objects directly to `buildDecisionContext()` for running profile rows (TAG/LAG/NIT/FISH). The OPPONENT STORY is blind, but the PROFILE ROWS still use assigned profiles. This is architecturally acceptable — the profile rows show "what would TAG do?" which requires knowing the TAG profile. The opponent story (the coaching voice) is blind. **→ Acceptable for now.**
 
 ### Layer 8: Computation Strategy
-✅ **FAST PATH.** Preflop: PokerBench per-hand-class data (Phase 1a). Postflop: TexasSolver tables (193 boards). Headless runs ~1000 hands/second with zero Monte Carlo.
-⚠️ **EQUITY TABLES NOT BUILT.** Phase 4 (pre-computed equity lookup tables) is not implemented. Opponent stories still use Monte Carlo (3,000 trials) in the browser. Headless mode skips equity via `skipEquity=true`. **→ Phase 4 needed for Convex deployment.**
-✅ **PRECISION PATH.** Monte Carlo available in browser for user-activated deep analysis. `skipEquity` flag controls fast vs precise path.
+✅ **FAST PATH.** Preflop: PokerBench per-hand-class data. Postflop: TexasSolver tables (193 boards). Equity: `equityLookup.ts` (14 categories × 4 range widths, interpolated). Headless runs ~1000 hands/second with zero Monte Carlo.
+✅ **EQUITY WIRED.** `opponentStory.ts` uses `lookupEquityInterpolated()` on fast path (skipEquity=true). Produces real equity estimates without MC.
+✅ **PRECISION PATH.** Monte Carlo available in browser for user-activated deep analysis (skipEquity=false).
 
 ### Layer 9: Statistical Validation — The Payoff Matrix
-✅ **INFRASTRUCTURE EXISTS.** `batchRunner.ts` runs deterministic matchups. `symmetricValidation.test.ts` tests GTO vs GTO and profile ordering.
-⚠️ **RESULTS SHOW BIAS.** GTO vs GTO = -75 BB/100 (should be ~0). NIT beats GTO (+12.4 BB/100, should lose). The diagnostic tool works — it correctly identifies the system is not calibrated. **→ Need to tune until symmetric test passes.**
-⚠️ **FULL MATRIX NOT RUN.** Only GTO vs individual profiles tested. Full K×K matrix with all 10 matchups not yet generated. **→ Phase 9a needed.**
-⚠️ **CONFIDENCE MODEL NOT BUILT.** No statistical model for "N observations → Y% confidence pattern is real." **→ Phase 9a needed.**
+✅ **SYMMETRIC TEST PASSES.** GTO vs GTO = +4.38 BB/100 over 20K hands (converges to ~0). System is fair.
+✅ **FULL MATRIX RUNS.** `payoffMatrix.ts` generates K×K matrix. 4-profile matrix (GTO/TAG/NIT/FISH) runs in ~4 seconds. GTO is best overall (+0.00 avg).
+✅ **CONFIDENCE MODEL BUILT.** `computeBehaviorConfidence()`: Bayesian inference from N observations × deviation. `confidenceLabel()`: "speculative" → "very high".
+⚠️ **NOT TUNED.** TAG modifier produces -30.93 BB/100 avg (should be closer to 0). Profile modifier values need adjustment using the payoff matrix as the diagnostic. The TOOL for tuning exists; the tuning loop hasn't been run.
 
 ### Layer 10: The Meta-Game — Emergent Knowledge Base
 ⚠️ **NOT IMPLEMENTED.** No counter-strategy map, no recursive matrix testing, no empirically-derived coaching adjustments. **→ Phase 9a + 9b needed. Requires calibrated symmetric test first.**
@@ -331,19 +333,27 @@ First Principles:
 
 ## Holes — Ordered by Priority
 
-1. ~~**GTO vs GTO bias (-75 BB/100)**~~ **RESOLVED.** The -75 was a single-seed variance artifact. 10 runs × 2000 hands (20K total) averages +4.38 BB/100 — converging to 0. Per-run range: -51.7 to +55.9 (normal poker variance). The system is fair. **No longer a blocker.**
+1. ~~**GTO vs GTO bias**~~ **RESOLVED.** Converges to ~0 over 20K hands.
+2. ~~**Equity tables**~~ **RESOLVED.** `equityLookup.ts` wired into `opponentStory.ts`.
+3. ~~**Constrained dealer**~~ **RESOLVED (hero).** Position-aware filter. Villain hands still random.
+4. ~~**Cross-street scoring**~~ **RESOLVED (types).** `conditionalVerdict` + `preflopContribution` fields exist.
+5. ~~**Exploitative coaching infrastructure**~~ **RESOLVED.** `counterStrategyMap.ts` built and wired into snapshot.
+6. ~~**Confidence model**~~ **RESOLVED.** `computeBehaviorConfidence()` + `confidenceLabel()` built.
+7. ~~**Full payoff matrix**~~ **RESOLVED.** `payoffMatrix.ts` generates K×K matrix in ~4 seconds.
 
-2. **Equity tables not built (Layer 8)** — Monte Carlo still runs in browser for opponent stories. Need pre-computed category-based equity lookup for Convex/headless. **BLOCKER for serverless deployment.**
+### Remaining Holes
 
-3. **Constrained dealer not upgraded (Layer 2)** — Villain hands in archetype drills are random, not constrained to preflop range. `isReasonablePreflop()` still hardcoded. **Quality issue for archetype mode.**
+1. **Profile modifier tuning** — TAG loses -30.93 BB/100 avg in the matrix (should be near 0). The tuning infrastructure exists (batch runner + payoff matrix) but the tuning loop hasn't been run. **Next priority.**
 
-4. **Cross-street scoring not built (Layer 2)** — No `conditionalVerdict` or `preflopContribution`. Can't express "flop was correct given you're here, but preflop was -EV." **Teaching quality issue.**
+2. **Counter-strategy not surfaced in UI** — `counterAdvice` data flows to the snapshot but the coaching panel doesn't display it. The narrative text exists; the UI rendering doesn't. **UI wiring needed.**
 
-5. **Exploitative coaching not built (Layer 5)** — Coaching shows GTO but not the 4-step threshold testing framework. Needs counter-strategy map from Phase 9b. **Core teaching feature missing.**
+3. **Confidence not surfaced in coaching narrative** — `inferBehavior()` produces confidence but the commentator doesn't say "75% confident this is a NIT." **Narrative enhancement needed.**
 
-6. **Confidence not surfaced (Layer 5)** — `inferBehavior()` computes confidence but coaching doesn't display "75% confident this is a NIT." **Read quality issue.**
+4. **Cross-street scoring not populated** — The `conditionalVerdict` and `preflopContribution` fields exist on `ActionScore` but are never set. Need `HandContext.heroPreflopFrequency` to flow into `scoreAction()`. **Wiring needed.**
 
-7. **Full payoff matrix not generated (Layer 9)** — Only individual matchups tested. Need full K×K matrix for counter-strategy discovery. **Research capability missing.**
+5. **Villain hands not constrained in archetype mode** — Hero hands are position-aware but villain hands are still random. **Quality enhancement.**
 
-8. **Adaptive villains not implemented (Layer 6)** — Villains don't adjust to hero's play over a session. **Realism/fun issue.**
+6. **HandContext not populated in HandSession.act()** — The type and pipeline exist but `HandSession` doesn't build/update `HandContext` during live play. **Wiring needed.**
+
+7. **Adaptive villains** — Villains don't adjust to hero's behavior over a session. **Future enhancement.**
 ```
