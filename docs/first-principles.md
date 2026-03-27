@@ -343,7 +343,7 @@ First Principles:
 
 ### Remaining Holes
 
-1. **Profile modifier tuning** — TAG loses -30.93 BB/100 avg in the matrix (should be near 0). The tuning infrastructure exists (batch runner + payoff matrix) but the tuning loop hasn't been run. **Next priority.**
+1. **Facing-bet solver data gap** — LAG beats GTO (+25.5 BB/100) because solver data doesn't distinguish "first to act" from "facing a bet." The check frequency (70-90%) gets split into fold/call at a hand-strength threshold, which always rewards aggression. Profile modifiers have been tuned (LAG reduced from +53 to +25), but the structural fix requires generating separate solver trees for facing-bet decisions using TexasSolver + RTX 3090. **NEXT PRIORITY — blocks correct profile ordering.**
 
 2. **Counter-strategy not surfaced in UI** — `counterAdvice` data flows to the snapshot but the coaching panel doesn't display it. The narrative text exists; the UI rendering doesn't. **UI wiring needed.**
 
