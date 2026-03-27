@@ -19,6 +19,8 @@ import type { HandCategorization } from "../gto/handCategorizer";
 import type { ArchetypeClassification } from "../gto/archetypeClassifier";
 import type { OpponentStory } from "./opponentStory";
 import type { ActionStory } from "../gto/actionNarratives";
+import type { InferredBehavior } from "../opponents/behaviorInference";
+import type { CounterAdvice } from "../pipeline/counterStrategyMap";
 import { cardToDisplay } from "../primitives/card";
 import { positionDisplayName } from "../primitives/position";
 
@@ -60,6 +62,10 @@ export interface CommentaryInput {
   gtoFrequencies?: ActionFrequencies;
   /** GTO optimal action */
   gtoOptimalAction?: string;
+  /** Counter-strategy advice (Layer 10) */
+  counterAdvice?: CounterAdvice;
+  /** Inferred opponent behavior (Layer 7) */
+  inferredBehavior?: InferredBehavior;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -70,6 +76,7 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
   const {
     heroCards, communityCards, gameState, heroSeat, legal,
     handCat, archetype, opponentStories, actionStories, gtoFrequencies, gtoOptimalAction,
+    counterAdvice, inferredBehavior,
   } = input;
 
   const street = gameState.currentStreet;
@@ -97,7 +104,7 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
 
   // ── Part 2: Opponent Stories ──
   if (opponentStories && opponentStories.length > 0) {
-    parts.push(buildOpponentSection(opponentStories, activeOpponents, gameState));
+    parts.push(buildOpponentSection(opponentStories, activeOpponents, gameState, inferredBehavior));
   } else if (activeOpponents.length > 0) {
     parts.push(buildBasicOpponentSection(activeOpponents, gameState));
   }
@@ -111,7 +118,7 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
   // ── Part 4: Recommendation ──
   const { recommendation, confidence, recommendedAction } = buildRecommendation(
     handCat, opponentStories, actionStories, gtoFrequencies, gtoOptimalAction,
-    legal, street,
+    legal, street, counterAdvice,
   );
   parts.push(recommendation);
 
@@ -196,6 +203,7 @@ function buildOpponentSection(
   stories: OpponentStory[],
   activeOpponents: GameState["players"],
   state: GameState,
+  inferredBehavior?: InferredBehavior,
 ): string {
   if (stories.length === 0) return "";
 
@@ -215,6 +223,13 @@ function buildOpponentSection(
       `Their story: ${rangeLabel} range (~${story.data.rangePercent.toFixed(0)}% of hands). ` +
       `${lastNarrative.interpretation}`,
     );
+  }
+
+  // Hole 3: Surface inferred behavior pattern with confidence
+  if (inferredBehavior && inferredBehavior.pattern !== "unknown" && inferredBehavior.confidence > 0) {
+    const confPct = (inferredBehavior.confidence * 100).toFixed(0);
+    const patternLabel = inferredBehavior.pattern.replace("-", "-");
+    parts.push(`Villain appears to be playing ${patternLabel} (confidence: ${confPct}%).`);
   }
 
   return parts.join(" ");
@@ -292,6 +307,7 @@ function buildRecommendation(
   gtoOptimalAction: string | undefined,
   legal: LegalActions,
   street: Street,
+  counterAdvice?: CounterAdvice,
 ): { recommendation: string; confidence: HandCommentary["confidence"]; recommendedAction: ActionType | null } {
   // Determine the recommended action from GTO or opponent story
   let recommendedAction: ActionType | null = null;
@@ -356,6 +372,11 @@ function buildRecommendation(
     recommendation = `${recommendedAction === "bet" ? "Bet" : "Raise"}. ${reason}${gtoConfirmation}`;
   } else {
     recommendation = `This is a close spot.${gtoConfirmation}`;
+  }
+
+  // Hole 2: Append counter-strategy advice when confidence > 50%
+  if (counterAdvice && counterAdvice.confidence > 0.5) {
+    recommendation += ` ${counterAdvice.narrative}`;
   }
 
   return { recommendation, confidence, recommendedAction };

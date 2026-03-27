@@ -8,7 +8,7 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { CardIndex, Position } from "../types/cards";
-import type { CardOverride } from "../state/gameState";
+import type { CardOverride, CardVisibility } from "../state/gameState";
 import { createShuffledDeck, deal } from "../primitives/deck";
 import { categorizeHand, type HandCategorization, type HandCategory } from "./handCategorizer";
 import {
@@ -318,6 +318,12 @@ function dealFlopTexture(
   // Deal hero hand with prototype-aware retry
   const isIP = heroPosition === "btn" || heroPosition === "co";
 
+  // Determine primary villain seat and position for preflop filtering
+  const villainSeatIndex = heroSeatIndex === 0 ? 1 : 0;
+  const allPositions = positionsForTableSize(numPlayers);
+  const villainOffset = (villainSeatIndex - dealerSeatIndex + numPlayers) % numPlayers;
+  const villainPosition = allPositions[villainOffset];
+
   // Phase 1: Try for both reasonable preflop AND matching category (50 attempts)
   let bestFallback: { heroCards: CardIndex[]; handCategory: HandCategorization } | null = null;
   for (let i = 0; i < 50; i++) {
@@ -335,19 +341,27 @@ function dealFlopTexture(
     // Filter: must match allowed categories (if any)
     if (allowedCategories && !allowedCategories.includes(handCategory.category)) continue;
 
+    const villainOverride = dealReasonableVillainHand(
+      [...flop, ...heroCards], villainSeatIndex, villainPosition,
+    );
     return buildDeal({
       heroSeatIndex, dealerSeatIndex, heroCards,
       communityCards: flop, numPlayers, archetypeId,
       handCategory, isInPosition: isIP,
+      villainCardOverrides: villainOverride ? [villainOverride] : undefined,
     });
   }
 
   // Phase 2: Fallback — use best reasonable hand (category may not match)
   if (bestFallback) {
+    const villainOverride = dealReasonableVillainHand(
+      [...flop, ...bestFallback.heroCards], villainSeatIndex, villainPosition,
+    );
     return buildDeal({
       heroSeatIndex, dealerSeatIndex, heroCards: bestFallback.heroCards,
       communityCards: flop, numPlayers, archetypeId,
       handCategory: bestFallback.handCategory, isInPosition: isIP,
+      villainCardOverrides: villainOverride ? [villainOverride] : undefined,
     });
   }
 
@@ -461,6 +475,12 @@ function dealPostflopPrinciple(
 
   const isIP = heroPosition === "btn" || heroPosition === "co";
 
+  // Determine primary villain seat and position for preflop filtering
+  const villainSeatIndex = heroSeatIndex === 0 ? 1 : 0;
+  const allPositions = positionsForTableSize(numPlayers);
+  const villainOffset = (villainSeatIndex - dealerSeatIndex + numPlayers) % numPlayers;
+  const villainPosition = allPositions[villainOffset];
+
   // Retry loop: generate board + hero hand matching prototype constraints
   let bestFallback: {
     heroCards: CardIndex[]; communityCards: CardIndex[];
@@ -497,20 +517,28 @@ function dealPostflopPrinciple(
     // Must match allowed categories
     if (allowedCategories && !allowedCategories.includes(handCategory.category)) continue;
 
+    const villainOverride = dealReasonableVillainHand(
+      [...communityCards, ...heroCards], villainSeatIndex, villainPosition,
+    );
     return buildDeal({
       heroSeatIndex, dealerSeatIndex, heroCards,
       communityCards, numPlayers, archetypeId,
       handCategory, isInPosition: isIP, textureArchetypeId,
+      villainCardOverrides: villainOverride ? [villainOverride] : undefined,
     });
   }
 
   // Fallback: use best reasonable hand found (category may not match prototype)
   if (bestFallback) {
+    const villainOverride = dealReasonableVillainHand(
+      [...bestFallback.communityCards, ...bestFallback.heroCards], villainSeatIndex, villainPosition,
+    );
     return buildDeal({
       heroSeatIndex, dealerSeatIndex, heroCards: bestFallback.heroCards,
       communityCards: bestFallback.communityCards, numPlayers, archetypeId,
       handCategory: bestFallback.handCategory, isInPosition: isIP,
       textureArchetypeId: bestFallback.textureId,
+      villainCardOverrides: villainOverride ? [villainOverride] : undefined,
     });
   }
 
@@ -566,6 +594,40 @@ function getCommunityCountForPrinciple(archetypeId: ArchetypeId): number {
 // HELPERS
 // ═══════════════════════════════════════════════════════
 
+/**
+ * Deal a reasonable villain hand for the primary villain seat.
+ * Best-effort: tries up to 10 times, returns undefined if no match.
+ * The villain seat is the first non-hero seat (seat 1 when hero is seat 0).
+ *
+ * Uses a derived RNG seeded from the excluded cards (deterministic per-deal)
+ * to avoid disrupting the caller's RNG sequence for subsequent deals.
+ */
+function dealReasonableVillainHand(
+  excludedCards: CardIndex[],
+  villainSeatIndex: number,
+  villainPosition: Position | undefined,
+): CardOverride | undefined {
+  // Derive a deterministic seed from the dealt cards (no main RNG consumption)
+  let s = excludedCards.reduce((acc, c) => (acc * 31 + c) | 0, 12345) & 0x7fffffff;
+  const villainRng = () => {
+    s = (s * 1664525 + 1013904223) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+
+  for (let i = 0; i < 10; i++) {
+    const deck = createShuffledDeck(excludedCards, villainRng);
+    const villainCards = deal(deck, 2);
+    if (isReasonablePreflop(villainCards, villainPosition)) {
+      return {
+        seatIndex: villainSeatIndex,
+        cards: [...villainCards],
+        visibility: "hidden" as CardVisibility,
+      };
+    }
+  }
+  return undefined;
+}
+
 /** Map postflop principle archetypes to the street they need solver data for */
 const POSTFLOP_PRINCIPLE_STREET: Partial<Record<ArchetypeId, "flop" | "turn" | "river">> = {
   cbet_sizing_frequency: "flop",
@@ -613,6 +675,7 @@ function buildDeal(params: {
   handCategory: HandCategorization;
   isInPosition: boolean;
   textureArchetypeId?: ArchetypeId;
+  villainCardOverrides?: CardOverride[];
 }): ConstrainedDeal {
   const { archetypeId, heroSeatIndex, dealerSeatIndex, numPlayers, heroCards, textureArchetypeId } = params;
   // Derive hero's position from seat indices
@@ -632,10 +695,13 @@ function buildDeal(params: {
       textureArchetypeId,
     },
     hasFrequencyData: archetypeHasData(archetypeId, category),
-    cardOverrides: [{
-      seatIndex: heroSeatIndex,
-      cards: [...heroCards],
-      visibility: "revealed" as const,
-    }],
+    cardOverrides: [
+      {
+        seatIndex: heroSeatIndex,
+        cards: [...heroCards],
+        visibility: "revealed" as const,
+      },
+      ...(params.villainCardOverrides ?? []),
+    ],
   };
 }

@@ -29,6 +29,12 @@ import {
 } from "../opponents/autoPlay";
 import { PRESET_PROFILES, PRESET_IDS } from "../opponents/presets";
 import { HandRecorder } from "../audit/handRecorder";
+import {
+  buildInitialContext,
+  updateContextAfterHeroAction,
+  updateContextAfterVillainAction,
+} from "../pipeline/handPipeline";
+import type { HandContext } from "../pipeline/handContext";
 
 // ═══════════════════════════════════════════════════════
 // HAND SESSION
@@ -53,6 +59,7 @@ export class HandSession {
   private _recorder: HandRecorder | null = null;
   private _lastRecordedStreet: Street | null = null;
   private _handHistory: HandRecord[] = [];
+  private _handContext: HandContext | null = null;
 
   // ── Callbacks ──
   private callbacks: HandSessionCallbacks;
@@ -116,6 +123,10 @@ export class HandSession {
 
   get recorder(): HandRecorder | null {
     return this._recorder;
+  }
+
+  get handContext(): HandContext | null {
+    return this._handContext;
   }
 
   // ═══════════════════════════════════════════════════════
@@ -211,6 +222,11 @@ export class HandSession {
       }
     }
 
+    // Build initial HandContext (funnel tracking)
+    const heroPlayer = s.players.find(p => p.seatIndex === this._heroSeatIndex);
+    const heroCards = heroPlayer?.holeCards ?? [];
+    this._handContext = buildInitialContext(s, this._heroSeatIndex, heroCards);
+
     // Initialize audit recorder
     const seatSetup: SeatSetupEntry[] = s.players.map((p) => {
       const prof = this._seatProfiles.get(p.seatIndex);
@@ -280,6 +296,16 @@ export class HandSession {
         this._recorder.recordEvent(lastAction, state.pot.total, "manual", undefined, coachingSnapshot, scoreSnapshot);
       }
 
+      // Update HandContext with hero action
+      if (this._handContext && lastAction) {
+        this._handContext = updateContextAfterHeroAction(
+          this._handContext,
+          lastAction.street as Street,
+          { street: lastAction.street as Street, actionType: lastAction.actionType, amount: lastAction.amount },
+          0, // GTO frequency unknown at this point
+        );
+      }
+
       // Detect street change after hero action
       this.detectAndRecordStreetChange(prevStreet, state);
 
@@ -344,6 +370,7 @@ export class HandSession {
   resetHand(): void {
     this._gameState = null;
     this._lastDecisions = new Map();
+    this._handContext = null;
     this.callbacks.onStateChange?.();
   }
 
@@ -568,6 +595,19 @@ export class HandSession {
           );
         }
 
+        // Update HandContext with villain action
+        if (this._handContext && lastAction) {
+          const villainIdx = activePlayer.seatIndex < this._heroSeatIndex
+            ? activePlayer.seatIndex
+            : activePlayer.seatIndex - 1;
+          this._handContext = updateContextAfterVillainAction(
+            this._handContext,
+            villainIdx,
+            activePlayer.position,
+            { street: lastAction.street as Street, actionType: lastAction.actionType, amount: lastAction.amount },
+          );
+        }
+
         // Detect street change
         if (s.currentStreet !== prevStreet && this._recorder) {
           this._recorder.recordStreetChange(
@@ -611,6 +651,10 @@ export class HandSession {
       this._recorder
     ) {
       const record = this._recorder.finalize(state);
+      // Attach HandContext to the record for cross-street scoring
+      if (this._handContext) {
+        record.handContext = this._handContext;
+      }
       this._handHistory = [...this._handHistory, record];
       this.callbacks.onHandComplete?.(record);
     }

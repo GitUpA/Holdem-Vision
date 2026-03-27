@@ -307,6 +307,41 @@ function sumAggressiveFrequencies(freq: ActionFrequencies): number {
 }
 
 // ═══════════════════════════════════════════════════════
+// CROSS-STREET ENRICHMENT
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Enrich an ActionScore with cross-street context fields.
+ *
+ * Pure function — no side effects. Call when you have both a score
+ * and a HandContext (e.g., from the drill pipeline or coaching lens).
+ */
+export function enrichScoreWithContext(
+  score: ActionScore,
+  handContext: { heroPreflopFrequency: number; heroInRange: boolean },
+): ActionScore {
+  // conditionalVerdict: the action IS correct given you're in this spot
+  const conditionalVerdict = score.verdict;
+
+  // preflopContribution: negative if hero entered with a hand GTO folds 90%+
+  // heroPreflopFrequency is the GTO raise frequency for hero's hand/position
+  // If GTO raises < 10% (i.e., folds 90%+), the preflop entry was -EV
+  const preflopContribution = handContext.heroPreflopFrequency < 0.10
+    ? -(1 - handContext.heroPreflopFrequency) * 0.5 // scaled penalty
+    : 0;
+
+  // cumulativeEVLoss: this street's loss + preflop contribution
+  const cumulativeEVLoss = score.evLoss + Math.abs(preflopContribution);
+
+  return {
+    ...score,
+    conditionalVerdict,
+    preflopContribution,
+    cumulativeEVLoss,
+  };
+}
+
+// ═══════════════════════════════════════════════════════
 // ACTION NORMALIZATION
 // ═══════════════════════════════════════════════════════
 

@@ -302,6 +302,8 @@ export function captureFullSnapshot(
 
   // ── Counter-strategy advice (Layer 10) ──
   let counterAdviceResult: FullSnapshot["counterAdvice"] = null;
+  let inferredBehaviorResult: import("../opponents/behaviorInference").InferredBehavior | undefined;
+  let counterAdviceForCommentary: import("../pipeline/counterStrategyMap").CounterAdvice | undefined;
   if (rawOpponentStories.length > 0) {
     // Collect all opponent actions for behavior inference
     const allOppActions = activeOpponents.flatMap(opp =>
@@ -311,10 +313,12 @@ export function captureFullSnapshot(
     );
     if (allOppActions.length > 0) {
       const inferred = inferBehavior(allOppActions);
+      inferredBehaviorResult = inferred;
       const gtoFoldRate = 0.5; // GTO baseline fold rate (approximate)
       const actualFoldRate = allOppActions.filter(a => a.actionType === "fold").length / allOppActions.length;
       const deviation = Math.abs(actualFoldRate - gtoFoldRate);
       const advice = getCounterAdvice(inferred.pattern, allOppActions.length, deviation);
+      counterAdviceForCommentary = advice;
       if (advice.confidence > 0.2) {
         counterAdviceResult = {
           pattern: advice.pattern,
@@ -346,6 +350,8 @@ export function captureFullSnapshot(
         actionStories: rawActionStories.length > 0 ? rawActionStories : undefined,
         gtoFrequencies: gtoLookup?.frequencies,
         gtoOptimalAction: gtoOptimalAction ?? undefined,
+        counterAdvice: counterAdviceForCommentary,
+        inferredBehavior: inferredBehaviorResult,
       });
       commentary = {
         narrative: result.narrative,
