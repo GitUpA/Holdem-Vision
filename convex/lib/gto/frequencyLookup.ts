@@ -109,27 +109,36 @@ export function lookupGtoFrequencies(
     const position = gameState.players[heroSeat].position;
     const handCat = categorizeHand(heroCards, communityCards);
 
-    // ── Primary: PokerBench per-hand-class data (solver-derived, position-aware) ──
     const openerPos = findPreflopOpener(gameState, heroSeat);
-    const hcLookup = lookupPreflopHandClass(
-      archetype.archetypeId,
-      position,
-      handClass,
-      openerPos,
-    );
 
-    if (hcLookup) {
-      return {
-        frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
-        source: "preflop-handclass",
-        archetype,
-        handCat,
-        preflopConfidence: getPreflopConfidence(hcLookup),
-        isExactMatch: true,
-      };
+    // ── For 3-bet and 4-bet pots, use validated ranges (PokerBench data conflates perspectives) ──
+    // PokerBench 3-bet data shows KK call 81% which is wrong — KK 3-bets nearly always.
+    // The validated ranges in preflopRanges.ts are correct for these archetypes.
+    const useValidatedRanges = archetype.archetypeId === "three_bet_pots"
+      || archetype.archetypeId === "four_bet_five_bet";
+
+    if (!useValidatedRanges) {
+      // ── Primary: PokerBench per-hand-class data (solver-derived, position-aware) ──
+      const hcLookup = lookupPreflopHandClass(
+        archetype.archetypeId,
+        position,
+        handClass,
+        openerPos,
+      );
+
+      if (hcLookup) {
+        return {
+          frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
+          source: "preflop-handclass",
+          archetype,
+          handCat,
+          preflopConfidence: getPreflopConfidence(hcLookup),
+          isExactMatch: true,
+        };
+      }
     }
 
-    // ── Fallback: validated GTO ranges for hands missing from PokerBench data ──
+    // ── Validated GTO ranges (primary for 3-bet/4-bet, fallback for others) ──
     let fallbackFreqs: { fold: number; call: number; raise: number } | null = null;
     switch (archetype.archetypeId) {
       case "rfi_opening":
