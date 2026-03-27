@@ -64,6 +64,26 @@ One engine handles all profiles. The modifier vector is the only variable:
 - Every dimension is tunable
 - Profiles compose ("NIT but calls more on rivers")
 
+### GTO Does Everything — The Difference is Consistency
+
+GTO is not a style that avoids certain actions. **GTO does everything** — raises, folds, bluffs, traps, check-raises. The difference between GTO and other profiles is not WHAT they do but HOW PREDICTABLY they do it:
+
+- GTO raises this hand 30% of the time — **randomly**, so opponents can't predict when
+- NIT raises this hand 5% of the time — **only with premiums**, predictable
+- LAG raises this hand 70% of the time — **too often**, predictable
+
+When GTO raises, the opponent can't distinguish the 30% value from the 30% bluff. When NIT raises, the opponent KNOWS it's value. **That predictability is the exploit.**
+
+Profiles aren't "bad players who can't play GTO." They're players whose deviations from GTO are **consistent and predictable**. A fish doesn't call because they're stupid — they call because they consistently overvalue their hand. That consistency is what makes them exploitable. GTO is unexploitable because its deviations are **randomized**.
+
+### The Small Sample Problem
+
+GTO is unexploitable over infinite hands. In a REAL SESSION (100-200 hands), patterns emerge that aren't real — they're variance. A GTO player might fold 5 times in a row (just bad cards). An observant opponent thinks "they're tight" and starts bluffing.
+
+**The real skill:** distinguishing a real pattern from variance. "V3 folded 5 times. Is that because they're a NIT (consistent deviation) or because they had 72o five times (variance)?"
+
+The payoff matrix provides the statistical foundation: "After N observations of behavior X, there's Y% confidence it's a real deviation from GTO." The coaching uses this: "V3 has folded 8 of 10 hands. Confidence: 75% that they're tighter than GTO. If this pattern holds, increase bluff frequency. But stay close to GTO as your baseline — if you're wrong about the read, GTO protects you."
+
 ### Exploitative Play as Threshold Testing
 
 Exploitative play is not "do the opposite of GTO." It's **testing the story**:
@@ -146,32 +166,48 @@ Pre-compute at build time → ship as static data → runtime is pure lookups.
 
 ## Layer 9: Statistical Validation — The Payoff Matrix
 
-### Symmetric Validation (null hypothesis)
+### Test 1: Symmetric Validation (null hypothesis)
 
-All 6 seats run identical GTO profiles. Over N hands, each seat should win ~1/6 of total chips. Deviation = system bug. This proves **fairness**.
+GTO vs GTO heads-up. Over N hands, each seat should win ~50% of total chips. Deviation = system bug (position bias, dealing bias, engine asymmetry). This proves **fairness**. Also run 6-way all-GTO to confirm each seat wins ~1/6.
 
-### Profile Strength Ranking
+### Test 2: GTO is Unexploitable (baseline)
 
-Replace one seat with a different profile, keep 5 as GTO:
-- GTO vs 5 GTOs → ~1/6 (no edge against itself)
-- TAG vs 5 GTOs → above 1/6 (exploits GTO's balance)
-- NIT vs 5 GTOs → below 1/6 (bleeds blinds)
-- FISH vs 5 GTOs → well below 1/6 (calls too much)
+Each profile vs GTO heads-up:
+- GTO vs GTO → 50/50 (no edge against itself)
+- TAG vs GTO → slightly below 50% (tight preflop = misses thin value spots)
+- LAG vs GTO → slightly below 50% (loose preflop = enters -EV pots)
+- NIT vs GTO → well below 50% (bleeds blinds by folding too much)
+- FISH vs GTO → well below 50% (calls too much, loses to value)
 
-### Full Interaction Matrix
+**Critical insight:** If GTO is truly optimal, NOTHING beats it. Every deviation from GTO is -EV against GTO. TAG doesn't beat GTO — TAG beats OTHER non-GTO profiles. This is the definition of game-theoretic optimality.
 
-K profiles → K×K payoff matrix (zero-sum). For 5 profiles: 15 unique matchups. ~10,000 hands each for significance. ~30 minutes headless for the full matrix.
+Heads-up is the cleanest test — no third-party noise. The win rate delta is mathematically equivalent to multi-way, just easier to measure.
+
+### Test 3: Profile vs Profile (the interesting part)
+
+K profiles → K×K payoff matrix heads-up. For 5 profiles: 10 unique matchups (symmetric pairs).
+
+This is where profiles show their strengths:
+- TAG vs NIT → TAG wins (punishes excessive folding)
+- TAG vs FISH → TAG wins big (value bets get called by worse)
+- LAG vs NIT → LAG wins (aggression exploits passivity)
+- LAG vs TAG → TAG wins (selective aggression beats reckless aggression)
+- FISH vs NIT → FISH may win (FISH's calling keeps NIT's bluffs honest)
+
+~10,000 hands per matchup for significance. ~30 minutes headless for the full matrix.
 
 ### What the Matrix Reveals
 
 The payoff matrix doesn't just validate — it **discovers optimal counter-strategies**.
 
-For each observed behavior pattern, the matrix shows which modifier vector wins the most against it. This is computable:
+For each observed behavior pattern, the matrix shows which modifier vector wins the most against it:
 
 1. Run profile A against all others → find A's weaknesses
 2. Generate counter-profiles that exploit A's weaknesses
 3. Run the counter-profiles against A → find the optimal counter
 4. The optimal counter IS the coaching recommendation
+
+The counter-strategy beats the opponent but is itself beatable by GTO. This is the fundamental triangle: **GTO can't be beaten, deviations can be exploited, but exploits are themselves exploitable.** The skill is reading which level to play at.
 
 ## Layer 10: The Meta-Game — Emergent Knowledge Base
 
@@ -186,10 +222,14 @@ The payoff matrix is a validation tool. But its higher purpose is **knowledge ge
 **Step 3: Map.** Run full K×K matrix. For each profile pair, record the win rate delta. This produces a **counter-strategy map**:
 
 ```
-If opponent behaves like NIT → optimal counter: increase bluff frequency +30%
-If opponent behaves like FISH → optimal counter: value bet thinner, never bluff
-If opponent behaves like LAG → optimal counter: tighten up, trap with strong hands
-If opponent behaves like TAG → optimal counter: mixed strategy (close to GTO)
+If opponent behaves like NIT → counter: bluff more (they fold too much)
+If opponent behaves like FISH → counter: value bet thinner, never bluff (they call too much)
+If opponent behaves like LAG → counter: tighten up, trap with strong hands (let them hang themselves)
+If opponent behaves like TAG → counter: play close to GTO (no easy exploits)
+
+But: each counter is itself exploitable. The NIT-counter (bluff heavy) loses to a FISH.
+The skill is reading which level the opponent is on and choosing the right counter.
+GTO is the safe fallback when you can't read the opponent.
 ```
 
 **Step 4: Discover.** The counter-strategies are themselves profiles (modifier vectors). Run THEM against the matrix. Do they create new vulnerabilities? What beats the NIT-counter? This recursive process converges to a **meta-GTO** — the strategy that accounts for opponent adaptation.
@@ -222,11 +262,15 @@ First Principles:
 ├── Poker is a funnel (each street filters ranges)
 ├── Two ranges always matter (hero's and villain's)
 ├── GTO is the unexploitable baseline (defense)
-├── Profiles are GTO deviations (modifier vectors)
+├── GTO does everything — the difference is predictability
+├── Profiles are consistent deviations from GTO (exploitable patterns)
 ├── Exploitative play tests thresholds (offense)
+├── The skill: distinguishing real patterns from variance
 ├── Every seat is a player (hero = pause for human)
-├── Coach is blind to setup (reads behavior)
+├── Coach is blind to setup (reads behavior, teaches thinking)
 ├── Pre-compute everything (fast path + optional precision)
 ├── Payoff matrix validates and discovers (statistical testing)
-└── Meta-GTO emerges (counter-strategy knowledge base)
+├── Counter-strategies beat deviations but are themselves beatable
+├── GTO is the safe fallback when you can't read the level
+└── Meta-GTO emerges (counter-strategy knowledge base from data)
 ```
