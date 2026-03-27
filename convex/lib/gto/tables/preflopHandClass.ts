@@ -52,8 +52,9 @@ export interface PreflopHandClassTable {
 
 const registry = new Map<string, PreflopHandClassTable>();
 
-/** Minimum observations required to trust a hand class frequency. */
-const MIN_SAMPLE_THRESHOLD = 3;
+/** Minimum observations to include data (even n=1 gives directional signal).
+ *  Confidence metadata (getPreflopConfidence) communicates reliability to consumers. */
+const MIN_SAMPLE_THRESHOLD = 1;
 
 /** Register a preflop hand class table. */
 export function registerPreflopHandClassTable(table: PreflopHandClassTable): void {
