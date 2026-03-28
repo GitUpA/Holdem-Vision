@@ -111,24 +111,29 @@ export function lookupGtoFrequencies(
 
     const openerPos = findPreflopOpener(gameState, heroSeat);
 
-    // ── For 3-bet, 4-bet, and BvB, use validated ranges (PokerBench data conflates perspectives) ──
-    // PokerBench shows premiums calling 70-95% in spots where they should raise.
-    // The data conflates "facing a raise" with "facing a 3-bet" perspective.
-    // Validated ranges in preflopRanges.ts are correct for these archetypes.
-    const useValidatedRanges = archetype.archetypeId === "three_bet_pots"
-      || archetype.archetypeId === "four_bet_five_bet"
-      || archetype.archetypeId === "blind_vs_blind";
+    // ── PokerBench label swap ──
+    // PokerBench "three_bet_pots" = hero FACING a 3-bet (not making one)
+    // PokerBench "four_bet_five_bet" = hero FACING a 4-bet (not making one)
+    // So: our "four_bet_five_bet" archetype (facing 3-bet) uses PokerBench "three_bet_pots" data
+    // Our "three_bet_pots" archetype (deciding to 3-bet) uses validated ranges (no PokerBench match)
+    // Our "blind_vs_blind" uses validated ranges (PokerBench BvB perspective unclear)
+    const pokerbenchLookupId =
+      archetype.archetypeId === "four_bet_five_bet" ? "three_bet_pots"  // SWAP: facing 3-bet
+      : archetype.archetypeId === "three_bet_pots" ? null               // No PokerBench match
+      : archetype.archetypeId === "blind_vs_blind" ? null               // Perspective unclear
+      : archetype.archetypeId;                                          // RFI + BB defense: as-is
 
-    if (!useValidatedRanges) {
-      // ── Primary: PokerBench per-hand-class data (solver-derived, position-aware) ──
+    if (pokerbenchLookupId) {
+      // ── PokerBench per-hand-class data (solver-derived, position-aware) ──
       const hcLookup = lookupPreflopHandClass(
-        archetype.archetypeId,
+        pokerbenchLookupId,
         position,
         handClass,
         openerPos,
       );
 
       if (hcLookup) {
+        // Use the ACTUAL archetype's raise action key, not the PokerBench label's
         return {
           frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
           source: "preflop-handclass",
