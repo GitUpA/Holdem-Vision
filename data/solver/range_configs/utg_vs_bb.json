@@ -1,0 +1,16 @@
+{
+  "scenarioId": "utg_vs_bb",
+  "name": "UTG/HJ open vs BB defend",
+  "ip": {
+    "position": "utg",
+    "rangeString": "AA,KK,QQ,JJ,TT,99,88,77,66,AKs,AQs,AJs,ATs,A5s,A4s,AKo,AQo,AJo,KQs,KJs,KTs,QJs,QTs,JTs,T9s,98s,87s,76s,65s,A9s,A3s,ATo,K9s,KQo,Q9s,QJo,J9s,T8s,97s,86s,75s,64s,54s",
+    "handCount": 43
+  },
+  "oop": {
+    "position": "bb",
+    "rangeString": "AA,KK,QQ,AKs,AKo,A5s,A4s,JJ,TT,99,88,77,66,55,AQs,AJs,ATs,A9s,AQo,KQs,KJs,KTs,QJs,QTs,JTs,J9s,T9s,98s,87s,76s,65s,54s",
+    "handCount": 32
+  },
+  "pot": 7,
+  "stack": 93
+}
