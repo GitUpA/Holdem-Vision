@@ -293,7 +293,7 @@ function buildHeroAssessment(
     return `Your ${heroHandDesc} is strong. You have a clear story to tell.`;
   }
   if (strength > 0.4) {
-    return `Your ${heroHandDesc} is playable but not premium. Choose your story carefully.`;
+    return `Your ${heroHandDesc} has some potential but isn't premium. Position and price will determine if it's worth playing.`;
   }
   return `Your ${heroHandDesc} is weak. You'll need a convincing story or the right price to continue.`;
 }
@@ -372,7 +372,7 @@ function buildRecommendation(
     const reason = actionNarrative?.counterNarrative ?? "The price is right to continue.";
     recommendation = `Call. ${reason}${gtoConfirmation}`;
   } else if (recommendedAction === "bet" || recommendedAction === "raise") {
-    const reason = actionNarrative?.counterNarrative ?? "You have a story worth telling.";
+    const reason = actionNarrative?.counterNarrative ?? "You're likely ahead — betting builds the pot when you have the edge.";
     recommendation = `${recommendedAction === "bet" ? "Bet" : "Raise"}. ${reason}${gtoConfirmation}`;
   } else {
     recommendation = `This is a close spot.${gtoConfirmation}`;
