@@ -412,8 +412,9 @@ def run_all_solves(scenario_id=None):
                 lines = input_content.strip().split('\n')
                 lines = [l if not l.startswith('dump_result') else f'dump_result {abs_output}' for l in lines]
 
-                # Write temp input in solver dir
-                temp_input = SOLVER_DIR / f"_temp_input.txt"
+                # Write temp input in solver dir (scenario-specific to avoid race conditions)
+                temp_suffix = f"_{scenario_id}" if scenario_id else ""
+                temp_input = SOLVER_DIR / f"_temp{temp_suffix}_input.txt"
                 temp_input.write_text('\n'.join(lines) + '\n')
 
                 result = subprocess.run(
@@ -432,7 +433,7 @@ def run_all_solves(scenario_id=None):
                 else:
                     failed += 1
                     print(f"FAIL ({solve_time:.0f}s)")
-                    err_file = OUTPUT_DIR / f"{name}.err"
+                    err_file = output_path.parent / f"{name}.err"
                     err_file.write_text(result.stderr or result.stdout or "unknown error")
 
             except subprocess.TimeoutExpired:
