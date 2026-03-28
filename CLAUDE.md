@@ -69,6 +69,17 @@ pnpm test:watch    # watch mode
 - **Pre-compute strategy**: preflop uses PokerBench data, postflop uses solver tables, equity uses lookup tables. Zero Monte Carlo in headless/Convex.
 - `/vision` is public (no auth required). Archetype mode at `/vision?mode=drill`.
 
+## Solver Data Storage
+
+- **D: drive** (`D:/HoldemVision/solver_data/`) — primary storage for large solver outputs (12TB available)
+  - `outputs/` — 193 flop raw solver JSONs (108MB)
+  - `turn_outputs/` — turn solver outputs (pending)
+  - `river_outputs/` — river solver outputs (pending)
+  - `frequency_tables/` — parsed frequency tables (2.4MB)
+- **Project dir** (`data/solver/outputs/`, `data/frequency_tables/`) — working copies used by build/tests
+- Solver batch scripts (`batch_solve.py`, `batch_turn_river.py`) should output to D: drive
+- `parseFacingBet.mjs` can read from D: paths
+
 ## Pipeline Modules (`convex/lib/pipeline/`)
 
 - `handContext.ts` — Seat-agnostic, observable-only context struct (funnel tracking).
