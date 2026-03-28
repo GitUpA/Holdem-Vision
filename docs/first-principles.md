@@ -306,8 +306,7 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 ✅ **SYMMETRIC TEST PASSES.** GTO vs GTO = +4.38 BB/100 over 20K hands (converges to ~0). System is fair.
 ✅ **FULL MATRIX RUNS.** `payoffMatrix.ts` generates K×K matrix. 4-profile matrix (GTO/TAG/NIT/FISH) runs in ~4 seconds. GTO is best overall (+0.00 avg).
 ✅ **CONFIDENCE MODEL BUILT.** `computeBehaviorConfidence()`: Bayesian inference from N observations × deviation. `confidenceLabel()`: "speculative" → "very high".
-✅ **TUNED.** Facing-bet solver data wired. LAG modifiers reduced. GTO vs GTO converges to ~0. Profile ranking: TAG +36 > LAG +32 > GTO +11 > FISH +2 > NIT -6. Coaching audit: 500 hands, 692 decisions, 0 issues.
-⚠️ **POSITIONAL BIAS.** GTO vs GTO avg +14 BB/100 over 20K hands (within variance but slightly positive). May indicate hero seat 0 has a small edge. Needs more volume to confirm.
+✅ **TUNED.** Complete facing-bet solver data across all 3 streets (24 tables: 8 flop + 8 turn + 8 river). GTO vs GTO converges to ~0. Profile ranking: TAG +35 > LAG +29 > GTO +11 > FISH +1 > NIT -9. Coaching audit: 1000 hands, 1387 decisions, 0 issues. DataConfidence framework surfaces uncertainty to coaching.
 
 ### Layer 10: The Meta-Game — Emergent Knowledge Base
 ⚠️ **NOT IMPLEMENTED.** No counter-strategy map, no recursive matrix testing, no empirically-derived coaching adjustments. **→ Phase 9a + 9b needed. Requires calibrated symmetric test first.**
