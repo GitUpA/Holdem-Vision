@@ -1,0 +1,21 @@
+set_pot 7
+set_effective_stack 93
+set_board 9h,9c,7d
+set_range_ip AA,KK,QQ,JJ,TT,99,88,77,66,AKs,AQs,AJs,ATs,A5s,A4s,AKo,AQo,AJo,KQs,KJs,KTs,QJs,QTs,JTs,T9s,98s,87s,76s,65s,A9s,A3s,ATo,K9s,KQo,Q9s,QJo,J9s,T8s,97s,86s,75s,64s,54s
+set_range_oop AA,KK,QQ,AKs,AKo,A5s,A4s,JJ,TT,99,88,77,66,55,AQs,AJs,ATs,A9s,AQo,KQs,KJs,KTs,QJs,QTs,JTs,J9s,T9s,98s,87s,76s,65s,54s
+set_bet_sizes oop,flop,bet,33,75
+set_bet_sizes oop,flop,raise,60
+set_bet_sizes oop,flop,allin
+set_bet_sizes ip,flop,bet,33,75
+set_bet_sizes ip,flop,raise,60
+set_bet_sizes ip,flop,allin
+set_allin_threshold 0.67
+build_tree
+set_thread_num 8
+set_accuracy 0.5
+set_max_iteration 200
+set_print_interval 50
+set_use_isomorphism 1
+start_solve
+set_dump_rounds 1
+dump_result D:\HoldemVision\solver_data\outputs_utg_vs_bb\utg_vs_bb_paired_boards_005.json

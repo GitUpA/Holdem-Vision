@@ -28,6 +28,10 @@ SOLVER_EXE = SOLVER_DIR / "console_solver.exe"
 INPUT_DIR = Path(__file__).parent / "inputs"
 OUTPUT_DIR = Path(__file__).parent / "outputs"
 TABLES_DIR = Path(__file__).parent.parent / "frequency_tables"
+RANGE_CONFIGS_DIR = Path(__file__).parent / "range_configs"
+
+# Default scenario: BTN vs BB (can be overridden via --scenario)
+ACTIVE_SCENARIO = None  # Set via CLI
 
 # Standard 100bb 6-max ranges (BTN vs BB single-raised pot)
 # BTN RFI range (~45% of hands)
@@ -240,17 +244,42 @@ def generate_boards():
 # INPUT FILE GENERATION
 # ═══════════════════════════════════════════════════════
 
-def generate_input_file(board_cards, output_name, settings=None):
-    """Generate a TexasSolver input config for a specific board."""
+def load_scenario_config(scenario_id):
+    """Load range config from range_configs/ directory."""
+    config_path = RANGE_CONFIGS_DIR / f"{scenario_id}.json"
+    if not config_path.exists():
+        raise FileNotFoundError(f"No range config for scenario '{scenario_id}' at {config_path}")
+    with open(config_path) as f:
+        return json.load(f)
+
+
+def generate_input_file(board_cards, output_name, settings=None, scenario=None):
+    """Generate a TexasSolver input config for a specific board.
+
+    If scenario is provided, uses range config from range_configs/.
+    Otherwise uses default BTN_RANGE / BB_RANGE.
+    """
     s = settings or SOLVER_SETTINGS
     bs = BET_SIZES_STANDARD
 
+    # Determine ranges
+    if scenario:
+        ip_range = scenario["ip"]["rangeString"]
+        oop_range = scenario["oop"]["rangeString"]
+        pot = scenario.get("pot", s["pot"])
+        stack = scenario.get("stack", s["stack"])
+    else:
+        ip_range = BTN_RANGE
+        oop_range = BB_RANGE
+        pot = s["pot"]
+        stack = s["stack"]
+
     lines = [
-        f"set_pot {s['pot']}",
-        f"set_effective_stack {s['stack']}",
+        f"set_pot {pot}",
+        f"set_effective_stack {stack}",
         f"set_board {','.join(board_cards)}",
-        f"set_range_ip {BTN_RANGE}",
-        f"set_range_oop {BB_RANGE}",
+        f"set_range_ip {ip_range}",
+        f"set_range_oop {oop_range}",
         f"set_bet_sizes oop,flop,bet,{bs['oop_flop_bet']}",
         f"set_bet_sizes oop,flop,raise,{bs['oop_flop_raise']}",
         f"set_bet_sizes oop,flop,allin",
@@ -271,10 +300,29 @@ def generate_input_file(board_cards, output_name, settings=None):
     return "\n".join(lines) + "\n"
 
 
-def generate_all_inputs():
-    """Generate input files for all boards across all archetypes."""
-    INPUT_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def generate_all_inputs(scenario_id=None):
+    """Generate input files for all boards across all archetypes.
+
+    If scenario_id is provided, loads range config and outputs
+    to a scenario-specific directory on D: drive.
+    """
+    scenario = None
+    if scenario_id:
+        scenario = load_scenario_config(scenario_id)
+        # Scenario-specific directories
+        input_dir = Path(__file__).parent / f"inputs_{scenario_id}"
+        output_dir = Path(f"D:/HoldemVision/solver_data/outputs_{scenario_id}")
+        manifest_name = f"manifest_{scenario_id}.json"
+        print(f"Scenario: {scenario['name']}")
+        print(f"  IP ({scenario['ip']['position']}): {scenario['ip']['handCount']} hand classes")
+        print(f"  OOP ({scenario['oop']['position']}): {scenario['oop']['handCount']} hand classes")
+    else:
+        input_dir = INPUT_DIR
+        output_dir = OUTPUT_DIR
+        manifest_name = "manifest.json"
+
+    input_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     boards = generate_boards()
     manifest = {}
@@ -282,26 +330,30 @@ def generate_all_inputs():
     for archetype, board_list in boards.items():
         manifest[archetype] = []
         for i, board_cards in enumerate(board_list):
-            name = f"{archetype}_{i:03d}"
-            input_file = INPUT_DIR / f"{name}.txt"
-            output_file = f"../../outputs/{name}.json"
+            prefix = f"{scenario_id}_" if scenario_id else ""
+            name = f"{prefix}{archetype}_{i:03d}"
+            input_file = input_dir / f"{name}.txt"
+            output_file = str(output_dir / f"{name}.json")
 
-            content = generate_input_file(board_cards, output_file)
+            content = generate_input_file(board_cards, output_file, scenario=scenario)
             input_file.write_text(content)
             manifest[archetype].append({
                 "name": name,
                 "board": board_cards,
                 "input": str(input_file),
-                "output": str(OUTPUT_DIR / f"{name}.json"),
+                "output": output_file,
+                "scenario": scenario_id or "btn_vs_bb",
             })
 
     # Save manifest
-    manifest_file = Path(__file__).parent / "manifest.json"
+    manifest_file = Path(__file__).parent / manifest_name
     with open(manifest_file, 'w') as f:
         json.dump(manifest, f, indent=2)
 
     total = sum(len(v) for v in manifest.values())
     print(f"Generated {total} input files across {len(manifest)} archetypes")
+    print(f"Manifest: {manifest_file}")
+    print(f"Outputs: {output_dir}")
     for arch, entries in manifest.items():
         print(f"  {arch}: {len(entries)} boards")
 
@@ -839,15 +891,30 @@ def parse_all_outputs():
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'help'
 
+    # --scenario flag: e.g., "python batch_solve.py generate --scenario co_vs_bb"
+    scenario_id = None
+    for i, arg in enumerate(sys.argv):
+        if arg == '--scenario' and i + 1 < len(sys.argv):
+            scenario_id = sys.argv[i + 1]
+
     if cmd == 'generate':
-        generate_all_inputs()
+        generate_all_inputs(scenario_id)
     elif cmd == 'run':
         run_all_solves()
     elif cmd == 'parse':
         parse_all_outputs()
     elif cmd == 'all':
-        generate_all_inputs()
+        generate_all_inputs(scenario_id)
         run_all_solves()
         parse_all_outputs()
+    elif cmd == 'scenarios':
+        # List available scenarios
+        print("Available scenarios:")
+        for f in sorted(RANGE_CONFIGS_DIR.glob("*.json")):
+            config = json.loads(f.read_text())
+            print(f"  {f.stem}: {config['name']} — IP {config['ip']['handCount']} hands, OOP {config['oop']['handCount']} hands")
     else:
         print(__doc__)
+        print("\nScenario support:")
+        print("  python batch_solve.py generate --scenario co_vs_bb")
+        print("  python batch_solve.py scenarios    # list available scenarios")
