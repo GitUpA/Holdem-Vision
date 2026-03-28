@@ -306,7 +306,8 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 ✅ **SYMMETRIC TEST PASSES.** GTO vs GTO = +4.38 BB/100 over 20K hands (converges to ~0). System is fair.
 ✅ **FULL MATRIX RUNS.** `payoffMatrix.ts` generates K×K matrix. 4-profile matrix (GTO/TAG/NIT/FISH) runs in ~4 seconds. GTO is best overall (+0.00 avg).
 ✅ **CONFIDENCE MODEL BUILT.** `computeBehaviorConfidence()`: Bayesian inference from N observations × deviation. `confidenceLabel()`: "speculative" → "very high".
-⚠️ **NOT TUNED.** TAG modifier produces -30.93 BB/100 avg (should be closer to 0). Profile modifier values need adjustment using the payoff matrix as the diagnostic. The TOOL for tuning exists; the tuning loop hasn't been run.
+✅ **TUNED.** Facing-bet solver data wired. LAG modifiers reduced. GTO vs GTO converges to ~0. Profile ranking: TAG +36 > LAG +32 > GTO +11 > FISH +2 > NIT -6. Coaching audit: 500 hands, 692 decisions, 0 issues.
+⚠️ **POSITIONAL BIAS.** GTO vs GTO avg +14 BB/100 over 20K hands (within variance but slightly positive). May indicate hero seat 0 has a small edge. Needs more volume to confirm.
 
 ### Layer 10: The Meta-Game — Emergent Knowledge Base
 ⚠️ **NOT IMPLEMENTED.** No counter-strategy map, no recursive matrix testing, no empirically-derived coaching adjustments. **→ Phase 9a + 9b needed. Requires calibrated symmetric test first.**

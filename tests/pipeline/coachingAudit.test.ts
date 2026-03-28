@@ -219,4 +219,195 @@ describe("Coaching Audit", () => {
     // Assert no critical issues
     expect(critical.length).toBe(0);
   }, 120_000);
+
+  it("audits 500 hands 6-max with mixed profiles for multi-way issues", () => {
+    const HANDS = 500;
+    const issues: CoachingIssue[] = [];
+    let totalDecisions = 0;
+
+    // Mixed table: TAG, LAG, NIT, FISH, GTO villains
+    const villainProfiles = [
+      PRESET_PROFILES.tag,
+      PRESET_PROFILES.lag,
+      PRESET_PROFILES.nit,
+      PRESET_PROFILES.fish,
+      PRESET_PROFILES.gto,
+    ];
+
+    for (let i = 0; i < HANDS; i++) {
+      const heroSeat = 0;
+      const profileMap = new Map<number, typeof GTO_PROFILE>();
+      for (let s = 1; s <= 5; s++) {
+        profileMap.set(s, villainProfiles[(s - 1) % villainProfiles.length]);
+      }
+
+      const stepper = new HandStepper({
+        numPlayers: 6,
+        startingStack: 100,
+        heroSeat,
+        dealerSeat: i % 6,
+        heroProfile: GTO_PROFILE,
+        villainProfile: GTO_PROFILE, // default, overridden by session profiles
+        seed: 90000 + i,
+      });
+
+      // Override villain profiles on the session
+      const session = (stepper as any).session;
+      if (session?._seatProfiles) {
+        for (const [seat, profile] of profileMap) {
+          session._seatProfiles.set(seat, profile);
+        }
+      }
+
+      const firstStep = stepper.deal();
+      if (!firstStep) continue;
+
+      let step: ReturnType<typeof stepper.autoAct> = firstStep;
+      let safety = 0;
+      while (step && !step.isHandOver && safety < 20) {
+        const state = (stepper as any).session?.state;
+        if (state) {
+          const legal = currentLegalActions(state);
+          const heroPlayer = state.players.find((p: any) => p.seatIndex === heroSeat);
+          if (legal && heroPlayer && heroPlayer.holeCards.length >= 2) {
+            const heroCards = heroPlayer.holeCards as CardIndex[];
+            const combo = cardsToCombo(heroCards[0], heroCards[1]);
+            const handClass = comboToHandClass(combo);
+
+            try {
+              const snap = captureFullSnapshot(state, heroSeat, heroCards, {
+                debug: "lite" as any,
+                opponentProfiles: profileMap,
+              });
+
+              totalDecisions++;
+              const gtoAction = snap.gtoOptimalAction ?? "unknown";
+              const commentary = snap.commentary;
+              const position = snap.heroPosition;
+              const archetype = snap.archetype?.id ?? "unknown";
+
+              // ── Check: Premium hands ──
+              const isPremium = ["AA", "KK", "QQ", "AKs", "AKo"].includes(handClass);
+              const is4BetPlus = archetype === "four_bet_five_bet";
+              if (isPremium && state.currentStreet === "preflop") {
+                if (gtoAction === "fold") {
+                  issues.push({
+                    handIndex: i, street: state.currentStreet,
+                    heroCards: heroCards.map(c => cardToString(c as CardIndex)).join(" "),
+                    handClass, position,
+                    severity: "critical",
+                    issue: "PREMIUM FOLD",
+                    details: `${handClass} from ${position} told to fold. Archetype=${archetype}`,
+                  });
+                }
+                if (gtoAction === "call" && legal.canRaise && !is4BetPlus) {
+                  const gtoFreq = snap.gtoFrequencies?.[gtoAction as keyof typeof snap.gtoFrequencies] as number ?? 0;
+                  if (gtoFreq > 0.7) {
+                    issues.push({
+                      handIndex: i, street: state.currentStreet,
+                      heroCards: heroCards.map(c => cardToString(c as CardIndex)).join(" "),
+                      handClass, position,
+                      severity: "critical",
+                      issue: "PREMIUM CALL-HEAVY",
+                      details: `${handClass} from ${position} call ${(gtoFreq*100).toFixed(0)}%. Archetype=${archetype}`,
+                    });
+                  }
+                }
+              }
+
+              // ── Check: Commentary exists ──
+              if (!commentary || !commentary.narrative || commentary.narrative.length < 20) {
+                issues.push({
+                  handIndex: i, street: state.currentStreet,
+                  heroCards: heroCards.map(c => cardToString(c as CardIndex)).join(" "),
+                  handClass, position,
+                  severity: "warning",
+                  issue: "MISSING COMMENTARY",
+                  details: `Archetype=${archetype}`,
+                });
+              }
+
+              // ── Check: GTO data exists ──
+              if (gtoAction === "unknown") {
+                issues.push({
+                  handIndex: i, street: state.currentStreet,
+                  heroCards: heroCards.map(c => cardToString(c as CardIndex)).join(" "),
+                  handClass, position,
+                  severity: "warning",
+                  issue: "NO GTO DATA",
+                  details: `Archetype=${archetype}`,
+                });
+              }
+
+              // ── Check: Commentary contradicts GTO ──
+              if (commentary?.recommendedAction) {
+                const gtoIsFold = gtoAction === "fold";
+                const commentaryIsFold = commentary.recommendedAction === "fold";
+                const gtoIsAggressive = gtoAction.startsWith("bet") || gtoAction.startsWith("raise");
+                const commentaryIsAggressive = commentary.recommendedAction === "bet" || commentary.recommendedAction === "raise";
+                if (gtoIsFold && commentaryIsAggressive) {
+                  issues.push({
+                    handIndex: i, street: state.currentStreet,
+                    heroCards: heroCards.map(c => cardToString(c as CardIndex)).join(" "),
+                    handClass, position,
+                    severity: "warning",
+                    issue: "COMMENTARY CONTRADICTS GTO",
+                    details: `Commentary=${commentary.recommendedAction} GTO=${gtoAction} Archetype=${archetype}`,
+                  });
+                }
+                if (commentaryIsFold && gtoIsAggressive) {
+                  issues.push({
+                    handIndex: i, street: state.currentStreet,
+                    heroCards: heroCards.map(c => cardToString(c as CardIndex)).join(" "),
+                    handClass, position,
+                    severity: "warning",
+                    issue: "COMMENTARY CONTRADICTS GTO",
+                    details: `Commentary=fold GTO=${gtoAction} Archetype=${archetype}`,
+                  });
+                }
+              }
+
+            } catch { /* skip */ }
+          }
+        }
+        step = stepper.autoAct();
+        safety++;
+      }
+    }
+
+    // Report
+    const critical = issues.filter(i => i.severity === "critical");
+    const warnings = issues.filter(i => i.severity === "warning");
+
+    console.log(`\n${"═".repeat(60)}`);
+    console.log(`6-MAX COACHING AUDIT — ${HANDS} hands, ${totalDecisions} decisions`);
+    console.log(`${"═".repeat(60)}`);
+    console.log(`Critical: ${critical.length} | Warnings: ${warnings.length} | Rate: ${((issues.length / Math.max(totalDecisions, 1)) * 100).toFixed(1)}%`);
+
+    if (critical.length > 0) {
+      console.log(`\nCRITICAL:`);
+      for (const issue of critical.slice(0, 10)) {
+        console.log(`  [${issue.issue}] #${issue.handIndex} ${issue.street} ${issue.heroCards} (${issue.handClass}) ${issue.position}`);
+        console.log(`    ${issue.details}`);
+      }
+    }
+    if (warnings.length > 0) {
+      console.log(`\nWARNINGS (first 10):`);
+      for (const issue of warnings.slice(0, 10)) {
+        console.log(`  [${issue.issue}] #${issue.handIndex} ${issue.street} ${issue.heroCards} (${issue.handClass}) ${issue.position}`);
+        console.log(`    ${issue.details}`);
+      }
+    }
+
+    const byType: Record<string, number> = {};
+    for (const issue of issues) byType[issue.issue] = (byType[issue.issue] ?? 0) + 1;
+    if (Object.keys(byType).length > 0) {
+      console.log(`\nBY TYPE:`);
+      for (const [type, count] of Object.entries(byType).sort((a, b) => b[1] - a[1])) {
+        console.log(`  ${type}: ${count}`);
+      }
+    }
+
+    expect(critical.length).toBe(0);
+  }, 120_000);
 });
