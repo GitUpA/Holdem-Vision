@@ -10,6 +10,7 @@
 import type { ExplanationNode } from "../types/analysis";
 import type { ArchetypeClassification } from "./archetypeClassifier";
 import type { HandCategorization } from "./handCategorizer";
+import type { DataConfidence } from "./dataConfidence";
 import {
   lookupFrequencies,
   getTable,
@@ -62,11 +63,16 @@ export interface ActionScore {
  * - acceptable: >= 15% (GTO does this sometimes)
  * - mistake:    >= 5%  (GTO rarely does this)
  * - blunder:    < 5%   (GTO almost never does this)
+ *
+ * When confidence is provided and low, thresholds widen — we give the
+ * user more benefit of the doubt because the data itself is uncertain.
+ * Max widening at confidence=0: 0.15 (so optimal threshold drops to 0.15).
  */
-function deriveVerdict(userFreq: number): Verdict {
-  if (userFreq >= 0.30) return "optimal";
-  if (userFreq >= 0.15) return "acceptable";
-  if (userFreq >= 0.05) return "mistake";
+function deriveVerdict(userFreq: number, confidence?: DataConfidence): Verdict {
+  const widening = confidence ? (1 - confidence.score) * 0.15 : 0;
+  if (userFreq >= 0.30 - widening) return "optimal";
+  if (userFreq >= 0.15 - widening * 0.5) return "acceptable";
+  if (userFreq >= 0.05 - widening * 0.3) return "mistake";
   return "blunder";
 }
 
@@ -93,6 +99,8 @@ export function scoreAction(
   street: "preflop" | "flop" | "turn" | "river" = "flop",
   /** Pre-computed frequencies from SpotSolution (avoids re-lookup, ensures DRY) */
   precomputedFrequencies?: ActionFrequencies,
+  /** Optional data confidence — widens verdict thresholds when low */
+  confidence?: DataConfidence,
 ): ActionScore | null {
   let frequencies: ActionFrequencies;
 
@@ -140,7 +148,7 @@ export function scoreAction(
     potSize,
   );
 
-  const verdict = deriveVerdict(userActionFrequency);
+  const verdict = deriveVerdict(userActionFrequency, confidence);
 
   // Build teaching explanation
   const explanation = buildScoringExplanation(

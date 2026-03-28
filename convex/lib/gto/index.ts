@@ -69,6 +69,20 @@ export {
 } from "./actionMapping";
 
 export {
+  buildDataConfidence,
+  type DataConfidence,
+  type ConfidenceTier,
+} from "./dataConfidence";
+
+export {
+  identifyDataGaps,
+  prioritizeInvestments,
+  type SpotDescription,
+  type DataGap,
+  type InvestmentRecommendation,
+} from "./dataInvestmentPlanner";
+
+export {
   getPrototype,
   getAllPrototypes,
   getPrototypeHands,

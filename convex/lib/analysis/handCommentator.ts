@@ -21,6 +21,7 @@ import type { OpponentStory } from "./opponentStory";
 import type { ActionStory } from "../gto/actionNarratives";
 import type { InferredBehavior } from "../opponents/behaviorInference";
 import type { CounterAdvice } from "../pipeline/counterStrategyMap";
+import type { ConfidenceTier } from "../gto/dataConfidence";
 import { cardToDisplay } from "../primitives/card";
 import { positionDisplayName } from "../primitives/position";
 
@@ -66,6 +67,8 @@ export interface CommentaryInput {
   counterAdvice?: CounterAdvice;
   /** Inferred opponent behavior (Layer 7) */
   inferredBehavior?: InferredBehavior;
+  /** Data confidence tier — modulates coaching language strength */
+  confidenceTier?: ConfidenceTier;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -76,7 +79,7 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
   const {
     heroCards, communityCards, gameState, heroSeat, legal,
     handCat, archetype, opponentStories, actionStories, gtoFrequencies, gtoOptimalAction,
-    counterAdvice, inferredBehavior,
+    counterAdvice, inferredBehavior, confidenceTier,
   } = input;
 
   const street = gameState.currentStreet;
@@ -118,7 +121,7 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
   // ── Part 4: Recommendation ──
   const { recommendation, confidence, recommendedAction } = buildRecommendation(
     handCat, opponentStories, actionStories, gtoFrequencies, gtoOptimalAction,
-    legal, street, counterAdvice,
+    legal, street, counterAdvice, confidenceTier,
   );
   parts.push(recommendation);
 
@@ -308,6 +311,7 @@ function buildRecommendation(
   legal: LegalActions,
   street: Street,
   counterAdvice?: CounterAdvice,
+  confidenceTier?: ConfidenceTier,
 ): { recommendation: string; confidence: HandCommentary["confidence"]; recommendedAction: ActionType | null } {
   // Determine the recommended action from GTO or opponent story
   let recommendedAction: ActionType | null = null;
@@ -337,7 +341,7 @@ function buildRecommendation(
   }
 
   // Build the recommendation text
-  const gtoConfirmation = gtoFrequencies ? buildGtoConfirmation(gtoFrequencies, gtoOptimalAction) : "";
+  const gtoConfirmation = gtoFrequencies ? buildGtoConfirmation(gtoFrequencies, gtoOptimalAction, confidenceTier) : "";
 
   // Find the matching action story
   const actionNarrative = actionStories?.find((s) => s.action === recommendedAction);
@@ -382,14 +386,36 @@ function buildRecommendation(
   return { recommendation, confidence, recommendedAction };
 }
 
-function buildGtoConfirmation(frequencies: ActionFrequencies, optimalAction?: string): string {
+function buildGtoConfirmation(
+  frequencies: ActionFrequencies,
+  optimalAction?: string,
+  confidenceTier?: ConfidenceTier,
+): string {
   if (!optimalAction) return "";
   const freq = frequencies[optimalAction as keyof ActionFrequencies] ?? 0;
   const pct = (freq * 100).toFixed(0);
+  const actionLabel = optimalAction.replace("_", " ");
 
-  if (freq > 0.7) return ` GTO confirms: ${optimalAction.replace("_", " ")} ${pct}% of the time.`;
-  if (freq > 0.5) return ` GTO leans ${optimalAction.replace("_", " ")} (${pct}%).`;
-  return ` GTO is mixed here — ${optimalAction.replace("_", " ")} ${pct}%, close spot.`;
+  // Modulate language strength based on data confidence tier
+  const verb = confidenceTierVerb(confidenceTier);
+
+  if (freq > 0.7) return ` ${verb} ${actionLabel} ${pct}% of the time.`;
+  if (freq > 0.5) return ` ${verb.replace("strongly recommends", "leans toward").replace("recommends", "leans toward").replace("leans toward", "leans toward").replace("best estimate suggests", "best estimate leans toward").replace("absence of better data, consider", "limited data, consider")} ${actionLabel} (${pct}%).`;
+  return ` GTO is mixed here — ${actionLabel} ${pct}%, close spot.`;
+}
+
+/**
+ * Map confidence tier to coaching language verb/phrasing.
+ */
+function confidenceTierVerb(tier?: ConfidenceTier): string {
+  switch (tier) {
+    case "solver-verified": return "GTO strongly recommends";
+    case "high-confidence": return "GTO recommends";
+    case "directional": return "GTO leans toward";
+    case "approximate": return "Our best estimate suggests";
+    case "speculative": return "In the absence of better data, consider";
+    default: return "GTO confirms:";
+  }
 }
 
 // ═══════════════════════════════════════════════════════

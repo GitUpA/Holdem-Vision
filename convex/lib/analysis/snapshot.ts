@@ -352,6 +352,7 @@ export function captureFullSnapshot(
         gtoOptimalAction: gtoOptimalAction ?? undefined,
         counterAdvice: counterAdviceForCommentary,
         inferredBehavior: inferredBehaviorResult,
+        confidenceTier: gtoLookup?.confidence?.implications.tier,
       });
       commentary = {
         narrative: result.narrative,

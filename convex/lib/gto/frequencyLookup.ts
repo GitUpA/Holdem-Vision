@@ -30,6 +30,8 @@ import type { ArchetypeClassification } from "./archetypeClassifier";
 import type { HandCategorization } from "./handCategorizer";
 import type { PreflopConfidence } from "./tables/preflopHandClass";
 import type { OpponentInput } from "../analysis/equityRecommendation";
+import type { DataConfidence } from "./dataConfidence";
+import { buildDataConfidence } from "./dataConfidence";
 
 import {
   classifyArchetype,
@@ -73,6 +75,8 @@ export interface GtoLookupResult {
   preflopConfidence?: PreflopConfidence;
   /** Whether this is an exact match or a fallback/interpolation */
   isExactMatch: boolean;
+  /** Unified confidence assessment for this data source */
+  confidence?: DataConfidence;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -97,6 +101,9 @@ export function lookupGtoFrequencies(
   },
 ): GtoLookupResult | null {
   if (heroCards.length < 2) return null;
+
+  const bigBlindForConf = gameState.blinds.big || 1;
+  const potSizeBB = gameState.pot.total / bigBlindForConf;
 
   const classCtx = contextFromGameState(gameState, heroSeat);
   const archetype = classifyArchetype(classCtx);
@@ -134,14 +141,14 @@ export function lookupGtoFrequencies(
 
       if (hcLookup) {
         // Use the ACTUAL archetype's raise action key, not the PokerBench label's
-        return {
+        return attachConfidence({
           frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
           source: "preflop-handclass",
           archetype,
           handCat,
           preflopConfidence: getPreflopConfidence(hcLookup),
           isExactMatch: true,
-        };
+        }, potSizeBB);
       }
     }
 
@@ -167,7 +174,7 @@ export function lookupGtoFrequencies(
     if (fallbackFreqs) {
       const raiseAction = archetype.archetypeId === "rfi_opening" || archetype.archetypeId === "blind_vs_blind"
         ? "bet_medium" : "raise_large";
-      return {
+      return attachConfidence({
         frequencies: {
           fold: fallbackFreqs.fold,
           call: fallbackFreqs.call,
@@ -177,7 +184,7 @@ export function lookupGtoFrequencies(
         archetype,
         handCat,
         isExactMatch: false, // fallback, not primary data
-      };
+      }, potSizeBB);
     }
   }
 
@@ -195,7 +202,7 @@ export function lookupGtoFrequencies(
     );
 
     if (lookup) {
-      return {
+      return attachConfidence({
         frequencies: lookup.frequencies,
         source: "category",
         archetype,
@@ -203,7 +210,7 @@ export function lookupGtoFrequencies(
         bands: lookup.bands,
         archetypeAccuracy: lookup.archetypeAccuracy,
         isExactMatch: lookup.isExact,
-      };
+      }, potSizeBB);
     }
   }
 
@@ -218,13 +225,13 @@ export function lookupGtoFrequencies(
 
     if (pbLookup) {
       const handCat = categorizeHand(heroCards, communityCards);
-      return {
+      return attachConfidence({
         frequencies: postflopHandClassToActionFrequencies(pbLookup),
         source: "postflop-handclass",
         archetype,
         handCat,
         isExactMatch: false,
-      };
+      }, potSizeBB);
     }
   }
 
@@ -250,18 +257,34 @@ export function lookupGtoFrequencies(
 
     if (eqResult) {
       const handCat = categorizeHand(heroCards, communityCards);
-      return {
+      return attachConfidence({
         frequencies: eqResult.frequencies,
         source: "equity",
         archetype,
         handCat,
         isExactMatch: false,
-      };
+      }, potSizeBB);
     }
   }
 
   // ── 5. No solver data available ──
   return null;
+}
+
+// ═══════════════════════════════════════════════════════
+// CONFIDENCE ENRICHMENT
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Attach DataConfidence to a GtoLookupResult before returning.
+ * potSizeBB is computed from gameState at the call site.
+ */
+function attachConfidence(
+  result: GtoLookupResult,
+  potSizeBB: number,
+): GtoLookupResult {
+  result.confidence = buildDataConfidence(result, potSizeBB);
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════
