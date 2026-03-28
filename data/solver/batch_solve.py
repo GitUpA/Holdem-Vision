@@ -364,7 +364,7 @@ def generate_all_inputs(scenario_id=None):
 # BATCH SOLVER RUNNER
 # ═══════════════════════════════════════════════════════
 
-def run_all_solves():
+def run_all_solves(scenario_id=None):
     """Run solver on all generated input files.
 
     The solver writes output relative to its CWD, so we:
@@ -372,7 +372,12 @@ def run_all_solves():
     2. Run from the solver directory
     3. Move the output to our outputs dir
     """
-    manifest_file = Path(__file__).parent / "manifest.json"
+    manifest_name = f"manifest_{scenario_id}.json" if scenario_id else "manifest.json"
+    manifest_file = Path(__file__).parent / manifest_name
+    if not manifest_file.exists():
+        print(f"Manifest not found: {manifest_file}")
+        print(f"Run 'python batch_solve.py generate --scenario {scenario_id}' first")
+        return
     with open(manifest_file) as f:
         manifest = json.load(f)
 
@@ -900,12 +905,12 @@ if __name__ == '__main__':
     if cmd == 'generate':
         generate_all_inputs(scenario_id)
     elif cmd == 'run':
-        run_all_solves()
+        run_all_solves(scenario_id)
     elif cmd == 'parse':
         parse_all_outputs()
     elif cmd == 'all':
         generate_all_inputs(scenario_id)
-        run_all_solves()
+        run_all_solves(scenario_id)
         parse_all_outputs()
     elif cmd == 'scenarios':
         # List available scenarios
