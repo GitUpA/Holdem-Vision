@@ -364,7 +364,7 @@ def generate_all_inputs(scenario_id=None):
 # BATCH SOLVER RUNNER
 # ═══════════════════════════════════════════════════════
 
-def run_all_solves(scenario_id=None):
+def run_all_solves(scenario_id=None, reverse=False):
     """Run solver on all generated input files.
 
     The solver writes output relative to its CWD, so we:
@@ -386,7 +386,15 @@ def run_all_solves(scenario_id=None):
     failed = 0
     start_time = time.time()
 
-    for archetype, entries in manifest.items():
+    # Reverse order for parallel runs (forward + backward meet in the middle)
+    arch_items = list(manifest.items())
+    if reverse:
+        arch_items = list(reversed(arch_items))
+        print(f"  *** REVERSE ORDER ***")
+
+    for archetype, entries in arch_items:
+        if reverse:
+            entries = list(reversed(entries))
         print(f"\n{'='*60}")
         print(f"  ARCHETYPE: {archetype} ({len(entries)} boards)")
         print(f"{'='*60}")
@@ -412,8 +420,10 @@ def run_all_solves(scenario_id=None):
                 lines = input_content.strip().split('\n')
                 lines = [l if not l.startswith('dump_result') else f'dump_result {abs_output}' for l in lines]
 
-                # Write temp input in solver dir (scenario-specific to avoid race conditions)
+                # Write temp input in solver dir (scenario + direction specific to avoid race conditions)
                 temp_suffix = f"_{scenario_id}" if scenario_id else ""
+                if reverse:
+                    temp_suffix += "_rev"
                 temp_input = SOLVER_DIR / f"_temp{temp_suffix}_input.txt"
                 temp_input.write_text('\n'.join(lines) + '\n')
 
@@ -898,15 +908,19 @@ if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'help'
 
     # --scenario flag: e.g., "python batch_solve.py generate --scenario co_vs_bb"
+    # --reverse flag: solve boards in reverse order (for parallel runs)
     scenario_id = None
+    reverse_order = False
     for i, arg in enumerate(sys.argv):
         if arg == '--scenario' and i + 1 < len(sys.argv):
             scenario_id = sys.argv[i + 1]
+        if arg == '--reverse':
+            reverse_order = True
 
     if cmd == 'generate':
         generate_all_inputs(scenario_id)
     elif cmd == 'run':
-        run_all_solves(scenario_id)
+        run_all_solves(scenario_id, reverse_order)
     elif cmd == 'parse':
         parse_all_outputs()
     elif cmd == 'all':
