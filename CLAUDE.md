@@ -66,7 +66,7 @@ pnpm test:watch    # watch mode
 - **One system**: Free Play and Archetype mode are identical except board generation (random vs constrained).
 - **Every seat is a player**: hero is the seat that pauses for human input. Headless mode auto-plays hero.
 - **Coach is blind**: coaching infers opponent behavior from actions, never reads assigned profile labels.
-- **Pre-compute strategy**: preflop uses PokerBench data, postflop uses solver tables, equity uses lookup tables. Zero Monte Carlo in headless/Convex.
+- **Pre-compute strategy**: preflop uses PokerBench data, postflop uses solver tables (56 facing-bet tables across 4 scenarios × 8 archetypes × 3 streets), equity uses lookup tables. Zero Monte Carlo in headless/Convex.
 - `/vision` is public (no auth required). Archetype mode at `/vision?mode=drill`.
 
 ## Solver Data Storage

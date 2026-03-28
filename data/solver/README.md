@@ -43,6 +43,12 @@
 | River facing-bet tables | 8 | ~160KB | `data/frequency_tables/` |
 | Preflop PokerBench data | 5 | ~2MB | `data/pokerbench/preflop_tables/` |
 | Solver input files | 763 | ~5MB | `inputs/` + `inputs_turn_river/` |
+| UTG vs BB solver outputs | 193 | ~56MB | `D:/HoldemVision/solver_data/outputs_utg_vs_bb/` |
+| CO vs BB solver outputs | 193 | ~80MB | `D:/HoldemVision/solver_data/outputs_co_vs_bb/` |
+| BvB solver outputs | 193 | ~120MB | `D:/HoldemVision/solver_data/outputs_bvb/` |
+| Scenario facing-bet tables | 32 | ~160KB | `data/frequency_tables/{scenario}_*_facing_bet.json` |
+| Scenario input files | 579 | ~10MB | `inputs_utg_vs_bb/` + `inputs_co_vs_bb/` + `inputs_bvb/` |
+| Scenario range configs | 4 | ~8KB | `range_configs/*.json` |
 
 ## IMPORTANT NOTES
 
@@ -56,7 +62,7 @@
 
 5. **PokerBench preflop data has label mismatches** — `three_bet_pots.json` is actually "facing a 3-bet" data, `four_bet_five_bet.json` is "facing a 4-bet". The system swaps labels at lookup time in `frequencyLookup.ts`. See `docs/plans/data_quality_plan.md`.
 
-6. **Solver runs used FULL ranges (1326 combos)** — future runs should restrict ranges to position-appropriate opening/defending ranges from `preflopRanges.ts` for more accurate postflop data.
+6. **Solver runs now use RESTRICTED ranges** — 4 preflop scenarios (BTN/CO/UTG/BvB vs BB) with position-appropriate ranges from `preflopRanges.ts`. Range configs in `range_configs/*.json`. Generated via `rangeGenerator.mjs`.
 
 ## How to Regenerate
 
