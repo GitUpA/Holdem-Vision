@@ -25,12 +25,13 @@ import { categorizeHand } from "../../gto/handCategorizer";
 import {
   lookupFacingBetFrequencies,
   facingBetToActionFrequencies,
+  type FacingBetScenario,
 } from "../../gto/tables/facingBetTables";
 
 // GTO base frequency retrieval — shared lookup
 import type { ArchetypeClassification } from "../../gto/archetypeClassifier";
 import type { HandCategorization } from "../../gto/handCategorizer";
-import { lookupGtoFrequencies } from "../../gto/frequencyLookup";
+import { lookupGtoFrequencies, findPreflopOpener } from "../../gto/frequencyLookup";
 import { PRESET_PROFILES } from "../../opponents/presets";
 import type { OpponentInput } from "../../analysis/equityRecommendation";
 
@@ -77,6 +78,7 @@ export const modifiedGtoEngine: DecisionEngine = {
     const modifiedFreqs = applyModifier(gtoFreqs, modifier, factors);
 
     // ── 5. Sample action from modified frequencies ──
+    const scenario = deriveFacingBetScenario(ctx);
     const { actionType, amount } = sampleFromModifiedFrequencies(
       modifiedFreqs,
       ctx.legal,
@@ -87,6 +89,7 @@ export const modifiedGtoEngine: DecisionEngine = {
         archetype,
         handCat,
         isInPosition: factors.isInPosition,
+        scenario,
       },
     );
 
@@ -217,6 +220,7 @@ interface FacingBetContext {
   archetype?: ArchetypeClassification;
   handCat?: HandCategorization;
   isInPosition: boolean;
+  scenario?: FacingBetScenario;
 }
 
 /**
@@ -251,6 +255,7 @@ function sampleFromModifiedFrequencies(
       textureId,
       fbCtx.handCat.category,
       fbCtx.isInPosition,
+      fbCtx.scenario,
     );
 
     if (fbLookup) {
@@ -370,6 +375,49 @@ function mapGtoActionToLegal(
     }
     default:
       return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// SCENARIO DETECTION
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Derive the preflop scenario from game state for facing-bet table lookup.
+ *
+ * Maps the first preflop raiser's position to a scenario:
+ * - UTG, UTG+1, HJ -> "utg_vs_bb" (early position)
+ * - CO -> "co_vs_bb"
+ * - BTN -> "btn_vs_bb"
+ * - SB -> "bvb" (blind vs blind)
+ *
+ * Returns undefined if no preflop raiser found (shouldn't happen in practice).
+ */
+function deriveFacingBetScenario(
+  ctx: DecisionContext,
+): FacingBetScenario | undefined {
+  // findPreflopOpener skips the hero seat, which is fine —
+  // we want the position of whoever opened the pot preflop.
+  const openerPos = findPreflopOpener(ctx.state, ctx.seatIndex);
+  if (!openerPos) return undefined;
+
+  const pos = openerPos.toLowerCase();
+  switch (pos) {
+    case "btn":
+      return "btn_vs_bb";
+    case "co":
+      return "co_vs_bb";
+    case "sb":
+      return "bvb";
+    case "utg":
+    case "utg1":
+    case "utg+1":
+    case "utg2":
+    case "utg+2":
+    case "hj":
+      return "utg_vs_bb";
+    default:
+      return undefined;
   }
 }
 
