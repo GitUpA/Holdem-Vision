@@ -1,0 +1,116 @@
+{
+  "archetypeId": "paired_boards",
+  "boardsAnalyzed": 25,
+  "ip_facing_bet": {
+    "two_pair": {
+      "fold": 0.3196,
+      "call": 0.571,
+      "raise": 0.1094,
+      "count": 4950
+    },
+    "sets_plus": {
+      "fold": 0.0468,
+      "call": 0.5077,
+      "raise": 0.4455,
+      "count": 1824
+    },
+    "air": {
+      "fold": 0.7824,
+      "call": 0.1141,
+      "raise": 0.1035,
+      "count": 4245
+    },
+    "overcards": {
+      "fold": 0.5373,
+      "call": 0.3694,
+      "raise": 0.0933,
+      "count": 8742
+    },
+    "top_pair_top_kicker": {
+      "fold": 0.2048,
+      "call": 0.4455,
+      "raise": 0.3497,
+      "count": 927
+    },
+    "top_pair_weak_kicker": {
+      "fold": 0.2156,
+      "call": 0.6865,
+      "raise": 0.0978,
+      "count": 891
+    },
+    "flush_draw": {
+      "fold": 0.2895,
+      "call": 0.4136,
+      "raise": 0.2969,
+      "count": 441
+    },
+    "straight_draw": {
+      "fold": 0.3333,
+      "call": 0.3593,
+      "raise": 0.3073,
+      "count": 300
+    },
+    "bottom_pair": {
+      "fold": 0.3362,
+      "call": 0.5931,
+      "raise": 0.0707,
+      "count": 603
+    }
+  },
+  "oop_facing_bet": {
+    "two_pair": {
+      "fold": 0.3878,
+      "call": 0.5429,
+      "raise": 0.0693,
+      "count": 4176
+    },
+    "sets_plus": {
+      "fold": 0.0163,
+      "call": 0.5332,
+      "raise": 0.4505,
+      "count": 1968
+    },
+    "air": {
+      "fold": 0.8499,
+      "call": 0.1127,
+      "raise": 0.0374,
+      "count": 5058
+    },
+    "overcards": {
+      "fold": 0.6525,
+      "call": 0.2956,
+      "raise": 0.0519,
+      "count": 10479
+    },
+    "top_pair_top_kicker": {
+      "fold": 0.1702,
+      "call": 0.4928,
+      "raise": 0.337,
+      "count": 999
+    },
+    "top_pair_weak_kicker": {
+      "fold": 0.286,
+      "call": 0.5534,
+      "raise": 0.1607,
+      "count": 1143
+    },
+    "flush_draw": {
+      "fold": 0.2942,
+      "call": 0.335,
+      "raise": 0.3709,
+      "count": 507
+    },
+    "straight_draw": {
+      "fold": 0.3308,
+      "call": 0.1715,
+      "raise": 0.4977,
+      "count": 336
+    },
+    "bottom_pair": {
+      "fold": 0.3521,
+      "call": 0.5971,
+      "raise": 0.0508,
+      "count": 702
+    }
+  }
+}

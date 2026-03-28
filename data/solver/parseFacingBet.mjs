@@ -16,9 +16,11 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// CLI args: node parseFacingBet.mjs [manifestFile] [outputsDir]
+// CLI args: node parseFacingBet.mjs [manifestFile] [outputsDir] [scenarioPrefix]
+// scenarioPrefix: e.g., "utg_vs_bb" → outputs "utg_vs_bb_ace_high_dry_rainbow_facing_bet.json"
 const MANIFEST_FILE = process.argv[2] || path.join(__dirname, "manifest.json");
 const OUTPUTS_DIR = process.argv[3] || path.join(__dirname, "outputs");
+const SCENARIO_PREFIX = process.argv[4] || "";
 const TABLES_DIR = path.join(__dirname, "..", "frequency_tables");
 
 // ═══════════════════════════════════════════════════════
@@ -269,7 +271,8 @@ function main() {
 
   // Write results per archetype
   for (const [archetype, data] of Object.entries(archetypeResults)) {
-    const outputFile = path.join(TABLES_DIR, `${archetype}_facing_bet.json`);
+    const prefix = SCENARIO_PREFIX ? `${SCENARIO_PREFIX}_` : "";
+    const outputFile = path.join(TABLES_DIR, `${prefix}${archetype}_facing_bet.json`);
     const output = {
       archetypeId: archetype,
       boardsAnalyzed: data.boards,

@@ -1,0 +1,104 @@
+{
+  "archetypeId": "ace_high_dry_rainbow",
+  "boardsAnalyzed": 24,
+  "ip_facing_bet": {
+    "air": {
+      "fold": 0.7288,
+      "call": 0.2171,
+      "raise": 0.0541,
+      "count": 5664
+    },
+    "two_pair": {
+      "fold": 0.3871,
+      "call": 0.5794,
+      "raise": 0.0336,
+      "count": 3186
+    },
+    "middle_pair": {
+      "fold": 0.3333,
+      "call": 0.5057,
+      "raise": 0.161,
+      "count": 999
+    },
+    "sets_plus": {
+      "fold": 0,
+      "call": 0.6379,
+      "raise": 0.3621,
+      "count": 432
+    },
+    "top_pair_weak_kicker": {
+      "fold": 0.2928,
+      "call": 0.6093,
+      "raise": 0.0979,
+      "count": 2358
+    },
+    "top_pair_top_kicker": {
+      "fold": 0.1102,
+      "call": 0.558,
+      "raise": 0.3318,
+      "count": 1728
+    },
+    "bottom_pair": {
+      "fold": 0.3333,
+      "call": 0.3877,
+      "raise": 0.279,
+      "count": 297
+    },
+    "straight_draw": {
+      "fold": 0.3333,
+      "call": 0.3346,
+      "raise": 0.332,
+      "count": 84
+    }
+  },
+  "oop_facing_bet": {
+    "air": {
+      "fold": 0.7945,
+      "call": 0.1296,
+      "raise": 0.0759,
+      "count": 2772
+    },
+    "two_pair": {
+      "fold": 0.4302,
+      "call": 0.5411,
+      "raise": 0.0287,
+      "count": 3480
+    },
+    "middle_pair": {
+      "fold": 0.3333,
+      "call": 0.3186,
+      "raise": 0.348,
+      "count": 504
+    },
+    "sets_plus": {
+      "fold": 0.0032,
+      "call": 0.5455,
+      "raise": 0.4513,
+      "count": 486
+    },
+    "top_pair_weak_kicker": {
+      "fold": 0.2923,
+      "call": 0.5113,
+      "raise": 0.1963,
+      "count": 882
+    },
+    "top_pair_top_kicker": {
+      "fold": 0.0875,
+      "call": 0.4732,
+      "raise": 0.4392,
+      "count": 1728
+    },
+    "bottom_pair": {
+      "fold": 0.3333,
+      "call": 0.2995,
+      "raise": 0.3672,
+      "count": 180
+    },
+    "straight_draw": {
+      "fold": 0.3333,
+      "call": 0.0543,
+      "raise": 0.6124,
+      "count": 60
+    }
+  }
+}
