@@ -37,7 +37,11 @@ from pathlib import Path
 SOLVER_DIR = Path(__file__).parent / "texassolver"
 SOLVER_EXE = SOLVER_DIR / "console_solver.exe"
 INPUT_DIR = Path(__file__).parent / "inputs_turn_river"
-OUTPUT_DIR = Path(__file__).parent / "outputs_turn_river"
+
+# Large solver outputs go to D: drive (12TB available)
+# Raw JSONs are 500KB-2MB each — too large for git/project dir
+OUTPUT_DIR = Path("D:/HoldemVision/solver_data/turn_river_outputs")
+
 TABLES_DIR = Path(__file__).parent.parent / "frequency_tables"
 MANIFEST_FILE = Path(__file__).parent / "manifest_turn_river.json"
 

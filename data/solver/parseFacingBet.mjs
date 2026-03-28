@@ -15,9 +15,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUTPUTS_DIR = path.join(__dirname, "outputs");
+
+// CLI args: node parseFacingBet.mjs [manifestFile] [outputsDir]
+const MANIFEST_FILE = process.argv[2] || path.join(__dirname, "manifest.json");
+const OUTPUTS_DIR = process.argv[3] || path.join(__dirname, "outputs");
 const TABLES_DIR = path.join(__dirname, "..", "frequency_tables");
-const MANIFEST_FILE = path.join(__dirname, "manifest.json");
 
 // ═══════════════════════════════════════════════════════
 // HAND CATEGORIZATION (mirrors convex/lib/gto/handCategorizer.ts)

@@ -46,6 +46,7 @@ export interface FacingBetFrequencies {
 // STATIC IMPORTS
 // ═══════════════════════════════════════════════════════
 
+// Flop facing-bet tables
 import aceHighDryFB from "../../../../data/frequency_tables/ace_high_dry_rainbow_facing_bet.json";
 import kqHighDryFB from "../../../../data/frequency_tables/kq_high_dry_rainbow_facing_bet.json";
 import midLowDryFB from "../../../../data/frequency_tables/mid_low_dry_rainbow_facing_bet.json";
@@ -54,6 +55,24 @@ import pairedBoardsFB from "../../../../data/frequency_tables/paired_boards_faci
 import rainbowConnectedFB from "../../../../data/frequency_tables/rainbow_connected_facing_bet.json";
 import twoToneConnectedFB from "../../../../data/frequency_tables/two_tone_connected_facing_bet.json";
 import twoToneDisconnectedFB from "../../../../data/frequency_tables/two_tone_disconnected_facing_bet.json";
+// Turn facing-bet tables
+import turnAceHighDryFB from "../../../../data/frequency_tables/turn_ace_high_dry_rainbow_facing_bet.json";
+import turnKqHighDryFB from "../../../../data/frequency_tables/turn_kq_high_dry_rainbow_facing_bet.json";
+import turnMidLowDryFB from "../../../../data/frequency_tables/turn_mid_low_dry_rainbow_facing_bet.json";
+import turnMonotoneFB from "../../../../data/frequency_tables/turn_monotone_facing_bet.json";
+import turnPairedBoardsFB from "../../../../data/frequency_tables/turn_paired_boards_facing_bet.json";
+import turnRainbowConnectedFB from "../../../../data/frequency_tables/turn_rainbow_connected_facing_bet.json";
+import turnTwoToneConnectedFB from "../../../../data/frequency_tables/turn_two_tone_connected_facing_bet.json";
+import turnTwoToneDisconnectedFB from "../../../../data/frequency_tables/turn_two_tone_disconnected_facing_bet.json";
+// River facing-bet tables
+import riverAceHighDryFB from "../../../../data/frequency_tables/river_ace_high_dry_rainbow_facing_bet.json";
+import riverKqHighDryFB from "../../../../data/frequency_tables/river_kq_high_dry_rainbow_facing_bet.json";
+import riverMidLowDryFB from "../../../../data/frequency_tables/river_mid_low_dry_rainbow_facing_bet.json";
+import riverMonotoneFB from "../../../../data/frequency_tables/river_monotone_facing_bet.json";
+import riverPairedBoardsFB from "../../../../data/frequency_tables/river_paired_boards_facing_bet.json";
+import riverRainbowConnectedFB from "../../../../data/frequency_tables/river_rainbow_connected_facing_bet.json";
+import riverTwoToneConnectedFB from "../../../../data/frequency_tables/river_two_tone_connected_facing_bet.json";
+import riverTwoToneDisconnectedFB from "../../../../data/frequency_tables/river_two_tone_disconnected_facing_bet.json";
 
 // ═══════════════════════════════════════════════════════
 // REGISTRY
@@ -66,6 +85,7 @@ function register(data: FacingBetData): void {
 }
 
 // Register all facing-bet tables at module load time
+// Flop (8 archetypes)
 register(aceHighDryFB as FacingBetData);
 register(kqHighDryFB as FacingBetData);
 register(midLowDryFB as FacingBetData);
@@ -74,6 +94,24 @@ register(pairedBoardsFB as FacingBetData);
 register(rainbowConnectedFB as FacingBetData);
 register(twoToneConnectedFB as FacingBetData);
 register(twoToneDisconnectedFB as FacingBetData);
+// Turn (8 archetypes)
+register(turnAceHighDryFB as FacingBetData);
+register(turnKqHighDryFB as FacingBetData);
+register(turnMidLowDryFB as FacingBetData);
+register(turnMonotoneFB as FacingBetData);
+register(turnPairedBoardsFB as FacingBetData);
+register(turnRainbowConnectedFB as FacingBetData);
+register(turnTwoToneConnectedFB as FacingBetData);
+register(turnTwoToneDisconnectedFB as FacingBetData);
+// River (8 archetypes)
+register(riverAceHighDryFB as FacingBetData);
+register(riverKqHighDryFB as FacingBetData);
+register(riverMidLowDryFB as FacingBetData);
+register(riverMonotoneFB as FacingBetData);
+register(riverPairedBoardsFB as FacingBetData);
+register(riverRainbowConnectedFB as FacingBetData);
+register(riverTwoToneConnectedFB as FacingBetData);
+register(riverTwoToneDisconnectedFB as FacingBetData);
 
 // ═══════════════════════════════════════════════════════
 // CATEGORY STRENGTH (for fallback matching)
