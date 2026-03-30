@@ -3,15 +3,24 @@
 /**
  * Vision Hand Grid — 13x13 poker hand class grid.
  *
- * Preflop: highlights hero's hand, optional equity heatmap overlay.
+ * Preflop: highlights hero's hand, optional equity heatmap, position range overlay.
  * Postflop: colors each cell by whether it beats hero on the current board.
  */
 import { useMemo, useState } from "react";
 import { evaluateHand, compareHandRanks } from "../../../convex/lib/primitives/handEvaluator";
 import { getPreflopEquity } from "../../../convex/lib/gto/preflopEquityTable";
+import { GTO_RFI_RANGES } from "../../../convex/lib/gto/tables/preflopRanges";
 
 const RL = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 const GRID_TO_RANK = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+
+const POSITIONS = [
+  { key: "utg", label: "UTG" },
+  { key: "hj", label: "HJ" },
+  { key: "co", label: "CO" },
+  { key: "btn", label: "BTN" },
+  { key: "sb", label: "SB" },
+] as const;
 
 interface GridCell {
   hc: string;
@@ -111,19 +120,30 @@ function computeGrid(heroCards: number[], communityCards: number[]) {
 
 export function HandGrid({ heroCards, communityCards }: HandGridProps) {
   const [showEquity, setShowEquity] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
 
   const data = useMemo(() => {
     if (!heroCards || heroCards.length < 2) return null;
     return computeGrid(heroCards, communityCards ?? []);
   }, [heroCards, communityCards]);
 
+  // Get the range set for the selected position
+  const positionRange = useMemo(() => {
+    if (!selectedPosition) return null;
+    return GTO_RFI_RANGES[selectedPosition] ?? null;
+  }, [selectedPosition]);
+
   if (!data) return null;
 
-  const { cells, heroHC, heroEquity, totalBeats, totalTies, totalLoses, hasBoard } = data;
+  const { cells, heroEquity, totalBeats, totalTies, totalLoses, hasBoard } = data;
   const totalCombos = totalBeats + totalTies + totalLoses;
+
+  // Count hands in selected range
+  const rangeCount = positionRange ? cells.filter(c => positionRange.has(c.hc)).length : 0;
 
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+      {/* Primary header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
         <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--gold-dim)]">
           Vision Hand Grid
@@ -135,9 +155,19 @@ export function HandGrid({ heroCards, communityCards }: HandGridProps) {
               <span className="text-yellow-400">{totalTies} tie</span>
               <span className="text-emerald-400">{totalLoses} win</span>
             </div>
-          ) : (
-            <span className="text-[10px] text-muted-foreground">Hero: {heroHC}</span>
-          )}
+          ) : (() => {
+            const eq = heroEquity;
+            const stronger = cells.filter(c => !c.isHero && !c.isDead && c.equity > eq).length;
+            const same = cells.filter(c => !c.isHero && !c.isDead && Math.abs(c.equity - eq) < 0.005).length;
+            const weaker = cells.filter(c => !c.isHero && !c.isDead && c.equity < eq).length;
+            return (
+              <div className="flex gap-2 text-[10px]">
+                <span className="text-red-400">{stronger} stronger</span>
+                <span className="text-yellow-400">{same} same</span>
+                <span className="text-emerald-400">{weaker} weaker</span>
+              </div>
+            );
+          })()}
           {!hasBoard && (
             <button
               onClick={() => setShowEquity(!showEquity)}
@@ -152,10 +182,44 @@ export function HandGrid({ heroCards, communityCards }: HandGridProps) {
           )}
         </div>
       </div>
+
+      {/* Position range bar */}
+      {!hasBoard && (
+        <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-[var(--border)]/50 bg-[var(--muted)]/15">
+          <span className="text-[9px] text-muted-foreground mr-1">Range:</span>
+          {POSITIONS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setSelectedPosition(selectedPosition === key ? null : key)}
+              className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+                selectedPosition === key
+                  ? "bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold-dim)]/50 font-semibold"
+                  : "text-muted-foreground hover:text-foreground border border-transparent hover:border-[var(--border)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {selectedPosition && (
+            <span className="text-[9px] text-muted-foreground ml-auto">
+              {rangeCount} hands
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Grid */}
       <div className="p-2">
         <div className="grid gap-px" style={{ gridTemplateColumns: "repeat(13, 1fr)" }}>
           {cells.map((cell) => (
-            <Cell key={`${cell.row}-${cell.col}`} cell={cell} hasBoard={hasBoard} showEquity={showEquity} />
+            <Cell
+              key={`${cell.row}-${cell.col}`}
+              cell={cell}
+              hasBoard={hasBoard}
+              showEquity={showEquity}
+              inRange={positionRange?.has(cell.hc) ?? false}
+              showRange={selectedPosition !== null}
+            />
           ))}
         </div>
       </div>
@@ -163,7 +227,13 @@ export function HandGrid({ heroCards, communityCards }: HandGridProps) {
   );
 }
 
-function Cell({ cell, hasBoard, showEquity }: { cell: GridCell; hasBoard: boolean; showEquity: boolean }) {
+function Cell({ cell, hasBoard, showEquity, inRange, showRange }: {
+  cell: GridCell;
+  hasBoard: boolean;
+  showEquity: boolean;
+  inRange: boolean;
+  showRange: boolean;
+}) {
   let bg: string;
   let txt: string;
 
@@ -174,7 +244,6 @@ function Cell({ cell, hasBoard, showEquity }: { cell: GridCell; hasBoard: boolea
     bg = "bg-muted/20";
     txt = "text-muted-foreground/30";
   } else if (!hasBoard && showEquity) {
-    // Preflop equity heatmap
     const eq = cell.equity;
     if (eq >= 0.75) { bg = "bg-red-600/60"; txt = "text-red-100"; }
     else if (eq >= 0.65) { bg = "bg-orange-600/50"; txt = "text-orange-100"; }
@@ -184,7 +253,6 @@ function Cell({ cell, hasBoard, showEquity }: { cell: GridCell; hasBoard: boolea
     else if (eq >= 0.42) { bg = "bg-sky-900/30"; txt = "text-sky-200"; }
     else { bg = "bg-slate-800/40"; txt = "text-slate-400"; }
   } else if (!hasBoard) {
-    // Preflop default: hand type coloring
     bg = cell.type === "pair" ? "bg-amber-900/40"
       : cell.type === "suited" ? "bg-sky-900/30"
       : "bg-slate-800/50";
@@ -193,7 +261,6 @@ function Cell({ cell, hasBoard, showEquity }: { cell: GridCell; hasBoard: boolea
     bg = "bg-muted/20";
     txt = "text-muted-foreground/30";
   } else {
-    // Postflop: color by how much it beats hero
     const beatRatio = cell.beats / cell.total;
     const tieRatio = cell.ties / cell.total;
 
@@ -204,18 +271,24 @@ function Cell({ cell, hasBoard, showEquity }: { cell: GridCell; hasBoard: boolea
     else { bg = "bg-emerald-900/30"; txt = "text-emerald-200"; }
   }
 
-  // Show equity % under the hand class label when equity mode is on
+  // Range overlay: outline cells that are in the selected position's range
+  const rangeBorder = showRange && !cell.isDead
+    ? inRange
+      ? "ring-2 ring-[var(--gold)] ring-inset"
+      : "opacity-40"
+    : "";
+
   const showEqLabel = !hasBoard && showEquity && !cell.isHero && !cell.isDead;
 
   const title = cell.isHero ? `Your hand: ${cell.hc} (${(cell.equity * 100).toFixed(0)}% equity)`
     : cell.isDead ? `${cell.hc}: blocked`
-    : !hasBoard ? `${cell.hc}: ${(cell.equity * 100).toFixed(0)}% equity vs random`
+    : !hasBoard ? `${cell.hc}: ${(cell.equity * 100).toFixed(0)}% equity vs random${showRange ? (inRange ? " — IN RANGE" : " — out of range") : ""}`
     : cell.total === 0 ? `${cell.hc}: no combos`
     : `${cell.hc}: ${cell.beats}/${cell.total} beat you (${((cell.beats / cell.total) * 100).toFixed(0)}%)`;
 
   return (
     <div
-      className={`${bg} ${txt} leading-none flex flex-col items-center justify-center rounded-sm aspect-square select-none cursor-default`}
+      className={`${bg} ${txt} ${rangeBorder} leading-none flex flex-col items-center justify-center rounded-sm aspect-square select-none cursor-default transition-opacity`}
       title={title}
     >
       <span className="text-sm font-semibold">{cell.hc}</span>
