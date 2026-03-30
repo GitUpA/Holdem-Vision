@@ -27,6 +27,7 @@ export type HandCategory =
   | "overpair"              // Pocket pair above all board cards
   | "top_pair_top_kicker"   // Paired top board card with strong kicker
   | "top_pair_weak_kicker"  // Paired top board card with weak kicker
+  | "second_pair"           // Pocket pair just below top board card (e.g., QQ on KT7)
   | "middle_pair"           // Paired with middle board card, or pocket pair between top/bottom
   | "bottom_pair"           // Paired with lowest board card
   | "two_pair"              // Two pair (hero contributes to both)
@@ -228,6 +229,21 @@ function categorizePostflop(
     const boardOnlyHand = evaluateHand(communityCards);
     boardOnlyTier = boardOnlyHand.rank.tier;
     heroImprovesBoardHand = compareHandRanks(madeHand.rank, boardOnlyHand.rank) > 0;
+  } else if (communityCards.length === 4) {
+    // On turn: detect board trips/quads from rank counts even without 5-card eval
+    const boardRankCounts = new Map<number, number>();
+    for (const r of boardRanks) boardRankCounts.set(r, (boardRankCounts.get(r) ?? 0) + 1);
+    const maxBoardCount = Math.max(...boardRankCounts.values());
+    if (maxBoardCount >= 3) boardOnlyTier = 3; // board has trips
+    if (maxBoardCount >= 4) boardOnlyTier = 7; // board has quads
+    // Check if hero actually contributes to the made hand
+    if (boardOnlyTier >= 3) {
+      const tripRank = [...boardRankCounts.entries()].find(([, c]) => c >= 3)?.[0];
+      const heroHasTripCard = tripRank !== undefined && heroRanks.includes(tripRank);
+      if (!heroHasTripCard && !isPocketPair) {
+        heroImprovesBoardHand = false;
+      }
+    }
   }
 
   // ── Monster hands: straight+ (tier >= 4) ──
@@ -318,7 +334,18 @@ function categorizePostflop(
       };
     }
     // Board has both pairs — hero has neither
-    // This is really just "board two pair" — treat as based on kicker
+    if (isPocketPair) {
+      // Pocket pair + board pair = two pair (hero contributes the second pair)
+      // heroPairsBoard was empty because hero's rank isn't ON the board,
+      // but the pocket pair IS the second pair in the two-pair hand.
+      return {
+        category: "two_pair",
+        subCategory: "pocket_pair_plus_board",
+        relativeStrength: 0.7 + heroRanks[0] * 0.005,
+        description: "Two pair (pocket pair + board pair)",
+      };
+    }
+    // Non-pocket pair hero, board has both pairs — treat as kicker
     if (highHero >= boardRanks[0]) {
       return {
         category: "overcards",
@@ -326,6 +353,12 @@ function categorizePostflop(
         description: "Board two pair with overcard",
       };
     }
+    return {
+      category: "air",
+      subCategory: "board_two_pair",
+      relativeStrength: 0.1 + highHero * 0.005,
+      description: "Board two pair (no kicker)",
+    };
   }
 
   // ── One pair ──
@@ -374,11 +407,16 @@ function classifyOnePair(
         description: `Underpair (${rankName(heroRanks[0])}${rankName(heroRanks[0])})`,
       };
     }
+    // Pocket pair between top and bottom board cards — stronger than a random middle pair
+    // because it's hidden and both cards contribute. QQ on KT7 = 0.65, JJ = 0.64, etc.
+    const isSecondPair = boardRanks.length >= 2 && heroRanks[0] > boardRanks[1];
     return {
-      category: "middle_pair",
+      category: isSecondPair ? "second_pair" : "middle_pair",
       subCategory: "pocket_pair_middle",
-      relativeStrength: 0.4 + heroRanks[0] * 0.01,
-      description: `Middle pair (${rankName(heroRanks[0])}${rankName(heroRanks[0])})`,
+      relativeStrength: 0.5 + heroRanks[0] * 0.015,
+      description: isSecondPair
+        ? `Second pair (${rankName(heroRanks[0])}${rankName(heroRanks[0])})`
+        : `Middle pair (${rankName(heroRanks[0])}${rankName(heroRanks[0])})`,
     };
   }
 
@@ -506,7 +544,28 @@ function classifyUnpaired(
     };
   }
 
-  // Backdoor flush only
+  // One overcard (not both) — ace-high or king-high with some equity
+  // This is HIGHER priority than a pure backdoor draw because the overcard
+  // has immediate showdown value if the board checks down.
+  const hasOneOvercard = highHero > topBoardRank;
+  if (hasOneOvercard) {
+    const hasBdFlush = draws.hasBackdoorFlush;
+    const isAceHigh = highHero === 12;
+    const strength = isAceHigh
+      ? 0.30 + lowHero * 0.005 + (hasBdFlush ? 0.05 : 0) // A-high with kicker
+      : 0.20 + highHero * 0.005 + (hasBdFlush ? 0.05 : 0);
+    const drawNote = hasBdFlush ? " + backdoor flush" : "";
+    return {
+      category: "overcards",
+      subCategory: isAceHigh ? "ace_high" : "one_overcard",
+      relativeStrength: strength,
+      description: isAceHigh
+        ? `Ace high (${rankName(lowHero)} kicker${drawNote})`
+        : `${rankName(highHero)} high${drawNote}`,
+    };
+  }
+
+  // Backdoor flush only (no overcards)
   if (draws.hasBackdoorFlush) {
     return {
       category: "weak_draw",

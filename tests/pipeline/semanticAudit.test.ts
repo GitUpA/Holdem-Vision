@@ -91,8 +91,14 @@ describe("Semantic Audit", () => {
             const rec = snap.commentary.recommendedAction;
 
             // Strong hand (strength >= 0.7) should not be called "weak" or told to fold
+            // Exclude "weak" in opponent descriptions (e.g., "weak kicker", "weaker holdings", "weak hands")
             if (strength >= 0.7 && street === "preflop") {
-              if (narrative.includes("weak") && !narrative.includes("not weak")) {
+              // Exclude "weak" that refers to opponent ranges, not hero's hand
+              const hasWeakAboutHero = narrative.includes("weak") && !narrative.includes("not weak")
+                && !narrative.includes("weak kicker") && !narrative.includes("weaker holdings")
+                && !narrative.includes("weak hands") && !narrative.includes("weak pairs")
+                && !narrative.includes("weaker story");
+              if (hasWeakAboutHero) {
                 issues.push({ hand: i, street, heroCards, category, severity: "error",
                   check: "STRONG_CALLED_WEAK",
                   details: `${handClass} (${category}, ${(strength*100).toFixed(0)}%) called "weak" in commentary`,

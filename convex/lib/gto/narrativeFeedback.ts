@@ -10,6 +10,8 @@
  */
 
 import type { GtoAction, ActionFrequencies } from "./tables/types";
+import type { PreflopClassification } from "./preflopClassification";
+import { classificationToCoachingText } from "./preflopClassification";
 import type { NarrativeIntentId } from "./narrativePrompts";
 import { checkNarrativeAlignment } from "./narrativePrompts";
 import { getPrototype } from "./archetypePrototypes";
@@ -54,9 +56,17 @@ function buildGtoContrast(
   optimalAction: GtoAction,
   optimalFrequency: number,
   frequencies: ActionFrequencies,
+  preflopClassification?: PreflopClassification,
 ): string | null {
   if (userAction === optimalAction) return null;
 
+  // Preflop: use range classification language instead of percentages
+  if (preflopClassification) {
+    const classText = classificationToCoachingText(preflopClassification);
+    return `${classText} Your ${formatAction(userAction)} doesn't match the standard play here.`;
+  }
+
+  // Postflop: existing percentage-based contrast
   const userFreq = frequencies[userAction] ?? 0;
   const optFreq = optimalFrequency;
 
@@ -110,6 +120,7 @@ export function buildNarrativeFeedback(
   optimalFrequency: number,
   frequencies: ActionFrequencies,
   archetypeId?: ArchetypeId,
+  preflopClassification?: PreflopClassification,
 ): NarrativeFeedback {
   // What the action communicated
   const actionKey = userAction.replace(/_.*/, "") === "bet" || userAction.replace(/_.*/, "") === "raise"
@@ -118,7 +129,7 @@ export function buildNarrativeFeedback(
   const actionNarrative = ACTION_STORIES[actionKey] ?? ACTION_STORIES[userAction.replace(/_.*/, "")] ?? `You chose ${userAction}.`;
 
   // GTO contrast
-  const gtoContrastNarrative = buildGtoContrast(userAction, optimalAction, optimalFrequency, frequencies);
+  const gtoContrastNarrative = buildGtoContrast(userAction, optimalAction, optimalFrequency, frequencies, preflopClassification);
 
   // Narrative alignment
   let narrativeAlignment: NarrativeFeedback["narrativeAlignment"] = null;

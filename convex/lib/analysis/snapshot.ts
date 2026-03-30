@@ -170,8 +170,8 @@ export type SnapshotDetailLevel = boolean | "lite";
 export interface SnapshotOptions {
   /** Detail level:
    *  - false: minimal (GTO action, basic state, no stories/commentary)
-   *  - "lite": everything EXCEPT Monte Carlo equity (opponent cards, commentary, stories without equity)
-   *  - true: full capture including Monte Carlo equity computations
+   *  - "lite": stories and commentary without debug data
+   *  - true: full capture including debug data
    */
   debug?: SnapshotDetailLevel;
   /** Opponent profiles keyed by seat index */
@@ -184,6 +184,19 @@ export interface SnapshotOptions {
  * Capture everything the user would see at this decision point.
  * Runs all analysis pipelines and returns structured data.
  */
+/** Normalize frequencies to sum to 1.0 (fix rounding/remap artifacts). */
+function normalizeFrequencies(freqs: ActionFrequencies): ActionFrequencies {
+  const sum = Object.values(freqs).reduce((s, v) => s + (v ?? 0), 0);
+  if (sum <= 0 || Math.abs(sum - 1) < 0.02) return freqs; // already ~1.0
+  const result: ActionFrequencies = {};
+  for (const [key, val] of Object.entries(freqs)) {
+    if (val !== undefined && val !== null) {
+      result[key as keyof ActionFrequencies] = val / sum;
+    }
+  }
+  return result;
+}
+
 export function captureFullSnapshot(
   gameState: GameState,
   heroSeat: number,
@@ -250,6 +263,8 @@ export function captureFullSnapshot(
 
   // ── Opponent stories ──
   const rawOpponentStories: OpponentStory[] = [];
+  /** Track which opponent (by index in activeOpponents) each story belongs to */
+  const storyOpponentIndices: number[] = [];
   const detailLevel = opts.debug;
   const includeStories = detailLevel === true || detailLevel === "lite";
 
@@ -258,7 +273,8 @@ export function captureFullSnapshot(
   );
 
   if (includeStories) {
-    for (const opp of activeOpponents) {
+    for (let oppIdx = 0; oppIdx < activeOpponents.length; oppIdx++) {
+      const opp = activeOpponents[oppIdx];
       const profile = opts.opponentProfiles?.get(opp.seatIndex);
       if (!profile) continue;
       const oppActions: PlayerAction[] = gameState.actionHistory
@@ -267,17 +283,17 @@ export function captureFullSnapshot(
       if (oppActions.length === 0) continue;
 
       try {
-        // "lite" mode skips Monte Carlo equity — passes skipEquity flag
+        // phe-based MC equity (~0.1ms per opponent)
         const story = buildOpponentStory(
           heroCards, communityCards, oppActions, profile, opp.position,
           gameState.pot.total / bigBlind,
           legal?.canCall ? legal.callAmount / bigBlind : 0,
           street, opts.deadCards ?? [],
           boardTex ?? undefined,
-          detailLevel === "lite", // skipEquity
           true, // inferFromActions: coach is blind to setup (Layer 7)
         );
         rawOpponentStories.push(story);
+        storyOpponentIndices.push(oppIdx);
       } catch { /* best-effort */ }
     }
   }
@@ -318,7 +334,10 @@ export function captureFullSnapshot(
       const actualFoldRate = allOppActions.filter(a => a.actionType === "fold").length / allOppActions.length;
       const deviation = Math.abs(actualFoldRate - gtoFoldRate);
       const advice = getCounterAdvice(inferred.pattern, allOppActions.length, deviation);
-      counterAdviceForCommentary = advice;
+      // Gate counter advice confidence by the inference confidence (capped for single-hand)
+      // to prevent high counter-advice confidence from small samples
+      const gatedConfidence = Math.min(advice.confidence, inferred.confidence);
+      counterAdviceForCommentary = { ...advice, confidence: gatedConfidence };
       if (advice.confidence > 0.2) {
         counterAdviceResult = {
           pattern: advice.pattern,
@@ -353,6 +372,7 @@ export function captureFullSnapshot(
         counterAdvice: counterAdviceForCommentary,
         inferredBehavior: inferredBehaviorResult,
         confidenceTier: gtoLookup?.confidence?.implications.tier,
+        preflopClassification: gtoLookup?.preflopClassification,
       });
       commentary = {
         narrative: result.narrative,
@@ -432,14 +452,17 @@ export function captureFullSnapshot(
       textureId: archetype.textureArchetypeId,
     } : null,
 
-    gtoFrequencies: gtoLookup?.frequencies ?? null,
+    gtoFrequencies: gtoLookup?.frequencies ? normalizeFrequencies(gtoLookup.frequencies) : null,
     gtoSource: gtoLookup?.source ?? null,
     gtoOptimalAction,
 
-    opponentStories: rawOpponentStories.map((s, i) => ({
-      seatIndex: activeOpponents[i]?.seatIndex ?? i,
-      position: activeOpponents[i] ? positionDisplayName(activeOpponents[i].position) : "unknown",
-      profileName: opts.opponentProfiles?.get(activeOpponents[i]?.seatIndex ?? i)?.name ?? "unknown",
+    opponentStories: rawOpponentStories.map((s, i) => {
+      const oppIdx = storyOpponentIndices[i] ?? i;
+      const opp = activeOpponents[oppIdx];
+      return {
+      seatIndex: opp?.seatIndex ?? i,
+      position: opp ? positionDisplayName(opp.position) : "unknown",
+      profileName: opts.opponentProfiles?.get(opp?.seatIndex ?? i)?.name ?? "unknown",
       equityVsRange: s.data.equityVsRange,
       rangePercent: s.data.rangePercent,
       confidence: s.confidence,
@@ -451,7 +474,7 @@ export function captureFullSnapshot(
         action: sn.action,
         interpretation: sn.interpretation,
       })),
-    })),
+    };}),
 
     actionStories: rawActionStories.map((s) => ({
       action: s.action,

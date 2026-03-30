@@ -1,4 +1,9 @@
 /**
+ * DEPRECATED — This benchmark used the old per-hand-class frequency table
+ * system (lookupPreflopHandClass, handClassToActionFrequencies) which has
+ * been replaced by range classifications (preflopClassification.ts).
+ * Kept for reference only; will not compile as-is.
+ *
  * PokerBench Benchmark — validate HoldemVision engine accuracy
  * against solver-optimal decisions.
  *

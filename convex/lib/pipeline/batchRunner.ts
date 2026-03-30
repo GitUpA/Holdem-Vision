@@ -12,8 +12,11 @@
  * Pure TypeScript, zero Convex/React imports.
  */
 
-import type { OpponentProfile } from "../types/opponents";
+import type { OpponentProfile, PlayerAction } from "../types/opponents";
 import { HandStepper, type StepperConfig } from "../analysis/handStepper";
+import { SessionMemory } from "./sessionMemory";
+import { updateExploiterModifiers } from "../opponents/adaptiveProfile";
+import { classifyAction } from "../opponents/rangeEstimator";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -77,19 +80,57 @@ export function runBatch(config: BatchConfig): BatchResult {
   let wins = 0;
   let losses = 0;
 
+  // Session memory for adaptive profiles (exploiter)
+  const heroIsAdaptive = heroProfile.id === "exploiter";
+  const villainIsAdaptive = villainProfile.id === "exploiter";
+  const useMemory = heroIsAdaptive || villainIsAdaptive;
+  const memory = useMemory ? new SessionMemory() : null;
+
   for (let i = 0; i < hands; i++) {
+    // Update adaptive modifier before each hand
+    if (memory && heroIsAdaptive) {
+      // Hero adapts to villain — compute counter-modifier from villain's pattern
+      for (let s = 1; s < numPlayers; s++) {
+        updateExploiterModifiers(memory, s);
+      }
+    }
+
     const stepper = new HandStepper({
       numPlayers,
       startingStack,
       heroSeat: 0,
-      dealerSeat: i % numPlayers, // rotate dealer each hand
+      dealerSeat: i % numPlayers,
       heroProfile,
       villainProfile,
-      seed: seed + i, // unique seed per hand, deterministic
+      seed: seed + i,
     });
 
     const result = stepper.playFullHand();
     if (!result.finalState) continue;
+
+    // Feed actions into session memory
+    if (memory && result.finalState) {
+      const actionHistory = result.finalState.actionHistory;
+      for (let ai = 0; ai < actionHistory.length; ai++) {
+        const a = actionHistory[ai];
+        const allPlayerActions: PlayerAction[] = actionHistory
+          .filter(x => x.seatIndex === a.seatIndex)
+          .map(x => ({ street: x.street as "preflop" | "flop" | "turn" | "river", actionType: x.actionType, amount: x.amount }));
+        const playerActionIdx = allPlayerActions.findIndex(x =>
+          x.street === a.street && x.actionType === a.actionType && x.amount === a.amount
+        );
+        if (playerActionIdx >= 0) {
+          const situation = classifyAction(
+            { street: a.street as "preflop" | "flop" | "turn" | "river", actionType: a.actionType, amount: a.amount },
+            allPlayerActions, playerActionIdx,
+          );
+          memory.recordAction(a.seatIndex, situation, a.actionType);
+        }
+      }
+      for (let s = 0; s < numPlayers; s++) {
+        memory.recordHandComplete(s);
+      }
+    }
 
     const heroPlayer = result.finalState.players[0];
     const delta = heroPlayer.currentStack - startingStack;

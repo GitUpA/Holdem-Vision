@@ -689,15 +689,19 @@ export const GTO_PROFILE: OpponentProfile = {
 // Preset registry
 // ═══════════════════════════════════════════════════════
 
+// Import adaptive profile (session memory driven)
+import { EXPLOITER_PROFILE } from "./adaptiveProfile";
+
 export const PRESET_PROFILES: Record<string, OpponentProfile> = {
   nit: NIT_PROFILE,
   fish: FISH_PROFILE,
   tag: TAG_PROFILE,
   lag: LAG_PROFILE,
   gto: GTO_PROFILE,
+  exploiter: EXPLOITER_PROFILE,
 };
 
-export const PRESET_IDS = ["nit", "fish", "tag", "lag", "gto"] as const;
+export const PRESET_IDS = ["nit", "fish", "tag", "lag", "gto", "exploiter"] as const;
 export type PresetId = (typeof PRESET_IDS)[number];
 
 export function getPreset(id: PresetId): OpponentProfile {

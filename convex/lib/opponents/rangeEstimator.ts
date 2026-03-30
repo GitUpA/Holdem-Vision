@@ -306,6 +306,7 @@ function applyActionWithParams(
       profileName,
       knownCards,
       position,
+      situationKey,
     );
   }
 
@@ -327,6 +328,7 @@ function applyPreflopAction(
   profileName: string,
   knownCards: CardIndex[],
   position?: Position,
+  situationKey?: SituationKey,
 ): ActionResult {
   const { actionType } = action;
 
@@ -351,7 +353,14 @@ function applyPreflopAction(
         params.positionAwareness,
         position,
       );
-      const callRangePct = Math.min(currentPct, adjustedContinue);
+      let callRangePct = Math.min(currentPct, adjustedContinue);
+
+      // Cap calling ranges in re-raise pots — calling a 3-bet/4-bet is narrow
+      if (situationKey === "preflop.facing_3bet") {
+        callRangePct = Math.min(callRangePct, 12); // calling a 3-bet
+      } else if (situationKey === "preflop.facing_4bet") {
+        callRangePct = Math.min(callRangePct, 5);  // calling a 4-bet+
+      }
       const newRange = topPercentRange(callRangePct, knownCards);
 
       // Reduce weight on very top hands (those would have raised)
@@ -384,21 +393,54 @@ function applyPreflopAction(
 
     case "raise":
     case "bet": {
-      // Raise range = continuePct * raisePct fraction
+      // Raise range = continuePct * raisePct fraction, then narrow for re-raises.
+      // Each additional raise level dramatically shrinks the range:
+      //   Single raise (open): 10-18% (position dependent) — use profile params as-is
+      //   3-bet: 5-8% — cap at 8%
+      //   4-bet: 3-4% — cap at 4%
+      //   5-bet+: 2-3% — cap at 3%
       const adjustedContinue = applyPositionAdjustment(
         params.continuePct,
         params.positionAwareness,
         position,
       );
-      const raisePct = adjustedContinue * (params.raisePct / 100);
+      let raisePct = adjustedContinue * (params.raisePct / 100);
+
+      // Apply re-raise narrowing based on situation key.
+      // situationKey tracks THIS player's raise count, but each re-raise
+      // implies an intervening opponent raise. So a player's 2nd raise
+      // is always a 4-bet (open → opponent 3-bet → hero 4-bet).
+      let raiseLabel = "raised";
+      if (situationKey === "preflop.facing_raise") {
+        // Player's 2nd raise = 4-bet (open → opp 3-bet → hero 4-bet)
+        raisePct = Math.min(raisePct, 4);
+        raiseLabel = "4-bet";
+      } else if (situationKey === "preflop.facing_3bet") {
+        // Player's 3rd raise = 6-bet
+        raisePct = Math.min(raisePct, 2.5);
+        raiseLabel = "6-bet";
+      } else if (situationKey === "preflop.facing_4bet") {
+        // Player's 4th+ raise — near-premium only
+        raisePct = Math.min(raisePct, 2);
+        raiseLabel = "re-raise";
+      } else if (situationKey === "preflop.open") {
+        // Player's first raise — could be an open (wide) or initial 3-bet
+        // If currentPct is already narrow (< 20%), this is probably a 3-bet
+        // not an open. Cap to avoid showing as a wide opener.
+        if (currentPct < 20) {
+          raisePct = Math.min(raisePct, 8);
+          raiseLabel = "3-bet";
+        }
+      }
+
       const newRange = topPercentRange(raisePct, knownCards);
 
       return {
         range: newRange,
         newPct: raisePct,
         explanation: {
-          summary: `${profileName} raised preflop → range ~${raisePct.toFixed(0)}%`,
-          detail: `${profileName} raises with top ${raisePct.toFixed(0)}% of hands. This includes ${describeRangeTop(raisePct)}.`,
+          summary: `${profileName} ${raiseLabel} preflop → range ~${raisePct.toFixed(0)}%`,
+          detail: `${profileName} ${raiseLabel}s with top ${raisePct.toFixed(0)}% of hands. This includes ${describeRangeTop(raisePct)}.`,
           sentiment: raisePct < 15 ? "warning" : "neutral",
           tags: ["preflop-raise"],
         },
@@ -475,7 +517,10 @@ function applyPostflopAction(
     }
 
     case "check": {
-      // Checking removes the strongest hands from range (they would bet)
+      // Checking suggests weaker holdings, but don't over-discount:
+      // opponents sometimes check strong hands (trapping, pot control).
+      // Use a mild discount — aggressive discounting causes equity drift
+      // when opponent bet earlier then checks (their range is already narrow).
       const betLikelihood = params.continuePct / 100;
       const adjustedRange: WeightedRange = new Map();
 
@@ -484,9 +529,10 @@ function applyPostflopAction(
         const strengthPct = handIdx / HAND_STRENGTH_ORDER.length;
 
         if (strengthPct < 0.1) {
-          adjustedRange.set(combo, weight * (1 - betLikelihood * 0.8));
+          // Premium hands: mild discount (they could be trapping)
+          adjustedRange.set(combo, weight * (1 - betLikelihood * 0.35));
         } else if (strengthPct < 0.3) {
-          adjustedRange.set(combo, weight * (1 - betLikelihood * 0.3));
+          adjustedRange.set(combo, weight * (1 - betLikelihood * 0.12));
         } else {
           adjustedRange.set(combo, weight);
         }
@@ -544,7 +590,9 @@ function applyPostflopAction(
       const bluffFreq = params.bluffFrequency;
 
       // Narrow to strong value hands + some bluffs
-      const valuePct = currentPct * 0.4;
+      // Floor at 3% to prevent over-narrowing on paired/trip boards
+      // where blocked combos make tiny ranges even tinier
+      const valuePct = Math.max(currentPct * 0.4, 3);
       const valueRange = topPercentRange(valuePct, knownCards);
 
       const adjustedRange: WeightedRange = new Map(valueRange);
@@ -585,7 +633,8 @@ function applyPostflopAction(
 
     case "all_in": {
       // All-in postflop: very polarized — nuts or desperation
-      const nutsRange = topPercentRange(currentPct * 0.15, knownCards);
+      // Floor at 1.5% to prevent over-narrowing on paired/trip boards
+      const nutsRange = topPercentRange(Math.max(currentPct * 0.15, 1.5), knownCards);
       const bluffWeight = params.bluffFrequency > 0.2 ? 0.15 : 0.05;
 
       const adjustedRange: WeightedRange = new Map(nutsRange);

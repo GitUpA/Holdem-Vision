@@ -262,7 +262,7 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 
 ### Layer 2: The Funnel Property
 ✅ **IMPLEMENTED.** `HandContext` (Phase 3) tracks the funnel across streets. `buildContextFromGameState()` reconstructs context from action history.
-✅ **ENFORCED (hero).** `constrainedDealer.ts` uses position-aware PokerBench grid lookup (Phase 6). Hero hands must have >10% GTO raise frequency for their position.
+✅ **ENFORCED (hero).** `constrainedDealer.ts` uses position-aware preflop frequency table lookup. Hero hands must have >10% GTO raise frequency for their position.
 ⚠️ **PARTIAL (villain).** Villain hands in archetype drills are still random (not constrained to their preflop range). Hero funnel is correct; villain funnel is approximate.
 
 ### Layer 3: Ranges, Not Hands
@@ -278,7 +278,7 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 
 **GTO Does Everything — Predictability:**
 ✅ **CONCEPTUALLY CORRECT.** Engine samples from frequency distributions — GTO profile uses identity modifier (pure frequencies), other profiles warp them.
-⚠️ **DATA QUALITY FLAG.** PokerBench preflop data has known issues: 67% low-sample cells, range sizes 9-16% above targets. However, GTO vs GTO converges to ~0 BB/100 over 20K hands (variance, not bias). Data is directionally correct but approximate.
+✅ **DATA QUALITY.** PokerBench preflop replaced with complete solver-quality frequency table (3,380 cells). Generated from validated GTO ranges with equity-based edge frequencies. No limp in RFI, premiums never fold >5%, position-aware gradients. GTO vs GTO converges to ~0 BB/100 over 20K hands.
 
 **The Small Sample Problem:**
 ✅ **TYPE EXISTS.** `PreflopConfidence` tracks sample counts and confidence levels.
@@ -298,7 +298,7 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 ⚠️ **PARTIAL (coaching lens).** `coachingLens.ts` still passes profile objects directly to `buildDecisionContext()` for running profile rows (TAG/LAG/NIT/FISH). The OPPONENT STORY is blind, but the PROFILE ROWS still use assigned profiles. This is architecturally acceptable — the profile rows show "what would TAG do?" which requires knowing the TAG profile. The opponent story (the coaching voice) is blind. **→ Acceptable for now.**
 
 ### Layer 8: Computation Strategy
-✅ **FAST PATH.** Preflop: PokerBench per-hand-class data. Postflop: TexasSolver tables (193 boards). Equity: `equityLookup.ts` (14 categories × 4 range widths, interpolated). Headless runs ~1000 hands/second with zero Monte Carlo.
+✅ **FAST PATH.** Preflop: complete solver-quality frequency table (3,380 cells across 5 archetypes × 6 positions × 169 hand classes). Postflop: TexasSolver tables (193 boards) + 56 facing-bet tables. Equity: `equityLookup.ts` (14 categories × 4 range widths, interpolated). Headless runs ~1000 hands/second with zero Monte Carlo.
 ✅ **EQUITY WIRED.** `opponentStory.ts` uses `lookupEquityInterpolated()` on fast path (skipEquity=true). Produces real equity estimates without MC.
 ✅ **PRECISION PATH.** Monte Carlo available in browser for user-activated deep analysis (skipEquity=false).
 
@@ -306,7 +306,7 @@ The coaching doesn't just say "GTO recommends X." It says "GTO recommends X, but
 ✅ **SYMMETRIC TEST PASSES.** GTO vs GTO = +4.38 BB/100 over 20K hands (converges to ~0). System is fair.
 ✅ **FULL MATRIX RUNS.** `payoffMatrix.ts` generates K×K matrix. 4-profile matrix (GTO/TAG/NIT/FISH) runs in ~4 seconds. GTO is best overall (+0.00 avg).
 ✅ **CONFIDENCE MODEL BUILT.** `computeBehaviorConfidence()`: Bayesian inference from N observations × deviation. `confidenceLabel()`: "speculative" → "very high".
-✅ **TUNED.** 56 facing-bet tables: 24 generic (8 archetypes × 3 streets) + 32 scenario-specific (4 preflop scenarios × 8 archetypes). Position-aware: UTG c-bet uses UTG-specific solver data. GTO vs GTO converges to ~0. Profile ranking: TAG +37 > LAG +30 > GTO +15 > FISH +1 > NIT -4. Coaching audit: 1000 hands, 1397 decisions, 0 issues. DataConfidence framework surfaces uncertainty to coaching.
+✅ **TUNED.** 56 facing-bet tables: 24 generic (8 archetypes × 3 streets) + 32 scenario-specific (4 preflop scenarios × 8 archetypes). Position-aware: UTG c-bet uses UTG-specific solver data. GTO vs GTO converges to +0.07 BB/100 over 20K hands (~0). Profile ranking (30K hands/matchup, statistically significant): TAG +20.2 > LAG +17.3 > GTO +15.7 > NIT +3.6 > FISH -4.8. Coaching audit: 1000 hands, 0 issues. DataConfidence framework surfaces uncertainty to coaching.
 
 ### Layer 10: The Meta-Game — Emergent Knowledge Base
 ⚠️ **NOT IMPLEMENTED.** No counter-strategy map, no recursive matrix testing, no empirically-derived coaching adjustments. **→ Phase 9a + 9b needed. Requires calibrated symmetric test first.**
@@ -324,11 +324,12 @@ First Principles:
 ├── ✅ Small sample problem (confidence surfaced in coaching narrative)
 ├── ✅ Every seat is a player (HandStepper, batchRunner, deterministic)
 ├── ✅ Coach is blind to setup (inferBehavior, snapshot path blind)
-├── ✅ Pre-compute everything (preflop ✅, postflop ✅, equity tables ✅)
+├── ✅ Pre-compute everything (preflop solver-quality ✅, postflop ✅, facing-bet ✅, equity tables ✅)
 ├── ✅ Payoff matrix (infrastructure ✅, GTO vs GTO converges to ~0, full K×K matrix runs)
 ├── ✅ Counter-strategies (counterStrategyMap.ts — per-pattern adjustments + narratives)
 ├── ✅ Confidence model (Bayesian: N observations × deviation → confidence 0-1)
-└── ✅ Meta-GTO foundation (counter-strategy map + exploitative coaching builder)
+├── ✅ Meta-GTO foundation (counter-strategy map + exploitative coaching builder)
+└── ✅ Self-improving coaching (/improve-system + /improve-coaching — 500+ hands, 22+ fixes)
 ```
 
 ## Holes — Ordered by Priority
@@ -356,4 +357,18 @@ First Principles:
 6. ~~**HandContext not populated**~~ **RESOLVED.** HandSession builds/updates HandContext at startHand, act, advanceOpponents, finalize.
 
 7. **Adaptive villains** — Villains don't adjust to hero's behavior over a session. **Future enhancement — only remaining hole.**
+
+### Self-Improving Coaching (2026-03-28)
+
+✅ **BUILT.** `/improve-system` skill plays 50 hands step-by-step, reasons about each decision using poker knowledge, compares against coaching output, flags disagreements. `/improve-coaching` runs automated 1000-hand semantic and coherence audits. 11 runs across 500+ hands and all 5 profiles found and fixed 22+ coaching issues including:
+- Facing-bet GTO data routing (facing-bet solver tables now consulted)
+- Exploit contradiction resolution (don't bluff + bet → check override)
+- Draw-specific MDF narratives (draws call for odds, not bluff-catching)
+- Board texture warnings (trips/paired boards)
+- Position-blind preflop frequencies → complete solver-quality table (3,380 cells)
+- Opponent seat attribution fix
+- Preflop-appropriate range language
+- Second_pair hand category for pocket pairs below top card
+- Equity-aware exploit overrides
+- Multi-street narrative coherence verified across all streets and pot sizes
 ```

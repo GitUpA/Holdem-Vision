@@ -33,6 +33,7 @@ export function useAnalysis(
     "threats",
     "outs",
     "draws",
+    "coaching",
   ]);
 
   const availableLenses = useMemo(() => getLensInfo(), []);

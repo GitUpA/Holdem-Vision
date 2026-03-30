@@ -81,6 +81,7 @@ export function buildDataConfidence(
     case "category":
       return buildCategoryConfidence(result, potSizeBB);
     case "preflop-handclass":
+    case "preflop-classification":
       return buildPreflopConfidence(result, potSizeBB);
     case "postflop-handclass":
       return buildPostflopHandClassConfidence(result, potSizeBB);

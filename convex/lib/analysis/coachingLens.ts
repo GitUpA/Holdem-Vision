@@ -58,6 +58,8 @@ export interface CoachingSolverData {
   accuracyImpact?: AccuracyImpact;
   /** Preflop confidence based on sample count */
   preflopConfidence?: import("../gto/tables").PreflopConfidence;
+  /** Preflop range classification */
+  preflopClassification?: import("../gto/preflopClassification").PreflopClassification;
   /** Whether this is a mixed strategy spot (two actions both > 25%, gap < 20%) */
   isMixedStrategy?: boolean;
   /** Alternative actions that are also correct in this spot */
@@ -476,6 +478,7 @@ function tryGtoSolverLookup(
     bands: remappedBands,
     archetypeAccuracy: result.archetypeAccuracy,
     preflopConfidence: result.preflopConfidence,
+    preflopClassification: result.preflopClassification,
   };
   enrichWithMixedStrategy(solverData);
 

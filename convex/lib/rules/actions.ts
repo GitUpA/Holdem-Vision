@@ -50,8 +50,11 @@ export function getLegalActions(state: GameState): LegalActions | null {
 
   // Can raise if there's a current bet
   // Must have enough chips to call + min raise increment
+  // Cap at 4 raises per street to prevent degenerate re-raise loops
+  const MAX_RAISES_PER_STREET = 4;
   const raiseMinTotal = state.currentBet + state.minRaiseSize;
-  const canRaise = state.currentBet > 0 && stack > toCall && toCall >= 0;
+  const canRaise = state.currentBet > 0 && stack > toCall && toCall >= 0
+    && state.raiseCount < MAX_RAISES_PER_STREET;
   const raiseMin = canRaise ? Math.min(raiseMinTotal, player.streetCommitted + stack) : 0;
   const raiseMax = canRaise ? player.streetCommitted + stack : 0;
 

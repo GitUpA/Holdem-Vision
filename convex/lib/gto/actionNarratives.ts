@@ -71,7 +71,7 @@ export function buildActionStories(
       action: "check",
       narrative: getCheckNarrative(street, strength, hasBoard),
       counterNarrative: opponentStory
-        ? getCheckCounter(opponentStory, strength)
+        ? getCheckCounter(opponentStory, strength, street)
         : undefined,
     });
   }
@@ -132,10 +132,12 @@ function getFoldNarrative(street: Street, callAmount: number, strength: number):
 
 function getFoldCounter(story: OpponentStory, strength: number): string {
   if (story.data.equityVsRange < 0.25) {
-    return "Their story says you're dominated. Folding respects the math.";
+    if (strength < 0.2) return "You have nothing against a strong range. Folding saves chips for a better spot.";
+    return "Your hand can't stand the heat — their range crushes yours. Fold and wait for a better spot.";
   }
   if (story.data.equityVsRange < 0.4) {
-    return "Their story suggests strength. Without the right odds, folding is disciplined.";
+    if (story.confidence === "strong") return "They've shown real strength through multiple actions. Without better odds, folding is disciplined.";
+    return "The numbers don't support continuing here. Save your stack for a clearer spot.";
   }
   return "You might be ahead, but folding avoids a tough spot. Is discretion the right play here?";
 }
@@ -157,11 +159,20 @@ function getCheckNarrative(street: Street, strength: number, hasBoard: boolean):
   return "I'm giving up on this street without investing more. Maybe I'll improve.";
 }
 
-function getCheckCounter(story: OpponentStory, strength: number): string {
+function getCheckCounter(story: OpponentStory, strength: number, street?: Street): string {
   if (story.data.equityVsRange > 0.55) {
     return "You're ahead of their range — checking might miss value but controls the pot.";
   }
-  return "Their story says they're strong. Checking avoids bloating a pot where you're behind.";
+  if (story.data.equityVsRange > 0.4) {
+    return "Pot control — your hand has some value but building a bigger pot risks running into better.";
+  }
+  if (strength > 0.3) {
+    if (street === "river") {
+      return "You have showdown value but not enough to bet for value. Check and see if your hand holds up.";
+    }
+    return "You have showdown value but not enough to bet for value. Check and evaluate on the next street.";
+  }
+  return "You're behind — checking keeps the pot small and avoids investing more with a weak hand.";
 }
 
 // ═══════════════════════════════════════════════════════
@@ -217,7 +228,11 @@ function getBetCounter(story: OpponentStory, strength: number): string {
   if (story.data.equityVsRange > 0.55) {
     return "You're likely ahead — betting builds the pot when you have the edge.";
   }
-  if (story.confidence === "strong" && story.data.equityVsRange < 0.4) {
+  // Only warn about "betting into strength" if villain's LATEST action was aggressive.
+  // If villain checked, they showed weakness — betting is fine.
+  const lastAction = story.streetNarratives[story.streetNarratives.length - 1];
+  const villainShowedStrength = lastAction?.action === "bet" || lastAction?.action === "raise";
+  if (villainShowedStrength && story.data.equityVsRange < 0.4) {
     return "Their story says they're strong. Betting into strength is risky — are you turning your hand into a bluff?";
   }
   return "Their range is mixed. A bet tests their story and puts the decision back on them.";

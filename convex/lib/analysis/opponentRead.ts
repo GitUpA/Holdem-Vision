@@ -25,8 +25,9 @@ import { monteCarloEquity, type EquityResult } from "./monteCarlo";
 import { estimateRange } from "../opponents/rangeEstimator";
 import { resolveProfile } from "../opponents/profileResolver";
 import { comboToCards, rangePct } from "../opponents/combos";
-import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
 import { cardToDisplay } from "../primitives/card";
+// @ts-expect-error — phe doesn't ship types
+import { evaluateCardCodes } from "phe";
 import { foldEquityScenarios, type SolverFoldContext } from "./foldEquity";
 import { classifyArchetype, contextFromGameState } from "../gto/archetypeClassifier";
 import { lookupFrequencies, hasTable } from "../gto/tables";
@@ -247,12 +248,17 @@ function buildSolverFoldContext(
  * Compute equity of heroCards against a weighted range of opponent holdings.
  * Samples combos from the range proportional to their weight.
  */
+/** Convert CardIndex (0-51) to phe card code. */
+function toPhe(card: CardIndex): number {
+  return Math.floor(card / 4) * 4 + (card % 4);
+}
+
 export function equityVsRange(
   heroCards: CardIndex[],
   communityCards: CardIndex[],
   range: WeightedRange,
   deadCards: CardIndex[],
-  trials: number = 5000,
+  trials: number = 500,
 ): EquityResult {
   if (range.size === 0) {
     return { win: 1, tie: 0, lose: 0, trials: 0, handDistribution: {} };
@@ -288,7 +294,6 @@ export function equityVsRange(
   let wins = 0;
   let ties = 0;
   let losses = 0;
-  const handCounts: Record<string, number> = {};
   const communityNeeded = 5 - communityCards.length;
 
   // Available cards for completing the board
@@ -319,21 +324,15 @@ export function equityVsRange(
     const shuffled = fisherYatesSample(available, communityNeeded);
     const fullCommunity = [...communityCards, ...shuffled];
 
-    // Evaluate
-    const heroAll = [...heroCards, ...fullCommunity];
-    const oppAll = [...oppCards, ...fullCommunity];
+    // Evaluate using phe (16M evals/sec vs 1M with evaluateHand)
+    const communityPhe = fullCommunity.map(toPhe);
+    const heroRank = evaluateCardCodes([...heroCards.map(toPhe), ...communityPhe]);
+    const oppRank = evaluateCardCodes([...oppCards.map(toPhe), ...communityPhe]);
 
-    const heroEval = evaluateHand(heroAll);
-    const oppEval = evaluateHand(oppAll);
-
-    // Track distribution
-    const handName = heroEval.rank.name;
-    handCounts[handName] = (handCounts[handName] ?? 0) + 1;
-
-    const cmp = compareHandRanks(heroEval.rank, oppEval.rank);
-    if (cmp > 0) wins++;
-    else if (cmp === 0) ties++;
-    else losses++;
+    // phe: lower rank = better hand
+    if (oppRank < heroRank) losses++;
+    else if (oppRank === heroRank) ties++;
+    else wins++;
   }
 
   const total = wins + ties + losses;
@@ -341,17 +340,12 @@ export function equityVsRange(
     return { win: 1, tie: 0, lose: 0, trials: 0, handDistribution: {} };
   }
 
-  const handDistribution: Record<string, number> = {};
-  for (const [name, count] of Object.entries(handCounts)) {
-    handDistribution[name] = count / total;
-  }
-
   return {
     win: wins / total,
     tie: ties / total,
     lose: losses / total,
     trials: total,
-    handDistribution,
+    handDistribution: {},
   };
 }
 

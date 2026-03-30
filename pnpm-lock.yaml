@@ -32,6 +32,9 @@ importers:
       next:
         specifier: 16.1.6
         version: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      phe:
+        specifier: ^0.6.0
+        version: 0.6.0
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3046,6 +3049,9 @@ packages:
 
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
+
+  phe@0.6.0:
+    resolution: {integrity: sha512-OUhqPZdGeqcu6AZ38WTW+pVPcb4hzaoZweliBAlgIsmSNPTkMKsTGly5+aiwPlCiwz2e3n5K9WBHgKbMSx/KFw==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -6744,6 +6750,8 @@ snapshots:
   path-to-regexp@8.3.0: {}
 
   pathe@2.0.3: {}
+
+  phe@0.6.0: {}
 
   picocolors@1.1.1: {}
 

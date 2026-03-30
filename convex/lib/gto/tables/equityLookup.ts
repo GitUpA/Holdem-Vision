@@ -110,9 +110,19 @@ const EQUITY_TABLE: Record<string, Record<string, number>> = {
     very_wide: 0.38,
   },
 
+  // ── Preflop broadways (AK, AQ, KQ, etc. before the flop) ──
+  // Separated from postflop overcards — broadways preflop have much
+  // higher equity since they haven't missed the board yet.
+  premium_broadway: {
+    tight: 0.38,    // AQs/AKo vs premium range
+    medium: 0.45,   // vs standard opening range
+    wide: 0.52,     // vs wide range
+    very_wide: 0.56,
+  },
+
   // ── Weak hands ──
   overcards: {
-    tight: 0.22,
+    tight: 0.22,    // Postflop overcards (e.g., AK on 567 board)
     medium: 0.28,
     wide: 0.32,
     very_wide: 0.35,
@@ -128,6 +138,27 @@ const EQUITY_TABLE: Record<string, Record<string, number>> = {
     medium: 0.15,
     wide: 0.20,
     very_wide: 0.22,
+  },
+
+  // ── Preflop weak hands (5 cards to come = much higher equity) ──
+  // Even the worst preflop hand (72o) has ~32% equity vs a tight range.
+  preflop_air: {
+    tight: 0.32,
+    medium: 0.35,
+    wide: 0.38,
+    very_wide: 0.40,
+  },
+  preflop_weak_draw: {
+    tight: 0.35,
+    medium: 0.38,
+    wide: 0.41,
+    very_wide: 0.43,
+  },
+  preflop_overcards: {
+    tight: 0.30,
+    medium: 0.35,
+    wide: 0.40,
+    very_wide: 0.44,
   },
 };
 

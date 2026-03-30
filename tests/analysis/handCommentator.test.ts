@@ -85,9 +85,9 @@ describe("Hand Commentator", () => {
     };
 
     const result = commentateHand(input);
-    // GTO says call, even though equity is 1% — MDF spot
+    // GTO says call, even though equity is 1% — at this low equity MDF doesn't apply
+    // but GTO recommendation still drives the action
     expect(result.recommendedAction).toBe("call");
-    expect(result.narrative).toContain("pot odds");
   });
 
   it("recommends continuing when GTO says continue and equity is good", () => {

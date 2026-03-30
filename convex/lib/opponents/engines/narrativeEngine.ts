@@ -25,6 +25,7 @@ import { actionVerb } from "./narrativeTemplates";
 import { formatSituation } from "./types";
 import { getModifierMap } from "./modifierProfiles";
 import { detectMixedStrategy, type MixedStrategyInfo } from "../../gto/mixedStrategy";
+import { classificationToCoachingText } from "../../gto/preflopClassification";
 
 // ═══════════════════════════════════════════════════════
 // MAIN ENTRY POINT
@@ -49,6 +50,7 @@ export function buildNarrativeExplanation(input: NarrativeInput): RenderedNarrat
     modifiedFrequencies,
     gtoSource,
     arc,
+    preflopClassification,
   } = input;
 
   // Get or derive narrative profile
@@ -82,6 +84,7 @@ export function buildNarrativeExplanation(input: NarrativeInput): RenderedNarrat
     narrativeProfile, action, interpretation, factors,
     gtoFrequencies, modifiedFrequencies, gtoSource, situationKey,
     profileName, baseModifier.deviationReason, isGtoProfile, mixed,
+    preflopClassification,
   );
 
   return {
@@ -186,6 +189,7 @@ function buildExplanationTree(
   deviationReason: string,
   isGtoProfile: boolean,
   mixed: MixedStrategyInfo,
+  preflopClassification?: NarrativeInput["preflopClassification"],
 ): ExplanationNode {
   const situationLabel = formatSituation(situationKey);
   const verb = actionVerb(action.actionType as import("../../state/gameState").ActionType);
@@ -264,20 +268,29 @@ function buildExplanationTree(
     });
   }
 
-  // GTO base frequencies (preserved for backward compat)
-  const gtoChildren: ExplanationNode[] = Object.entries(gtoFrequencies)
-    .filter(([, v]) => (v ?? 0) > 0.01)
-    .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
-    .map(([a, v]) => ({
-      summary: `${a}: ${((v ?? 0) * 100).toFixed(0)}%`,
-      tags: ["frequency"] as string[],
-    }));
+  // GTO base frequencies (preflop: classification, postflop: solver frequencies)
+  if (preflopClassification) {
+    const classText = classificationToCoachingText(preflopClassification);
+    children.push({
+      summary: `Classification:${classText}`,
+      detail: preflopClassification.teachingNote,
+      tags: ["gto-base", "classification"],
+    });
+  } else {
+    const gtoChildren: ExplanationNode[] = Object.entries(gtoFrequencies)
+      .filter(([, v]) => (v ?? 0) > 0.01)
+      .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
+      .map(([a, v]) => ({
+        summary: `${a}: ${((v ?? 0) * 100).toFixed(0)}%`,
+        tags: ["frequency"] as string[],
+      }));
 
-  children.push({
-    summary: `GTO base frequencies (${gtoSource}):`,
-    children: gtoChildren,
-    tags: ["gto-base"],
-  });
+    children.push({
+      summary: `GTO base frequencies (${gtoSource}):`,
+      children: gtoChildren,
+      tags: ["gto-base"],
+    });
+  }
 
   // Modified frequencies (skip for GTO — no deviation)
   if (!isGtoProfile) {

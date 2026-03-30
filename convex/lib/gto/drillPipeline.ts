@@ -23,7 +23,7 @@ import type {
   AccuracyImpact,
 } from "./tables/types";
 import type { ConstrainedDeal, DrillConstraints } from "./constrainedDealer";
-import { getRfiFrequencies, getBbDefenseFrequencies, get3BetFrequencies, getBvbFrequencies, get4BetFrequencies } from "./tables/preflopRanges";
+import { classifyPreflopHand, classificationToFrequencies } from "./preflopClassification";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
 import type { HandSessionConfig } from "../session/types";
 
@@ -138,25 +138,10 @@ function computePreflopSolution(deal: ConstrainedDeal): SpotSolution | null {
   const archId = deal.archetype.archetypeId;
   const position = deal.heroPosition;
 
-  let freqs: { fold: number; call: number; raise: number } | null = null;
+  const classification = classifyPreflopHand(handClass, archId, position);
+  // Always return a solution for preflop — the classification IS the answer
 
-  switch (archId) {
-    case "rfi_opening": freqs = getRfiFrequencies(handClass, position); break;
-    case "bb_defense_vs_rfi": freqs = getBbDefenseFrequencies(handClass, "btn"); break;
-    case "three_bet_pots": freqs = get3BetFrequencies(handClass, position); break;
-    case "blind_vs_blind": freqs = getBvbFrequencies(handClass, position); break;
-    case "four_bet_five_bet": freqs = get4BetFrequencies(handClass, 2); break;
-  }
-
-  if (!freqs) return null;
-
-  const raiseAction: GtoAction = archId === "rfi_opening" || archId === "blind_vs_blind"
-    ? "bet_medium" : "raise_large";
-  const frequencies: ActionFrequencies = {
-    fold: freqs.fold,
-    call: freqs.call,
-    [raiseAction]: freqs.raise,
-  };
+  const frequencies = classificationToFrequencies(classification, archId);
 
   let optimalAction: GtoAction = "fold";
   let optimalFrequency = 0;
@@ -173,7 +158,7 @@ function computePreflopSolution(deal: ConstrainedDeal): SpotSolution | null {
     frequencies,
     optimalAction,
     optimalFrequency,
-    availableActions: ["fold", "call", raiseAction],
+    availableActions: Object.keys(frequencies).filter(a => (frequencies[a as GtoAction] ?? 0) > 0.001) as GtoAction[],
     explanation,
     isExactMatch: true,
     resolvedCategory: deal.handCategory.category,

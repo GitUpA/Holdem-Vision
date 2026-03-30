@@ -12,9 +12,9 @@ import { ALL_SITUATION_KEYS, deriveTendencies } from "../../convex/lib/types/opp
 import { resolveProfile } from "../../convex/lib/opponents/profileResolver";
 
 describe("preset profiles", () => {
-  it("has 5 presets", () => {
+  it("has 6 presets", () => {
     const all = getAllPresets();
-    expect(all.length).toBe(5);
+    expect(all.length).toBe(6);
   });
 
   it("all presets have required fields", () => {

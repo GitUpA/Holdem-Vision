@@ -57,12 +57,12 @@ describe("coachingLens", () => {
     expect(value.advices).toHaveLength(0);
   });
 
-  it("produces advice from all 5 preset profiles", () => {
+  it("produces advice from all preset profiles", () => {
     const context = makeContext();
     const result = coachingLens.analyze(context);
     const value = result.value as CoachingValue;
 
-    expect(value.advices).toHaveLength(5);
+    expect(value.advices.length).toBeGreaterThanOrEqual(5);
     const profileIds = value.advices.map((a) => a.profileId);
     expect(profileIds).toContain("nit");
     expect(profileIds).toContain("fish");
@@ -81,7 +81,7 @@ describe("coachingLens", () => {
     expect(result.visuals[0].priority).toBe(100);
 
     const data = result.visuals[0].data as { advices: unknown[]; consensus?: unknown };
-    expect(data.advices).toHaveLength(5);
+    expect(data.advices.length).toBeGreaterThanOrEqual(5);
   });
 
   it("each advice has valid action types", () => {
@@ -136,7 +136,7 @@ describe("coachingLens", () => {
     const result = coachingLens.analyze(context);
 
     expect(result.explanation.children).toBeDefined();
-    expect(result.explanation.children!.length).toBe(5);
+    expect(result.explanation.children!.length).toBeGreaterThanOrEqual(5);
     expect(result.explanation.summary).toContain("Coaching");
   });
 

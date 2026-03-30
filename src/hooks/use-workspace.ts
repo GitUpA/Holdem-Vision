@@ -48,6 +48,9 @@ import {
 } from "../../convex/lib/primitives/position";
 import { HandSession } from "../../convex/lib/session";
 import { PRESET_PROFILES } from "../../convex/lib/opponents/presets";
+import { SessionMemory } from "../../convex/lib/pipeline/sessionMemory";
+import { updateExploiterModifiers } from "../../convex/lib/opponents/adaptiveProfile";
+import { classifyAction } from "../../convex/lib/opponents/rangeEstimator";
 
 // Analysis
 import { runLenses, getLensInfo, isHeavyLens } from "../../convex/lib/analysis/lensRegistry";
@@ -156,6 +159,7 @@ export function useWorkspace(mode: WorkspaceMode) {
 
   // ─── HandSession ───
   const sessionRef = useRef<HandSession | null>(null);
+  const sessionMemoryRef = useRef<SessionMemory>(new SessionMemory());
 
   const getSession = useCallback((): HandSession => {
     if (!sessionRef.current) {
@@ -565,18 +569,57 @@ export function useWorkspace(mode: WorkspaceMode) {
 
   // ── Hand lifecycle (vision mode) ──
 
+  /** Update exploiter modifiers before dealing + record actions after hand */
+  const syncSessionMemory = useCallback((beforeDeal: boolean) => {
+    const memory = sessionMemoryRef.current;
+    const state = session.state;
+    if (!state) return;
+
+    if (beforeDeal) {
+      // Before new hand: update exploiter modifiers from accumulated data
+      for (const [seatIdx, profile] of session.profiles) {
+        if (profile.id === "exploiter") {
+          updateExploiterModifiers(memory, seatIdx);
+        }
+      }
+    } else {
+      // After hand: record all actions into session memory
+      const actionHistory = state.actionHistory;
+      for (let ai = 0; ai < actionHistory.length; ai++) {
+        const a = actionHistory[ai];
+        const playerActions = actionHistory
+          .filter(x => x.seatIndex === a.seatIndex)
+          .map(x => ({ street: x.street as "preflop" | "flop" | "turn" | "river", actionType: x.actionType, amount: x.amount }));
+        const idx = playerActions.findIndex(x =>
+          x.street === a.street && x.actionType === a.actionType && x.amount === a.amount
+        );
+        if (idx >= 0) {
+          const situation = classifyAction(playerActions[idx], playerActions, idx);
+          memory.recordAction(a.seatIndex, situation, a.actionType);
+        }
+      }
+      for (let s = 0; s < state.numPlayers; s++) {
+        memory.recordHandComplete(s);
+      }
+    }
+  }, [session]);
+
   const startHand = useCallback((customStacks?: number[]) => {
+    syncSessionMemory(false); // record previous hand's actions
+    syncSessionMemory(true);  // update exploiter modifiers for new hand
     const stacks = Array.isArray(customStacks) ? customStacks : undefined;
     session.startHand(stacks);
     setSelectionTarget("hero");
-  }, [session]);
+  }, [session, syncSessionMemory]);
 
   const startNextHand = useCallback(() => {
+    syncSessionMemory(false); // record previous hand's actions
+    syncSessionMemory(true);  // update exploiter modifiers for new hand
     session.dealNext();
     setDealerSeatIndex(session.dealerSeatIndex);
     setSelectionTarget("hero");
     setVillainCardBuffer(new Map());
-  }, [session]);
+  }, [session, syncSessionMemory]);
 
   const newHand = useCallback(() => {
     session.resetHand();

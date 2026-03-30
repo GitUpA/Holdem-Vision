@@ -78,9 +78,9 @@ export const GTO_RFI_RANGES: Record<string, Set<string>> = {
     "AKs", "AQs", "AJs", "ATs", "A9s", "A8s", "A7s", "A6s", "A5s", "A4s", "A3s", "A2s",
     "AKo", "AQo", "AJo", "ATo", "A9o", "A8o", "A7o", "A6o", "A5o", "A4o", "A3o", "A2o",
     "KQs", "KJs", "KTs", "K9s", "K8s", "K7s", "K6s", "K5s", "K4s", "K3s", "K2s",
-    "KQo", "KJo", "KTo", "K9o",
+    "KQo", "KJo", "KTo", "K9o", "K8o", "K7o", "K6o", "K5o",
     "QJs", "QTs", "Q9s", "Q8s", "Q7s", "Q6s", "Q5s", "Q4s", "Q3s", "Q2s",
-    "QJo", "QTo", "Q9o",
+    "QJo", "QTo", "Q9o", "Q8o",
     "JTs", "J9s", "J8s", "J7s", "J6s", "J5s",
     "JTo", "J9o",
     "T9s", "T8s", "T7s", "T6s",
@@ -107,19 +107,21 @@ export const GTO_RFI_RANGES: Record<string, Set<string>> = {
     "KQs", "KJs", "KTs", "K9s", "K8s", "K7s", "K6s", "K5s", "K4s",
     "KQo", "KJo", "KTo", "K9o",
     "QJs", "QTs", "Q9s", "Q8s", "Q7s", "Q6s", "Q5s",
-    "QJo", "QTo",
+    "QJo", "QTo", "Q9o",
     "JTs", "J9s", "J8s", "J7s", "J6s",
     "JTo", "J9o",
     "T9s", "T8s", "T7s", "T6s",
-    "T9o",
+    "T9o", "T8o",
     "98s", "97s", "96s", "95s",
-    "98o",
+    "98o", "97o",
     "87s", "86s", "85s",
-    "87o",
+    "87o", "86o",
     "76s", "75s", "74s",
-    "76o",
+    "76o", "75o",
     "65s", "64s", "63s",
+    "65o",
     "54s", "53s",
+    "54o",
     "43s",
   ]),
 };
@@ -134,20 +136,6 @@ export function isInRfiRange(handClass: string, position: string): boolean {
   return range.has(handClass);
 }
 
-/**
- * Get the approximate RFI frequencies for a hand from a position.
- * Hands in range: raise ~85%, fold ~10%, call ~5% (mixed at edges)
- * Hands not in range: fold ~95%, call ~3%, raise ~2% (occasional bluff)
- */
-export function getRfiFrequencies(
-  handClass: string,
-  position: string,
-): { fold: number; call: number; raise: number } {
-  if (isInRfiRange(handClass, position)) {
-    return { fold: 0.05, call: 0.05, raise: 0.90 };
-  }
-  return { fold: 0.95, call: 0.03, raise: 0.02 };
-}
 
 // ═══════════════════════════════════════════════════════
 // BB DEFENSE vs RFI
@@ -178,6 +166,20 @@ export const GTO_BB_DEFENSE: Record<string, { call: Set<string>; threebet: Set<s
       "JTs", "J9s",
       "T9s",
       "98s", "87s", "76s", "65s", "54s",
+    ]),
+  },
+  // vs HJ open (~35% defend total: ~25% call, ~10% 3-bet)
+  vs_hj: {
+    threebet: new Set(["AA", "KK", "QQ", "AKs", "AKo", "A5s", "A4s"]),
+    call: new Set([
+      "JJ", "TT", "99", "88", "77", "66", "55",
+      "AQs", "AJs", "ATs", "A9s", "A8s",
+      "AQo", "AJo", "ATo",
+      "KQs", "KJs", "KTs", "K9s",
+      "KQo",
+      "QJs", "QTs", "Q9s",
+      "JTs", "J9s",
+      "T9s", "T8s", "98s", "87s", "76s", "65s", "54s",
     ]),
   },
   // vs CO open (~40% defend total: ~30% call, ~10% 3-bet)
@@ -218,7 +220,7 @@ export const GTO_BB_DEFENSE: Record<string, { call: Set<string>; threebet: Set<s
       "ATs", "A9s", "A8s", "A7s", "A6s",
       "AJo", "ATo", "A9o",
       "KTs", "K9s", "K8s", "K7s", "K6s", "K5s",
-      "KQo", "KJo", "KTo",
+      "KQo", "KJo", "KTo", "K9o",
       "QJs", "QTs", "Q9s", "Q8s", "Q7s",
       "QJo", "QTo",
       "JTs", "J9s", "J8s", "J7s",
@@ -238,24 +240,6 @@ export const GTO_BB_DEFENSE: Record<string, { call: Set<string>; threebet: Set<s
   },
 };
 
-/** Get BB defense frequencies vs a raiser from a given position. */
-export function getBbDefenseFrequencies(
-  handClass: string,
-  raiserPosition: string,
-): { fold: number; call: number; raise: number } {
-  // Map raiser position to defense range
-  let key = "vs_btn"; // default to widest
-  if (raiserPosition === "utg" || raiserPosition === "hj") key = "vs_utg";
-  else if (raiserPosition === "co") key = "vs_co";
-
-  const range = GTO_BB_DEFENSE[key];
-  if (!range) return { fold: 0.80, call: 0.15, raise: 0.05 };
-
-  if (range.threebet.has(handClass)) return { fold: 0.05, call: 0.10, raise: 0.85 };
-  if (range.call.has(handClass)) return { fold: 0.05, call: 0.90, raise: 0.05 };
-  return { fold: 0.95, call: 0.03, raise: 0.02 };
-}
-
 // ═══════════════════════════════════════════════════════
 // 3-BET POTS (non-BB positions facing a raise, deciding to 3-bet or fold)
 // ═══════════════════════════════════════════════════════
@@ -269,37 +253,89 @@ export const GTO_3BET_RANGES: Record<string, Set<string>> = {
   btn: new Set([
     "AA", "KK", "QQ", "JJ", "TT",
     "AKs", "AQs", "AJs", "AKo", "AQo",
-    // Bluffs
     "A5s", "A4s", "A3s",
-    "KQs",
-    "76s", "65s", "54s",
   ]),
   // From CO vs earlier open
-  co: new Set([
-    "AA", "KK", "QQ", "JJ",
-    "AKs", "AQs", "AKo",
-    "A5s", "A4s",
-  ]),
+  co: new Set(["AA", "KK", "QQ", "JJ", "AKs", "AQs", "AKo", "A5s", "A4s"]),
   // From SB vs any open
   sb: new Set([
     "AA", "KK", "QQ", "JJ", "TT",
     "AKs", "AQs", "AJs", "ATs", "AKo", "AQo",
-    "A5s", "A4s", "A3s", "A2s",
-    "KQs", "KJs",
-    "76s", "65s",
+    "A5s", "A4s", "A3s", "A2s", "KQs", "KJs",
   ]),
+  // From HJ vs earlier open
+  hj: new Set(["AA", "KK", "QQ", "JJ", "AKs", "AQs", "AKo", "A5s"]),
+  // UTG facing a 3-bet (opened tight, now 4-betting)
+  utg: new Set(["AA", "KK", "QQ", "AKs", "AKo"]),
+  // BB facing a 3-bet (open + 3-bet happened, BB cold-decides)
+  bb: new Set(["AA", "KK", "AKs"]),
 };
 
-/** Get 3-bet frequencies for a hand facing a raise (non-BB). */
-export function get3BetFrequencies(
-  handClass: string,
-  heroPosition: string,
-): { fold: number; call: number; raise: number } {
-  const range = GTO_3BET_RANGES[heroPosition] ?? GTO_3BET_RANGES.co;
-  if (range.has(handClass)) return { fold: 0.05, call: 0.05, raise: 0.90 };
-  // Cold-call range is very narrow in GTO (mostly from BTN/CO with suited hands)
-  return { fold: 0.92, call: 0.05, raise: 0.03 };
-}
+/** Hands that 3-bet at mixed frequency (sometimes 3-bet, sometimes flat) */
+export const GTO_3BET_MIXED: Record<string, Set<string>> = {
+  btn: new Set(["KQs", "76s", "65s", "54s"]),
+  co: new Set([]),
+  sb: new Set(["76s", "65s"]),
+  hj: new Set([]),
+  utg: new Set([]),
+  bb: new Set(["QQ", "AKo"]),
+};
+
+export const GTO_COLD_CALL_RANGES: Record<string, Set<string>> = {
+  // UTG facing a 3-bet: call with strong non-4bet hands
+  utg: new Set([
+    "JJ", "TT", "99",
+    "AQs", "AJs",
+    "AQo",
+    "KQs",
+  ]),
+  // HJ facing a raise
+  hj: new Set([
+    "TT", "99", "88",
+    "AJs", "ATs",
+    "AJo",
+    "KQs", "KJs",
+    "QJs", "JTs", "T9s",
+  ]),
+  btn: new Set([
+    "99", "88", "77", "66", "55",
+    "ATs", "A9s", "A8s",
+    "AJo", "ATo",
+    "KQs", "KJs", "KTs", "K9s",
+    "KQo",
+    "QJs", "QTs",
+    "JTs", "J9s",
+    "T9s", "98s", "87s", "76s", "65s", "54s",
+  ]),
+  co: new Set([
+    "TT", "99", "88", "77",
+    "AJs", "ATs", "A9s",
+    "AJo",
+    "KQs", "KJs", "KTs",
+    "KQo",
+    "QJs", "QTs",
+    "JTs",
+    "T9s", "98s",
+  ]),
+  sb: new Set([
+    "99", "88", "77",
+    "A9s", "A8s",
+    "AJo",
+    "KTs", "K9s",
+    "KQo",
+    "QJs", "QTs",
+    "JTs", "J9s",
+    "T9s", "98s", "87s",
+  ]),
+  // BB facing a 3-bet: call with strong but not 4-bet hands
+  bb: new Set([
+    "JJ", "TT", "99",
+    "AQs", "AJs", "ATs",
+    "AQo",
+    "KQs", "KJs",
+    "QJs", "JTs",
+  ]),
+};
 
 // ═══════════════════════════════════════════════════════
 // BLIND vs BLIND
@@ -352,21 +388,6 @@ export const GTO_BVB = {
   ]),
 };
 
-/** Get BvB frequencies. */
-export function getBvbFrequencies(
-  handClass: string,
-  heroPosition: string,
-): { fold: number; call: number; raise: number } {
-  if (heroPosition === "sb") {
-    // SB opening
-    return getRfiFrequencies(handClass, "sb");
-  }
-  // BB vs SB
-  if (GTO_BVB.bb_3bet_vs_sb.has(handClass)) return { fold: 0.05, call: 0.05, raise: 0.90 };
-  if (GTO_BVB.bb_call_vs_sb.has(handClass)) return { fold: 0.05, call: 0.90, raise: 0.05 };
-  return { fold: 0.90, call: 0.07, raise: 0.03 };
-}
-
 // ═══════════════════════════════════════════════════════
 // 4-BET / 5-BET
 // ═══════════════════════════════════════════════════════
@@ -390,26 +411,3 @@ export const GTO_4BET = {
   bluffs: new Set(["A5s", "A4s", "A3s", "A2s"]),
 };
 
-/** Facing a 4-bet (deciding to 5-bet, call, or fold). Very narrow. */
-export const GTO_5BET = {
-  value: new Set(["AA", "KK"]),
-  call: new Set(["QQ", "AKs", "AKo"]),
-};
-
-/** Get 4-bet/5-bet frequencies. */
-export function get4BetFrequencies(
-  handClass: string,
-  numBets: number,
-): { fold: number; call: number; raise: number } {
-  if (numBets >= 3) {
-    // Facing a 4-bet (deciding to 5-bet)
-    if (GTO_5BET.value.has(handClass)) return { fold: 0.02, call: 0.08, raise: 0.90 };
-    if (GTO_5BET.call.has(handClass)) return { fold: 0.10, call: 0.85, raise: 0.05 };
-    return { fold: 0.95, call: 0.03, raise: 0.02 };
-  }
-  // Facing a 3-bet (deciding to 4-bet)
-  if (GTO_4BET.value.has(handClass)) return { fold: 0.02, call: 0.08, raise: 0.90 };
-  if (GTO_4BET.bluffs.has(handClass)) return { fold: 0.15, call: 0.05, raise: 0.80 };
-  if (GTO_4BET.call.has(handClass)) return { fold: 0.10, call: 0.85, raise: 0.05 };
-  return { fold: 0.92, call: 0.05, raise: 0.03 };
-}

@@ -16,6 +16,8 @@ import {
   type GtoAction,
   type ActionFrequencies,
 } from "./tables";
+import type { PreflopClassification } from "./preflopClassification";
+import { classificationToCoachingText } from "./preflopClassification";
 import { getTeachingContent } from "./archetypePrototypes";
 
 // ═══════════════════════════════════════════════════════
@@ -34,6 +36,7 @@ export function explainArchetype(
   isInPosition: boolean,
   userAction?: GtoAction,
   street: "preflop" | "flop" | "turn" | "river" = "flop",
+  preflopClassification?: PreflopClassification,
 ): ExplanationNode {
   // For turn/river, use textureArchetypeId for solver lookup
   const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
@@ -66,8 +69,16 @@ export function explainArchetype(
     tags: ["position"],
   });
 
-  // GTO frequencies
-  if (lookup) {
+  // GTO frequencies (preflop: use classification, postflop: use solver frequencies)
+  if (preflopClassification) {
+    const classText = classificationToCoachingText(preflopClassification);
+    children.push({
+      summary: `Range classification:${classText}`,
+      detail: preflopClassification.teachingNote,
+      sentiment: "neutral",
+      tags: ["classification"],
+    });
+  } else if (lookup) {
     const freqLines = formatFrequencies(lookup.frequencies);
     children.push({
       summary: `GTO says:`,
@@ -92,7 +103,25 @@ export function explainArchetype(
   }
 
   // User action comparison
-  if (userAction && lookup) {
+  if (userAction && preflopClassification) {
+    // Preflop: classification-based verdict
+    const rc = preflopClassification.rangeClass;
+    const isActionRaise = userAction.startsWith("bet") || userAction.startsWith("raise");
+    const isActionCall = userAction === "call";
+    const isActionFold = userAction === "fold";
+    const matchesClass =
+      (isActionRaise && (rc === "clear_raise" || rc === "raise" || rc === "mixed_raise")) ||
+      (isActionCall && (rc === "call" || rc === "mixed_raise")) ||
+      (isActionFold && (rc === "clear_fold" || rc === "borderline"));
+    const sentiment = matchesClass ? "positive" : "warning";
+    const verdictLabel = matchesClass ? "matches range" : "deviates from range";
+
+    children.push({
+      summary: `You chose: ${userAction} — ${verdictLabel}`,
+      sentiment,
+      tags: ["user-action", matchesClass ? "optimal" : "mistake"],
+    });
+  } else if (userAction && lookup) {
     const userFreq = lookup.frequencies[userAction] ?? 0;
     const userPct = (userFreq * 100).toFixed(0);
     const verdict =

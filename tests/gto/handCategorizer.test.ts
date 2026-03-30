@@ -121,9 +121,9 @@ describe("Postflop — Made Hands", () => {
     expect(r.category).toBe("middle_pair");
   });
 
-  it("middle_pair — pocket pair between top and bottom", () => {
+  it("second_pair — pocket pair just below top card", () => {
     const r = classify(["8s", "8h"], ["Td", "5s", "3c"]);
-    expect(r.category).toBe("middle_pair");
+    expect(r.category).toBe("second_pair");
   });
 
   it("bottom_pair — hero pairs bottom card", () => {

@@ -171,6 +171,7 @@ function investmentParams(
       };
 
     case "preflop-handclass":
+    case "preflop-classification":
       // PokerBench or validated ranges. Improvement = more PokerBench hands or dedicated solver runs.
       if (currentConfidence > 0.7) {
         return {

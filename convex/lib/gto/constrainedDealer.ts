@@ -18,7 +18,7 @@ import {
 } from "./archetypeClassifier";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
 import { hasTable, hasAnyTableForStreet } from "./tables/tableRegistry";
-import { lookupPreflopHandClass } from "./tables/preflopHandClass";
+import { classifyPreflopHand } from "./preflopClassification";
 import { isInRfiRange } from "./tables/preflopRanges";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
 import { positionsForTableSize } from "../primitives/position";
@@ -127,7 +127,7 @@ const PREFLOP_HERO_POSITIONS: Record<string, Position[]> = {
 /**
  * Check if hero's hand is reasonable for the assigned position.
  *
- * Phase 6: uses PokerBench grid lookup first. If the hand has raise
+ * Uses preflop frequency table lookup first. If the hand has raise
  * frequency > 10% for the position, it's in range. Falls back to
  * validated GTO Sets, then to hardcoded heuristic.
  */
@@ -135,9 +135,9 @@ function isReasonablePreflop(heroCards: CardIndex[], heroPosition?: Position): b
   if (heroPosition) {
     const combo = cardsToCombo(heroCards[0], heroCards[1]);
     const handClass = comboToHandClass(combo);
-    // Primary: PokerBench data
-    const hcLookup = lookupPreflopHandClass("rfi_opening", heroPosition, handClass);
-    if (hcLookup) return hcLookup.raise > 0.10;
+    // Primary: preflop range classification
+    const classification = classifyPreflopHand(handClass, "rfi_opening", heroPosition);
+    if (classification.rangeClass !== "clear_fold") return true;
     // Fallback: validated GTO ranges
     if (isInRfiRange(handClass, heroPosition)) return true;
   }
@@ -184,17 +184,17 @@ const TEXTURE_MATCHERS: Partial<Record<ArchetypeId, TextureMatcher>> = {
   rainbow_connected: (t) => t.isRainbow && (t.hasConnectors || t.straightHeavy),
 };
 
-/** Hardcoded fallback flops when rejection sampling fails (card indices) */
+/** Hardcoded fallback flops when rejection sampling fails (card indices).
+ *  Encoding: rank*4 + suit, suit: 0=c 1=d 2=h 3=s, rank: 0=2..12=A */
 const FALLBACK_FLOPS: Partial<Record<ArchetypeId, CardIndex[]>> = {
-  // A♠7♦2♣ (A=48+3=51 for A♠, 7=5*4+1=21 for 7♦, 2=0*4+0=0 for 2♣)
-  ace_high_dry_rainbow: [48, 21, 0],    // A♣ 7♦ 2♣ — close enough, rainbow if suits differ
-  kq_high_dry_rainbow: [40, 17, 4],     // K♣ 6♦ 3♣
-  mid_low_dry_rainbow: [32, 13, 1],     // T♣ 5♦ 2♦
+  ace_high_dry_rainbow: [51, 21, 0],    // A♠ 7♦ 2♣ — rainbow (3 different suits)
+  kq_high_dry_rainbow: [43, 17, 4],     // K♠ 6♦ 3♣ — rainbow
+  mid_low_dry_rainbow: [34, 13, 0],     // T♥ 5♦ 2♣ — rainbow
   paired_boards: [24, 25, 0],           // 8♣ 8♦ 2♣
-  two_tone_disconnected: [48, 45, 41],  // A♣ Q♦ K♦
-  two_tone_connected: [36, 33, 29],     // J♣ T♦ 9♦
-  monotone: [48, 36, 24],              // A♣ J♣ 8♣
-  rainbow_connected: [33, 29, 25],     // T♦ 9♦ 8♦ — need different suits
+  two_tone_disconnected: [48, 45, 41],  // A♣ Q♦ K♦ — two-tone (2d + 1c)
+  two_tone_connected: [36, 33, 29],     // J♣ T♦ 9♦ — two-tone (2d + 1c)
+  monotone: [48, 36, 24],              // A♣ J♣ 8♣ — monotone (all clubs)
+  rainbow_connected: [35, 29, 26],     // T♠ 9♦ 8♥ — rainbow connected (3 suits)
 };
 
 // ═══════════════════════════════════════════════════════

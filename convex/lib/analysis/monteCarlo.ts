@@ -5,9 +5,40 @@
  * Pure TypeScript, zero Convex imports.
  */
 import type { CardIndex } from "../types/cards";
-import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
+// evaluateHand still used elsewhere for display (hand name, best 5 cards)
+// but removed from the MC hot loop in favor of phe (16x faster)
 import { shuffle } from "../primitives/deck";
 import { createDeck } from "../primitives/card";
+// @ts-expect-error — phe doesn't ship types
+import { evaluateCardCodes } from "phe";
+
+/**
+ * Convert our CardIndex (0-51) to phe card code.
+ * Our: rank = floor(card/4) (0=2..12=A), suit = card%4 (0=c,1=d,2=h,3=s)
+ * phe: code = rank * 4 + suit (rank 0-12 mapped to 0,4,8,...,48; suit 0-3)
+ */
+function toPhe(card: CardIndex): number {
+  const rank = Math.floor(card / 4);  // 0=2, ..., 12=A
+  const suit = card % 4;              // 0=c, 1=d, 2=h, 3=s
+  return rank * 4 + suit;
+}
+
+/**
+ * Map phe rank to hand name (for distribution tracking).
+ * phe uses 7462 unique ranks, lower = better.
+ * Boundaries from Two Plus Two evaluator:
+ */
+function pheRankToName(rank: number): string {
+  if (rank <= 10) return "Straight Flush";   // includes Royal Flush
+  if (rank <= 166) return "Four of a Kind";
+  if (rank <= 322) return "Full House";
+  if (rank <= 1599) return "Flush";
+  if (rank <= 1609) return "Straight";
+  if (rank <= 2467) return "Three of a Kind";
+  if (rank <= 3325) return "Two Pair";
+  if (rank <= 6185) return "One Pair";
+  return "High Card";
+}
 
 export interface EquityResult {
   /** Win probability 0-1 */
@@ -82,12 +113,12 @@ export function monteCarloEquity(
       fullCommunity.push(deck[deckIdx++]);
     }
 
-    // Evaluate hero
-    const heroAll = [...heroCards, ...fullCommunity];
-    const heroEval = evaluateHand(heroAll);
+    // Evaluate hero using phe (16M evals/sec vs 1M with our evaluator)
+    const communityPhe = fullCommunity.map(toPhe);
+    const heroRank = evaluateCardCodes([...heroCards.map(toPhe), ...communityPhe]);
 
     // Track hand distribution
-    const handName = heroEval.rank.name;
+    const handName = pheRankToName(heroRank);
     handCounts[handName] = (handCounts[handName] ?? 0) + 1;
 
     // Evaluate opponents
@@ -96,15 +127,14 @@ export function monteCarloEquity(
 
     for (let opp = 0; opp < numOpponents; opp++) {
       const oppCards = [deck[deckIdx++], deck[deckIdx++]];
-      const oppAll = [...oppCards, ...fullCommunity];
-      const oppEval = evaluateHand(oppAll);
+      const oppRank = evaluateCardCodes([...oppCards.map(toPhe), ...communityPhe]);
 
-      const cmp = compareHandRanks(heroEval.rank, oppEval.rank);
-      if (cmp < 0) {
+      // phe: lower rank = better hand
+      if (oppRank < heroRank) {
         heroBest = false;
         heroTied = false;
         break;
-      } else if (cmp === 0) {
+      } else if (oppRank === heroRank) {
         heroTied = true;
       }
     }

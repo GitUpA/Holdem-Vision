@@ -11,6 +11,8 @@ import type { ExplanationNode } from "../types/analysis";
 import type { ArchetypeClassification } from "./archetypeClassifier";
 import type { HandCategorization } from "./handCategorizer";
 import type { DataConfidence } from "./dataConfidence";
+import type { PreflopClassification } from "./preflopClassification";
+import { classificationToCoachingText } from "./preflopClassification";
 import {
   lookupFrequencies,
   getTable,
@@ -101,6 +103,8 @@ export function scoreAction(
   precomputedFrequencies?: ActionFrequencies,
   /** Optional data confidence — widens verdict thresholds when low */
   confidence?: DataConfidence,
+  /** Preflop range classification — replaces percentages in explanations */
+  preflopClassification?: PreflopClassification,
 ): ActionScore | null {
   let frequencies: ActionFrequencies;
 
@@ -163,6 +167,7 @@ export function scoreAction(
     evLoss,
     table?.keyPrinciple ?? "",
     table?.commonMistakes ?? [],
+    preflopClassification,
   );
 
   return {
@@ -219,6 +224,7 @@ function buildScoringExplanation(
   evLoss: number,
   keyPrinciple: string,
   commonMistakes: string[],
+  preflopClassification?: PreflopClassification,
 ): ExplanationNode {
   const verdictSentiment = verdict === "optimal" || verdict === "acceptable"
     ? "positive"
@@ -227,39 +233,67 @@ function buildScoringExplanation(
       : "negative" as const;
 
   const children: ExplanationNode[] = [];
+  const isPreflop = !!preflopClassification;
 
   // Your action
-  children.push({
-    summary: `You chose: ${userAction} (GTO frequency: ${(userFreq * 100).toFixed(0)}%)`,
-    sentiment: verdictSentiment,
-    tags: ["user-action"],
-  });
-
-  // GTO optimal
-  if (userAction !== optimalAction) {
+  if (isPreflop) {
+    const classText = classificationToCoachingText(preflopClassification);
     children.push({
-      summary: `GTO prefers: ${optimalAction} (${(optimalFreq * 100).toFixed(0)}%)`,
-      sentiment: "neutral",
-      tags: ["optimal-action"],
+      summary: `You chose: ${userAction}.${classText}`,
+      sentiment: verdictSentiment,
+      tags: ["user-action"],
+    });
+  } else {
+    children.push({
+      summary: `You chose: ${userAction} (GTO frequency: ${(userFreq * 100).toFixed(0)}%)`,
+      sentiment: verdictSentiment,
+      tags: ["user-action"],
     });
   }
 
-  // Full distribution
-  const freqChildren: ExplanationNode[] = Object.entries(frequencies)
-    .filter(([, v]) => (v ?? 0) > 0.01)
-    .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
-    .map(([action, freq]) => ({
-      summary: `${action}: ${((freq ?? 0) * 100).toFixed(0)}%${action === userAction ? " <-- your choice" : ""}`,
-      sentiment: action === userAction ? verdictSentiment : ("neutral" as const),
-      tags: ["frequency"],
-    }));
+  // GTO optimal
+  if (userAction !== optimalAction) {
+    if (isPreflop) {
+      children.push({
+        summary: `Standard play: ${optimalAction}`,
+        sentiment: "neutral",
+        tags: ["optimal-action"],
+      });
+    } else {
+      children.push({
+        summary: `GTO prefers: ${optimalAction} (${(optimalFreq * 100).toFixed(0)}%)`,
+        sentiment: "neutral",
+        tags: ["optimal-action"],
+      });
+    }
+  }
 
-  children.push({
-    summary: "GTO frequency distribution:",
-    children: freqChildren,
-    sentiment: "neutral",
-    tags: ["frequencies"],
-  });
+  // Full distribution (postflop only — preflop uses classification)
+  if (!isPreflop) {
+    const freqChildren: ExplanationNode[] = Object.entries(frequencies)
+      .filter(([, v]) => (v ?? 0) > 0.01)
+      .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
+      .map(([action, freq]) => ({
+        summary: `${action}: ${((freq ?? 0) * 100).toFixed(0)}%${action === userAction ? " <-- your choice" : ""}`,
+        sentiment: action === userAction ? verdictSentiment : ("neutral" as const),
+        tags: ["frequency"],
+      }));
+
+    children.push({
+      summary: "GTO frequency distribution:",
+      children: freqChildren,
+      sentiment: "neutral",
+      tags: ["frequencies"],
+    });
+  } else {
+    // Preflop: show classification and teaching note instead of frequencies
+    children.push({
+      summary: `Range: ${preflopClassification.reason}`,
+      detail: preflopClassification.teachingNote,
+      sentiment: "neutral",
+      tags: ["classification"],
+    });
+  }
 
   // EV loss
   if (evLoss > 0) {
@@ -295,8 +329,13 @@ function buildScoringExplanation(
     }
   }
 
+  // Summary line
+  const summaryText = isPreflop
+    ? `${verdict.toUpperCase()}: ${userAction} — ${preflopClassification.reason}`
+    : `${verdict.toUpperCase()}: ${userAction} (GTO: ${(userFreq * 100).toFixed(0)}%) — EV loss: ${evLoss.toFixed(1)} BB`;
+
   return {
-    summary: `${verdict.toUpperCase()}: ${userAction} (GTO: ${(userFreq * 100).toFixed(0)}%) — EV loss: ${evLoss.toFixed(1)} BB`,
+    summary: summaryText,
     sentiment: verdictSentiment,
     children,
     tags: ["scoring", verdict],

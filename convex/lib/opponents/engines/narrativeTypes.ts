@@ -238,7 +238,9 @@ export interface NarrativeInput {
   /** Modified frequencies (after profile adjustment) */
   modifiedFrequencies: import("../../gto/tables/types").ActionFrequencies;
   /** Whether GTO came from solver or heuristic */
-  gtoSource: "solver" | "heuristic" | "equity" | "pokerbench";
+  gtoSource: "solver" | "heuristic" | "equity" | "preflop-table";
   /** Multi-street arc tracker (optional) */
   arc?: NarrativeArcTracker;
+  /** Preflop range classification — replaces fake GTO percentages for preflop */
+  preflopClassification?: import("../../gto/preflopClassification").PreflopClassification;
 }

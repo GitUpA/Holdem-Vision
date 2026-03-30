@@ -11,7 +11,7 @@ import type { HandRecord } from "../audit/types";
 import type { ReplayTimeline, ReplaySnapshot } from "./types";
 import type { HandConfig as GameHandConfig, CardOverride } from "../state/gameState";
 import type { Street } from "../types/cards";
-import { initializeHand, applyAction } from "../state/stateMachine";
+import { initializeHand, applyAction, currentLegalActions } from "../state/stateMachine";
 
 /**
  * Build a replay timeline from a completed HandRecord.
@@ -86,12 +86,29 @@ export function buildTimeline(record: HandRecord): ReplayTimeline {
   let lastStreet: Street = "preflop";
 
   for (const event of playerEvents) {
+    // Clamp raise/bet amounts to legal range — the recorded amount may be
+    // slightly off if the replay reconstructs a marginally different pot
+    // (e.g., due to premium-hand protection changing an earlier fold to raise).
+    let replayAmount = event.amount;
+    if ((event.actionType === "raise" || event.actionType === "bet") && replayAmount !== undefined) {
+      const legal = currentLegalActions(currentState);
+      if (legal) {
+        if (event.actionType === "raise" && legal.canRaise) {
+          replayAmount = Math.max(replayAmount, legal.raiseMin);
+          replayAmount = Math.min(replayAmount, legal.raiseMax);
+        } else if (event.actionType === "bet" && legal.canBet) {
+          replayAmount = Math.max(replayAmount, legal.betMin);
+          replayAmount = Math.min(replayAmount, legal.betMax);
+        }
+      }
+    }
+
     // Apply the action
     const result = applyAction(
       currentState,
       event.seatIndex,
       event.actionType,
-      event.amount,
+      replayAmount,
     );
     currentState = result.state;
 

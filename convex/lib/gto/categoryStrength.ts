@@ -14,6 +14,7 @@ export const CATEGORY_STRENGTH: Record<string, number> = {
   overpair: 0.78,
   top_pair_top_kicker: 0.7,
   top_pair_weak_kicker: 0.6,
+  second_pair: 0.55,
   middle_pair: 0.45,
   bottom_pair: 0.35,
   combo_draw: 0.5,

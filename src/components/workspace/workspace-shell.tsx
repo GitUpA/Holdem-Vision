@@ -29,6 +29,7 @@ import { CardSelector, type SelectionMode } from "../cards/card-selector";
 import { VisualRenderer } from "../analysis/visual-renderer";
 import { ExplanationTree } from "../analysis/explanation-tree";
 import { CoachingPanel } from "../analysis/coaching-panel";
+import { HandGrid } from "../analysis/hand-grid";
 import type { CoachingAdvice } from "../../../convex/lib/analysis/coachingLens";
 import { PlayerList } from "../table/player-list";
 import { TableControls } from "../table/table-controls";
@@ -626,6 +627,11 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                 </div>
               </div>
               </>
+
+              {/* ── Hand Grid (13x13) ── */}
+              {ws.heroCards.length >= 2 && (
+                <HandGrid heroCards={ws.heroCards} communityCards={ws.communityCards} />
+              )}
 
               {/* ── Coaching + Solution (unified in drill mode) ── */}
               <CoachingSection

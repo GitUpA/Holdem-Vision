@@ -18,7 +18,7 @@ import type { PlayerAction } from "../types/opponents";
 import type { ArchetypeId } from "../gto/archetypeClassifier";
 import { classifyArchetype, contextFromGameState } from "../gto/archetypeClassifier";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
-import { lookupPreflopHandClass, handClassToActionFrequencies } from "../gto/tables";
+import { classifyPreflopHand, classificationToFrequencies } from "../gto/preflopClassification";
 import {
   createHandContext,
   recordHeroAction,
@@ -60,14 +60,15 @@ export function buildInitialContext(
   const combo = cardsToCombo(heroCards[0], heroCards[1]);
   const handClass = comboToHandClass(combo);
 
-  // Look up GTO frequency for hero's hand in this position
-  const hcLookup = lookupPreflopHandClass(
+  // Classify hero's hand in this preflop situation
+  const classification = classifyPreflopHand(
+    handClass,
     archetype.archetypeId,
     hero.position,
-    handClass,
   );
-  const raiseFreq = hcLookup ? hcLookup.raise : 0;
-  const heroInRange = raiseFreq > 0.10; // >10% GTO frequency = in range
+  const heroInRange = classification.rangeClass !== "clear_fold" && classification.rangeClass !== "borderline";
+  const freqs = classificationToFrequencies(classification, archetype.archetypeId);
+  const raiseFreq = Math.max(freqs.bet_medium ?? 0, freqs.raise_large ?? 0);
 
   return createHandContext(
     hero.position,

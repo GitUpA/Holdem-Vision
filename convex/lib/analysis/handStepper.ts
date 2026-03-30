@@ -21,7 +21,6 @@ import { captureFullSnapshot, formatSnapshot, type FullSnapshot, type SnapshotOp
 import { currentLegalActions } from "../state/stateMachine";
 import { GTO_PROFILE } from "../opponents/presets";
 import { chooseActionFromProfile } from "../opponents/autoPlay";
-import { buildOpponentStory } from "./opponentStory";
 
 // ═══════════════════════════════════════════════════════
 // TYPES

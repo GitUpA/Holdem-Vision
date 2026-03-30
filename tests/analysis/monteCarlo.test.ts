@@ -7,20 +7,20 @@ describe("Monte Carlo equity engine", () => {
   it("AA is heavily favored preflop vs 1 opponent", () => {
     const hero = cardsFromStrings(["As", "Ah"]);
     const result = monteCarloEquity(hero, [], {
-      trials: 5000,
+      trials: 50000,
       numOpponents: 1,
       random: seededRandom(42),
     });
     // AA vs random hand is ~85% equity
-    expect(result.win).toBeGreaterThan(0.75);
-    expect(result.win).toBeLessThan(0.95);
+    expect(result.win).toBeGreaterThan(0.80);
+    expect(result.win).toBeLessThan(0.90);
     expect(result.win + result.tie + result.lose).toBeCloseTo(1, 2);
   });
 
   it("72o is weak preflop", () => {
     const hero = cardsFromStrings(["7d", "2c"]);
     const result = monteCarloEquity(hero, [], {
-      trials: 5000,
+      trials: 50000,
       numOpponents: 1,
       random: seededRandom(42),
     });
@@ -33,7 +33,7 @@ describe("Monte Carlo equity engine", () => {
     const hero = cardsFromStrings(["Kc", "Kd"]);
     const community = cardsFromStrings(["Ks", "7h", "2d"]);
     const result = monteCarloEquity(hero, community, {
-      trials: 5000,
+      trials: 50000,
       numOpponents: 1,
       random: seededRandom(42),
     });

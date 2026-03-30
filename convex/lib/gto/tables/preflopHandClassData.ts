@@ -1,26 +1,12 @@
 /**
- * Preflop Hand Class Data — auto-registration via side-effect import.
+ * Preflop Hand Class Data — DEPRECATED.
  *
- * Imports the PokerBench-aggregated JSON files and registers them
- * into the preflop hand class registry. Same pattern as solverData.ts.
+ * The preflop system now uses range classifications (preflopClassification.ts)
+ * instead of frequency lookup tables. This file previously loaded
+ * complete_preflop_tables.json into a registry. That data is no longer
+ * the source of truth — the range Sets in preflopRanges.ts are.
+ *
+ * This file is kept as a no-op to avoid breaking side-effect import chains.
  */
 
-import { registerPreflopHandClassTable, type PreflopHandClassTable } from "./preflopHandClass";
-
-import rfiOpening from "../../../../data/pokerbench/preflop_tables/rfi_opening.json";
-import bbDefense from "../../../../data/pokerbench/preflop_tables/bb_defense_vs_rfi.json";
-import threeBetPots from "../../../../data/pokerbench/preflop_tables/three_bet_pots.json";
-import blindVsBlind from "../../../../data/pokerbench/preflop_tables/blind_vs_blind.json";
-import fourBetFiveBet from "../../../../data/pokerbench/preflop_tables/four_bet_five_bet.json";
-
-const ALL_PREFLOP_HAND_CLASS_DATA: PreflopHandClassTable[] = [
-  rfiOpening as PreflopHandClassTable,
-  bbDefense as PreflopHandClassTable,
-  threeBetPots as PreflopHandClassTable,
-  blindVsBlind as PreflopHandClassTable,
-  fourBetFiveBet as PreflopHandClassTable,
-];
-
-for (const table of ALL_PREFLOP_HAND_CLASS_DATA) {
-  registerPreflopHandClassTable(table);
-}
+// No-op: preflop data now comes from classification, not JSON tables.

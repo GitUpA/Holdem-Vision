@@ -12,21 +12,12 @@
 import type { CardIndex, Position, Street } from "../types/cards";
 import type { OpponentProfile, PlayerAction, WeightedRange } from "../types/opponents";
 import type { ExplanationNode } from "../types/analysis";
-import { estimateRange, type RangeEstimation } from "../opponents/rangeEstimator";
+import { estimateRange } from "../opponents/rangeEstimator";
 import { buildInferredProfile } from "../opponents/behaviorInference";
-import { lookupEquityInterpolated } from "../gto/tables/equityLookup";
-import { categorizeHand } from "../gto/handCategorizer";
-
-/** Get hand category string for equity lookup */
-function heroStrengthCategory(heroCards: CardIndex[], communityCards: CardIndex[]): string {
-  if (heroCards.length < 2) return "air";
-  const cat = categorizeHand(heroCards, communityCards);
-  return cat.category;
-}
 import { equityVsRange } from "./opponentRead";
 import type { EquityResult } from "./monteCarlo";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
-import { rankOf, rankValue, suitValue, cardToDisplay } from "../primitives/card";
+import { rankValue, suitValue, cardToDisplay } from "../primitives/card";
 import { evaluateHand } from "../primitives/handEvaluator";
 import { rangePct } from "../opponents/combos";
 
@@ -87,7 +78,6 @@ export function buildOpponentStory(
   street: Street,
   deadCards: CardIndex[] = [],
   boardTexture?: BoardTexture,
-  skipEquity = false,
   /** When true, use inferred behavior instead of assigned profile (Layer 7: coach blind) */
   inferFromActions = false,
 ): OpponentStory {
@@ -112,17 +102,9 @@ export function buildOpponentStory(
         isPaired: false, isTrips: false, hasConnectors: false, highCard: 12,
         flushPossible: false, straightHeavy: false, cardCount: 0, description: "preflop" } as BoardTexture);
 
-  // 3. Compute equity vs estimated range
-  // Fast path: pre-computed lookup (Layer 8 — no MC for headless/Convex)
-  // Precision path: Monte Carlo (browser only, user-activated)
+  // 3. Compute equity vs estimated range (phe-based Monte Carlo, fast enough for all paths)
   let equityResult: EquityResult;
-  if (skipEquity) {
-    // Use pre-computed equity lookup tables (fast path)
-    const handCat = heroStrengthCategory(heroCards, communityCards);
-    const eqEst = lookupEquityInterpolated(handCat, rangeEst.rangePctOfAll);
-    equityResult = { win: eqEst.equity, tie: 0, lose: 1 - eqEst.equity, trials: 0, handDistribution: {} };
-  } else if (heroCards.length === 2 && rangeEst.range.size > 0) {
-    // Precision path: full Monte Carlo (browser only)
+  if (heroCards.length === 2 && rangeEst.range.size > 0) {
     equityResult = equityVsRange(heroCards, communityCards, rangeEst.range, deadCards, 3000);
   } else {
     equityResult = { win: 0.5, tie: 0, lose: 0.5, trials: 0, handDistribution: {} };
@@ -316,12 +298,17 @@ function buildRangeNarrative(
   streetNarratives: StreetNarrative[],
 ): string {
   const actionCount = streetNarratives.length;
+  const isPreflop = streetNarratives.length === 0 || streetNarratives.every(s => s.street === "preflop");
 
   if (rangePct < 5) {
-    return `${profileName}'s range is very narrow (~${rangePct.toFixed(0)}% of hands). After ${actionCount} actions, they almost certainly have a premium hand.`;
+    const desc = isPreflop ? "a premium pocket pair or AK" : "a premium hand";
+    return `${profileName}'s range is very narrow (~${rangePct.toFixed(0)}% of hands). After ${actionCount} actions, they almost certainly have ${desc}.`;
   }
   if (rangePct < 15) {
-    return `${profileName}'s range is narrow (~${rangePct.toFixed(0)}% of hands). Their actions indicate a strong holding — top pair or better, or a strong draw.`;
+    const desc = isPreflop
+      ? "a strong starting hand — big pairs, broadway combos, or suited aces"
+      : "a strong holding — top pair or better, or a strong draw";
+    return `${profileName}'s range is narrow (~${rangePct.toFixed(0)}% of hands). Their actions indicate ${desc}.`;
   }
   if (rangePct < 30) {
     return `${profileName}'s range is moderate (~${rangePct.toFixed(0)}% of hands). They could have a variety of made hands and draws.`;

@@ -6,11 +6,12 @@
  * that previously existed in both paths.
  *
  * Canonical lookup order:
- * 1. Preflop per-hand-class (169 grid from PokerBench)
- * 2. Postflop per-category (solver tables) — when confidence >= threshold AND table exists
- * 3. PokerBench postflop per-hand-class (500k aggregated) — fallback
- * 4. Equity-based recommendation — when opponents available
- * 5. Return null
+ * 1. Preflop per-hand-class (169 grid, solver-quality complete table)
+ * 2. Postflop facing-bet (solver tables) — when hero faces a bet
+ * 3. Postflop per-category (solver tables) — when confidence >= threshold AND table exists
+ * 4. Postflop per-hand-class (500k aggregated) — fallback
+ * 5. Equity-based recommendation — when opponents available
+ * 6. Return null
  *
  * Does NOT apply calibrateWeakHandFrequencies() — consumers handle that if needed.
  * Does NOT apply remapFrequenciesToLegal() — consumers handle that if needed.
@@ -41,15 +42,15 @@ import { categorizeHand } from "./handCategorizer";
 import {
   lookupFrequencies,
   hasTable,
-  lookupPreflopHandClass,
-  handClassToActionFrequencies,
-  getPreflopConfidence,
   lookupPostflopHandClass,
   postflopHandClassToActionFrequencies,
+  lookupFacingBetFrequencies,
+  hasFacingBetData,
+  facingBetToActionFrequencies,
 } from "./tables";
 import { equityBasedRecommendation } from "../analysis/equityRecommendation";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
-import { getRfiFrequencies, getBbDefenseFrequencies, get3BetFrequencies, getBvbFrequencies, get4BetFrequencies } from "./tables/preflopRanges";
+import { classifyPreflopHand, classificationToFrequencies, type PreflopClassification } from "./preflopClassification";
 
 // ═══════════════════════════════════════════════════════
 // CONFIG
@@ -64,7 +65,7 @@ const CONFIDENCE_THRESHOLD = 0.6;
 
 export interface GtoLookupResult {
   frequencies: ActionFrequencies;
-  source: "preflop-handclass" | "postflop-handclass" | "category" | "equity";
+  source: "preflop-handclass" | "preflop-classification" | "postflop-handclass" | "category" | "equity";
   archetype: ArchetypeClassification;
   handCat: HandCategorization;
   /** Frequency bands (if solver distributions available) */
@@ -73,6 +74,8 @@ export interface GtoLookupResult {
   archetypeAccuracy?: ArchetypeAccuracy;
   /** Preflop confidence based on sample count */
   preflopConfidence?: PreflopConfidence;
+  /** Preflop range classification (when using classification system) */
+  preflopClassification?: PreflopClassification;
   /** Whether this is an exact match or a fallback/interpolation */
   isExactMatch: boolean;
   /** Unified confidence assessment for this data source */
@@ -115,81 +118,55 @@ export function lookupGtoFrequencies(
   if (street === "preflop") {
     const position = gameState.players[heroSeat].position;
     const handCat = categorizeHand(heroCards, communityCards);
-
     const openerPos = findPreflopOpener(gameState, heroSeat);
 
-    // ── PokerBench label swap ──
-    // PokerBench "three_bet_pots" = hero FACING a 3-bet (not making one)
-    // PokerBench "four_bet_five_bet" = hero FACING a 4-bet (not making one)
-    // So: our "four_bet_five_bet" archetype (facing 3-bet) uses PokerBench "three_bet_pots" data
-    // Our "three_bet_pots" archetype (deciding to 3-bet) uses validated ranges (no PokerBench match)
-    // Our "blind_vs_blind" uses validated ranges (PokerBench BvB perspective unclear)
-    const pokerbenchLookupId =
-      archetype.archetypeId === "four_bet_five_bet" ? "three_bet_pots"  // SWAP: facing 3-bet
-      : archetype.archetypeId === "three_bet_pots" ? null               // No PokerBench match
-      : archetype.archetypeId === "blind_vs_blind" ? null               // Perspective unclear
-      : archetype.archetypeId;                                          // RFI + BB defense: as-is
+    const classification = classifyPreflopHand(handClass, archetype.archetypeId, position, openerPos);
+    const frequencies = classificationToFrequencies(classification, archetype.archetypeId);
 
-    if (pokerbenchLookupId) {
-      // ── PokerBench per-hand-class data (solver-derived, position-aware) ──
-      const hcLookup = lookupPreflopHandClass(
-        pokerbenchLookupId,
-        position,
-        handClass,
-        openerPos,
-      );
+    return attachConfidence({
+      frequencies,
+      source: "preflop-classification",
+      archetype,
+      handCat,
+      preflopClassification: classification,
+      isExactMatch: true,
+    }, potSizeBB);
+  }
 
-      if (hcLookup) {
-        // Use the ACTUAL archetype's raise action key, not the PokerBench label's
-        return attachConfidence({
-          frequencies: handClassToActionFrequencies(hcLookup, archetype.archetypeId),
-          source: "preflop-handclass",
-          archetype,
-          handCat,
-          preflopConfidence: getPreflopConfidence(hcLookup),
-          isExactMatch: true,
-        }, potSizeBB);
-      }
-    }
+  // ── 2a. Postflop facing-bet (hero can't check but can call) ──
+  // Preflop already returned above, so street is always postflop here
+  const isFacingBet = !legal.canCheck && legal.canCall;
+  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
 
-    // ── Validated GTO ranges (primary for 3-bet/4-bet, fallback for others) ──
-    let fallbackFreqs: { fold: number; call: number; raise: number } | null = null;
-    switch (archetype.archetypeId) {
-      case "rfi_opening":
-        fallbackFreqs = getRfiFrequencies(handClass, position); break;
-      case "bb_defense_vs_rfi":
-        fallbackFreqs = getBbDefenseFrequencies(handClass, openerPos ?? "btn"); break;
-      case "three_bet_pots":
-        fallbackFreqs = get3BetFrequencies(handClass, position); break;
-      case "blind_vs_blind":
-        fallbackFreqs = getBvbFrequencies(handClass, position); break;
-      case "four_bet_five_bet": {
-        const raises = gameState.actionHistory.filter(
-          (a) => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet"),
-        );
-        fallbackFreqs = get4BetFrequencies(handClass, raises.length); break;
-      }
-    }
+  // Facing-bet tables are keyed with street prefix: "turn_ace_high_dry_rainbow", "river_paired_boards"
+  const fbArchetypeId = (street === "turn" ? `turn_${lookupArchetypeId}`
+    : street === "river" ? `river_${lookupArchetypeId}`
+    : lookupArchetypeId) as typeof lookupArchetypeId;
 
-    if (fallbackFreqs) {
-      const raiseAction = archetype.archetypeId === "rfi_opening" || archetype.archetypeId === "blind_vs_blind"
-        ? "bet_medium" : "raise_large";
+  if (isFacingBet && (hasFacingBetData(fbArchetypeId) || hasFacingBetData(lookupArchetypeId))) {
+    const handCat = categorizeHand(heroCards, communityCards);
+    // Try street-specific first, fall back to generic (flop) table
+    const fbLookup = lookupFacingBetFrequencies(
+      fbArchetypeId,
+      handCat.category,
+      classCtx.isInPosition,
+    ) ?? lookupFacingBetFrequencies(
+      lookupArchetypeId,
+      handCat.category,
+      classCtx.isInPosition,
+    );
+    if (fbLookup) {
       return attachConfidence({
-        frequencies: {
-          fold: fallbackFreqs.fold,
-          call: fallbackFreqs.call,
-          [raiseAction]: fallbackFreqs.raise,
-        },
-        source: "preflop-handclass",
+        frequencies: facingBetToActionFrequencies(fbLookup),
+        source: "category",
         archetype,
         handCat,
-        isExactMatch: false, // fallback, not primary data
+        isExactMatch: true,
       }, potSizeBB);
     }
   }
 
-  // ── 2. Postflop per-category (solver tables) ──
-  const lookupArchetypeId = archetype.textureArchetypeId ?? archetype.archetypeId;
+  // ── 2b. Postflop per-category (solver tables) ──
 
   if (archetype.confidence >= CONFIDENCE_THRESHOLD && hasTable(lookupArchetypeId, street)) {
     const handCat = categorizeHand(heroCards, communityCards);
@@ -215,7 +192,7 @@ export function lookupGtoFrequencies(
   }
 
   // ── 3. PokerBench postflop per-hand-class (500k aggregated) ──
-  if (street !== "preflop") {
+  {
     const pbLookup = lookupPostflopHandClass(
       lookupArchetypeId,
       handClass,

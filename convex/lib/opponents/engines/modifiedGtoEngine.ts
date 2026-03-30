@@ -34,6 +34,8 @@ import type { HandCategorization } from "../../gto/handCategorizer";
 import { lookupGtoFrequencies, findPreflopOpener } from "../../gto/frequencyLookup";
 import { PRESET_PROFILES } from "../../opponents/presets";
 import type { OpponentInput } from "../../analysis/equityRecommendation";
+import { suitValue, rankValue } from "../../primitives/card";
+import type { CardIndex } from "../../types/cards";
 
 // Shared context analysis
 import { computeContextFactors, type ContextFactors } from "./contextAnalysis";
@@ -75,7 +77,20 @@ export const modifiedGtoEngine: DecisionEngine = {
     const modifier = modifierMap[ctx.situationKey] ?? identitySituationModifier();
 
     // ── 4. Apply modifier to GTO frequencies ──
-    const modifiedFreqs = applyModifier(gtoFreqs, modifier, factors);
+    let modifiedFreqs = applyModifier(gtoFreqs, modifier, factors);
+
+    // ── 4b. Equity reality check ──
+    // If the board makes our hand much weaker than the category suggests,
+    // shift frequencies toward folding. Catches: pocket pair on flush board
+    // without flush card, underpair calling big bets, etc.
+    if (ctx.state.currentStreet !== "preflop" && ctx.holeCards && ctx.holeCards.length >= 2) {
+      modifiedFreqs = applyEquityRealityCheck(
+        modifiedFreqs,
+        ctx.holeCards,
+        ctx.state.communityCards as CardIndex[],
+        handCat,
+      );
+    }
 
     // ── 5. Sample action from modified frequencies ──
     const scenario = deriveFacingBetScenario(ctx);
@@ -93,6 +108,26 @@ export const modifiedGtoEngine: DecisionEngine = {
       },
     );
 
+    // ── 5b. Premium hand protection ──
+    // AA/KK/AKs/QQ should NEVER fold preflop. The solver's small fold frequency
+    // is a theoretical artifact that looks wrong to users.
+    let finalAction = actionType;
+    let finalAmount = amount;
+    if (ctx.state.currentStreet === "preflop" && actionType === "fold" && handCat) {
+      const cat = handCat.category;
+      const strength = handCat.relativeStrength ?? 0;
+      if (cat === "premium_pair" || cat === "overpair" || strength >= 0.75) {
+        // Override: raise if possible, else call
+        if (ctx.legal.canRaise) {
+          finalAction = "raise";
+          finalAmount = ctx.legal.raiseMin;
+        } else if (ctx.legal.canCall) {
+          finalAction = "call";
+          finalAmount = ctx.legal.callAmount;
+        }
+      }
+    }
+
     // ── 6. Build narrative explanation ──
     const effective = computeEffectiveModifier(modifier, factors);
 
@@ -100,7 +135,7 @@ export const modifiedGtoEngine: DecisionEngine = {
       profileId: ctx.profile.id,
       profileName: ctx.profile.name,
       situationKey: ctx.situationKey,
-      action: { actionType, amount },
+      action: { actionType: finalAction, amount: finalAmount },
       factors,
       baseModifier: modifier,
       effectiveModifier: effective,
@@ -111,8 +146,8 @@ export const modifiedGtoEngine: DecisionEngine = {
     });
 
     return {
-      actionType,
-      amount,
+      actionType: finalAction,
+      amount: finalAmount,
       situationKey: ctx.situationKey,
       engineId: "modified-gto",
       explanation: narrative.explanationTree,
@@ -209,6 +244,158 @@ function getGtoBaseFrequencies(
     frequencies: gtoFreqs,
     source: "heuristic",
   };
+}
+
+// ═══════════════════════════════════════════════════════
+// EQUITY REALITY CHECK
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Board-specific equity reality check using pattern heuristics.
+ *
+ * Solver frequencies are keyed by hand CATEGORY averaged across all boards.
+ * This detects when the specific board makes the hand much weaker and
+ * shifts frequencies toward folding.
+ *
+ * NOTE: We tried micro-MC (phe) for actual equity but equity vs RANDOM
+ * doesn't capture facing-action danger. Pairs have HIGH equity vs random
+ * on flush boards (most randoms miss). The solver already accounts for
+ * balanced ranges. Heuristic pattern detection targets the real issue:
+ * "flush board + no flush card = opponent who bets likely has the flush."
+ * microEquity() remains available for coaching narratives.
+ */
+function applyEquityRealityCheck(
+  freqs: ActionFrequencies,
+  holeCards: CardIndex[],
+  communityCards: CardIndex[],
+  handCat?: HandCategorization,
+): ActionFrequencies {
+  if (communityCards.length < 3) return freqs;
+
+  const category = handCat?.category ?? "air";
+  const strength = handCat?.relativeStrength ?? 0.1;
+
+  // sets_plus covers sets, straights, flushes, full houses, quads.
+  // Very strong sets_plus hands (full house+, nut flush) — no penalty.
+  if (category === "sets_plus" && strength >= 0.8) return freqs;
+
+  // ── Flush vulnerability ──
+  const boardSuits = communityCards.map(suitValue);
+  const suitCounts = new Map<number, number>();
+  for (const s of boardSuits) suitCounts.set(s, (suitCounts.get(s) ?? 0) + 1);
+  const maxSuitCount = Math.max(...suitCounts.values());
+  const flushSuit = [...suitCounts.entries()].find(([, c]) => c >= 3)?.[0];
+
+  let penalty = 0;
+
+  if (flushSuit !== undefined && maxSuitCount >= 3) {
+    const heroHasFlushCard = holeCards.some(c => suitValue(c) === flushSuit);
+    const heroFlushCards = holeCards.filter(c => suitValue(c) === flushSuit).length;
+
+    if (!heroHasFlushCard) {
+      // No flush card at all — scale penalty by hand strength
+      const strongPair = category === "premium_pair" || category === "overpair"
+        || category === "top_pair_top_kicker" || category === "two_pair";
+      // sets_plus with moderate strength = trips/sets (not full house/quads)
+      const hasTrips = category === "sets_plus" && strength < 0.8;
+      // sets_plus with low-moderate strength could be a straight
+      const hasStraight = category === "sets_plus" && strength >= 0.4 && strength < 0.6;
+
+      if (maxSuitCount >= 4) {
+        // 4-flush board: any single club in opponent's hand makes a flush
+        // Even straights and trips are nearly dead (only full house+ survives)
+        if (hasTrips) penalty += 0.55;      // trips can improve to full house
+        else if (hasStraight) penalty += 0.75; // straight is dead vs flush
+        else if (strongPair) penalty += 0.7;   // overpair/TPTK nearly dead
+        else penalty += 0.88;                  // weak hands almost always fold
+      } else {
+        // 3-flush board: flush is possible but not guaranteed
+        if (hasTrips) penalty += 0.15;         // trips still strong
+        else if (hasStraight) penalty += 0.2;  // straight still strong
+        else if (strongPair) penalty += 0.3;   // overpair/TPTK has showdown value
+        else penalty += 0.55;                  // weak hands fold more
+        if (strength < 0.35) penalty += 0.15;  // extra for very weak hands
+      }
+    } else if (maxSuitCount >= 4 && heroFlushCards < 2) {
+      // 4-flush on board, hero has one card of suit — only nut flush matters
+      penalty += 0.25;
+    }
+  }
+
+  // ── Board trips ──
+  const boardRanks = communityCards.map(rankValue);
+  const rankCounts = new Map<number, number>();
+  for (const r of boardRanks) rankCounts.set(r, (rankCounts.get(r) ?? 0) + 1);
+  if (Math.max(...rankCounts.values()) >= 3 && category !== "sets_plus") {
+    penalty += 0.15;
+  }
+
+  // ── Weak pairs on later streets ──
+  if ((category === "middle_pair" || category === "bottom_pair" || category === "second_pair") &&
+      communityCards.length >= 4) {
+    if (boardRanks.filter(r => r >= 10).length >= 3) penalty += 0.2;
+  }
+  if (category === "bottom_pair" && communityCards.length >= 4) {
+    penalty += 0.15;
+  }
+  // Underpairs on turn+ are very weak — add penalty (subCategory "underpair" under bottom_pair)
+  if (category === "bottom_pair" && handCat?.subCategory === "underpair" && communityCards.length >= 4) {
+    penalty += 0.25;
+  }
+
+  // ── Air aggression dampening ──
+  // If hero has air (no pair, no draw) on later streets, reduce aggression
+  const isAir = category === "air" || category === "overcards" || category === "weak_draw";
+  if (isAir && communityCards.length >= 4) {
+    // On turn/river with air, severely limit betting/raising
+    penalty += 0.3;
+  }
+
+  // ── Street escalation ──
+  // Dangers compound: a dangerous board on the flop is MORE dangerous on turn/river
+  // because opponents who bet multiple streets are more likely to have it
+  if (penalty > 0.1 && communityCards.length >= 4) {
+    penalty *= 1.15; // 15% escalation on turn
+  }
+  if (penalty > 0.1 && communityCards.length >= 5) {
+    penalty *= 1.15; // another 15% on river (compounds to ~32%)
+  }
+
+  if (penalty <= 0.05) return freqs;
+  penalty = Math.min(penalty, 0.92);
+
+  const currentFold = freqs.fold ?? 0;
+  const nonFold = 1 - currentFold;
+  if (nonFold <= 0.01) return freqs;
+
+  const foldIncrease = nonFold * penalty;
+  const scale = (nonFold - foldIncrease) / nonFold;
+
+  const adjusted: ActionFrequencies = { ...freqs };
+  for (const key of Object.keys(adjusted) as Array<keyof ActionFrequencies>) {
+    const val = adjusted[key];
+    if (val === undefined || val === null) continue;
+    if (key === "fold") adjusted.fold = Math.min(1, currentFold + foldIncrease);
+    else adjusted[key] = val * scale;
+  }
+
+  // ── Aggression dampening for air/weak hands ──
+  // When hero has air, additionally shift raise → call (not just more folding)
+  if (isAir && communityCards.length >= 4) {
+    const aggroKeys: (keyof ActionFrequencies)[] = ["raise_small", "raise_large", "bet_medium", "bet_small", "bet_large"];
+    const raiseWeight = aggroKeys.reduce((s, k) => s + (adjusted[k] ?? 0), 0);
+    if (raiseWeight > 0.15) {
+      const dampen = raiseWeight * 0.6;
+      for (const key of aggroKeys) {
+        if (adjusted[key]) adjusted[key] = adjusted[key]! * 0.4;
+      }
+      if (adjusted.check !== undefined) adjusted.check += dampen * 0.5;
+      if (adjusted.call !== undefined) adjusted.call = (adjusted.call ?? 0) + dampen * 0.5;
+      else if (adjusted.check !== undefined) adjusted.check += dampen * 0.5;
+    }
+  }
+
+  return adjusted;
 }
 
 // ═══════════════════════════════════════════════════════

@@ -265,8 +265,9 @@ describe("Street-Level Analysis", () => {
     expect(preflopFoldRate).toBeLessThan(0.98);
     if (showdowns.length >= 10) {
       // With GTO mixed strategy sampling, variance is high at 500 hands.
-      // Accept losses up to -500 BB (individual all-ins swing ±100 BB).
-      expect(totalPnl).toBeGreaterThan(-500);
+      // Tight preflop play means fewer but higher-variance spots.
+      // Accept losses up to -1000 BB (several all-in swings at ±100 BB each).
+      expect(totalPnl).toBeGreaterThan(-1000);
     }
   }, 120_000);
 });

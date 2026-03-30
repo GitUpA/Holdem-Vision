@@ -42,8 +42,8 @@ export type BehaviorPattern =
 
 /** Default GTO-like params when we have no data. */
 const DEFAULT_PARAMS: BehavioralParams = {
-  continuePct: 0.5,
-  raisePct: 0.15,
+  continuePct: 50,
+  raisePct: 15,
   bluffFrequency: 0.3,
   positionAwareness: 0.7,
   sizings: [{ action: "bet", sizingPct: 67, weight: 1 }],
@@ -80,25 +80,43 @@ export function inferBehavior(actions: PlayerAction[]): InferredBehavior {
   const aggressiveRate = raises / total;
 
   // Derive behavioral params from observed rates
-  const continuePct = 1 - foldRate; // how often they stay in
-  const raisePct = aggressiveRate;
-  const bluffFrequency = aggressiveRate > 0.3 ? 0.4 : 0.2; // aggressive players bluff more
+  // Profiles use percentage scale (0-100), not fractions (0-1)
+  // With very few actions, blend toward GTO defaults to avoid wild extrapolation
+  const gtoDefault = { continuePct: 30, raisePct: 20 }; // reasonable GTO baseline
+  const sampleWeight = total >= 8 ? 1.0 : total >= 4 ? 0.7 : total >= 2 ? 0.4 : 0.2;
+  const observedContinue = (1 - foldRate) * 100;
+  const observedRaise = aggressiveRate * 100;
+  const continuePct = observedContinue * sampleWeight + gtoDefault.continuePct * (1 - sampleWeight);
+  const raisePct = observedRaise * sampleWeight + gtoDefault.raisePct * (1 - sampleWeight);
+  const bluffFrequency = aggressiveRate > 0.3 ? 0.4 : 0.2; // aggressive players bluff more (stays 0-1)
   const positionAwareness = 0.5; // can't infer from actions alone
 
-  // Detect pattern
-  let pattern: BehaviorPattern = "balanced";
-  if (foldRate > 0.7) {
-    pattern = aggressiveRate > 0.15 ? "tight-aggressive" : "tight-passive";
-  } else if (foldRate < 0.3) {
-    pattern = aggressiveRate > 0.3 ? "loose-aggressive" : "loose-passive";
+  // Detect pattern — require minimum 3 actions to classify
+  let pattern: BehaviorPattern = "unknown";
+  if (total >= 3) {
+    pattern = "balanced";
+    if (foldRate > 0.7) {
+      pattern = aggressiveRate > 0.15 ? "tight-aggressive" : "tight-passive";
+    } else if (foldRate < 0.3) {
+      // Need a higher aggression bar for LAG classification — a fish who occasionally
+      // raises shouldn't be labeled as aggressive. Require >40% aggressive rate
+      // AND at least 3 aggressive actions to avoid small-sample misclassification.
+      const aggressiveActions = actions.filter(a =>
+        a.actionType === "raise" || a.actionType === "bet"
+      ).length;
+      pattern = (aggressiveRate > 0.4 && aggressiveActions >= 3) ? "loose-aggressive" : "loose-passive";
+    }
   }
 
-  // Confidence based on sample size
+  // Confidence based on sample size.
+  // Single-hand inference is unreliable — cap at 0.7 unless we have 15+ actions
+  // (which implies multi-hand observation via session memory).
   let confidence = 0;
-  if (total >= 10) confidence = 0.8;
-  else if (total >= 5) confidence = 0.6;
-  else if (total >= 3) confidence = 0.4;
-  else confidence = 0.2;
+  if (total >= 15) confidence = 0.85;
+  else if (total >= 10) confidence = 0.7;
+  else if (total >= 5) confidence = 0.5;
+  else if (total >= 3) confidence = 0.3;
+  else confidence = 0.15;
 
   // Build description
   const descriptions: Record<BehaviorPattern, string> = {

@@ -97,15 +97,26 @@ function buildPerceivedNarrative(
 ): string {
   const posLabel = position ? positionLabel(position) : "your position";
   const actionSummary = summarizeActions(actions);
+  const lastAction = actions[actions.length - 1];
+  const wasPassive = lastAction && (lastAction.actionType === "check" || lastAction.actionType === "call");
 
   if (rangePct > 50) {
     return `Your actions (${actionSummary}) from ${posLabel} leave your range wide (~${Math.round(rangePct)}% of hands). Opponents can't narrow you down much yet.`;
   }
   if (rangePct > 25) {
+    if (wasPassive) {
+      return `Your actions (${actionSummary}) from ${posLabel} suggest medium strength (~${Math.round(rangePct)}% of hands). Opponents see you as passive — mid pairs, draws, or speculative hands.`;
+    }
     return `Your actions (${actionSummary}) from ${posLabel} tell a clear story — opponents put you on a medium-strength range (~${Math.round(rangePct)}% of hands). They see you as having something but not necessarily a monster.`;
   }
   if (rangePct > 10) {
-    return `Your actions (${actionSummary}) from ${posLabel} have narrowed your perceived range to ~${Math.round(rangePct)}% of hands. Opponents think you're strong — premium pairs, top pair with good kickers, or strong draws.`;
+    if (wasPassive) {
+      return `Your actions (${actionSummary}) from ${posLabel} have narrowed your perceived range to ~${Math.round(rangePct)}% of hands. Opponents see you as passive — calling hands, traps, or draws that didn't raise.`;
+    }
+    return `Your actions (${actionSummary}) from ${posLabel} have narrowed your perceived range to ~${Math.round(rangePct)}% of hands. Opponents think you're strong — big pairs, broadway hands, or suited connectors.`;
+  }
+  if (wasPassive) {
+    return `Your actions (${actionSummary}) from ${posLabel} show a very narrow range (~${Math.round(rangePct)}% of hands). Your passive line reads as a weak hand trying to get to showdown cheaply, or possibly a slow-played monster.`;
   }
   return `Your actions (${actionSummary}) from ${posLabel} scream strength — opponents put you on a very narrow range (~${Math.round(rangePct)}% of hands). They think you have a monster or a very strong bluff.`;
 }
