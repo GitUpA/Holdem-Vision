@@ -634,6 +634,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                   heroCards={ws.heroCards}
                   communityCards={ws.communityCards}
                   heroPosition={ws.gameState?.players[ws.heroSeatIndex]?.position}
+                  facingBetBB={ws.legalActions?.callAmount ? ws.legalActions.callAmount / (ws.blinds?.big ?? 1) : 0}
                 />
               )}
 

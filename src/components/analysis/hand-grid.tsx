@@ -6,7 +6,7 @@
  * Preflop: equity heatmap, position range overlays (multi-select comparison).
  * Postflop: colors each cell by whether it beats hero on the current board.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { evaluateHand, compareHandRanks } from "../../../convex/lib/primitives/handEvaluator";
 import { getPreflopEquity } from "../../../convex/lib/gto/preflopEquityTable";
 import { GTO_RFI_RANGES } from "../../../convex/lib/gto/tables/preflopRanges";
@@ -39,10 +39,38 @@ interface GridCell {
   equity: number;
 }
 
+type SizingRole = "V" | "M" | "B" | "F";
+
+/**
+ * Facing: what should I do with this hand facing a bet of sizingBB?
+ * V = call/raise for value | M = mixed/borderline | B = bluff-catch | F = fold
+ */
+function classifyFacing(equity: number, sizingBB: number): SizingRole {
+  if (sizingBB <= 0) return "M";
+  const potOdds = sizingBB / (3 + sizingBB * 2);
+  const surplus = equity - potOdds;
+  const polarization = Math.min(1, Math.max(0, (sizingBB - 2) / 10));
+
+  if (equity >= 0.70) return "V";
+  if (surplus > 0.15) return "V";
+  if (surplus > 0.05) return "M";
+  if (surplus > -0.05 && polarization > 0.3) return "B";
+  if (surplus > -0.03) return "M";
+  return "F";
+}
+
+const FACING_COLOR: Record<SizingRole, string> = {
+  V: "text-green-400", M: "text-slate-400", B: "text-amber-300", F: "text-red-400/60",
+};
+const ROLE_LABEL: Record<SizingRole, string> = {
+  V: "Value", M: "Mixed", B: "Bluff-catch", F: "Fold",
+};
+
 interface HandGridProps {
   heroCards: number[];
   communityCards?: number[];
   heroPosition?: string;
+  facingBetBB?: number;
 }
 
 function getHeroHandClass(heroCards: number[]): string {
@@ -122,9 +150,19 @@ function computeGrid(heroCards: number[], communityCards: number[]) {
   return { cells, heroHC, heroEquity: getPreflopEquity(heroHC), totalBeats, totalTies, totalLoses, hasBoard };
 }
 
-export function HandGrid({ heroCards, communityCards, heroPosition }: HandGridProps) {
+export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0 }: HandGridProps) {
   const [showEquity, setShowEquity] = useState(false);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
+  const [facingSizingBB, setFacingSizingBB] = useState(0);
+  const [showFacing, setShowFacing] = useState(false);
+
+  // Auto-sync to live bet
+  useEffect(() => {
+    if (facingBetBB > 0) {
+      setFacingSizingBB(facingBetBB);
+      setShowFacing(true);
+    }
+  }, [facingBetBB]);
 
   const data = useMemo(() => {
     if (!heroCards || heroCards.length < 2) return null;
@@ -274,12 +312,41 @@ export function HandGrid({ heroCards, communityCards, heroPosition }: HandGridPr
         </div>
       )}
 
+      {/* ── Facing: what should I do facing this bet? ── */}
+      {!hasBoard && (
+        <div className="flex items-center gap-2 px-4 py-1.5 border-b border-[var(--border)]/50 bg-[var(--muted)]/10">
+          <span className="text-[9px] text-muted-foreground">Facing:</span>
+          <button onClick={() => setShowFacing(!showFacing)}
+            className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+              showFacing
+                ? "border-green-500/60 bg-green-500/15 text-green-400"
+                : "border-[var(--border)] text-muted-foreground hover:text-green-400 hover:border-green-500/40"
+            }`}>
+            {showFacing ? `${facingSizingBB.toFixed(1)}BB` : "Off"}
+          </button>
+          {showFacing && (
+            <>
+              <input type="range" min={0} max={20} step={0.5} value={facingSizingBB}
+                onChange={e => setFacingSizingBB(parseFloat(e.target.value))}
+                className="flex-1 h-1 accent-green-400 cursor-pointer" />
+              <div className="flex gap-1.5 text-[8px]">
+                <span className="text-green-400">V</span>
+                <span className="text-slate-400">M</span>
+                <span className="text-amber-300">B</span>
+                <span className="text-red-400/60">F</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Grid */}
       <div className="p-2">
         <div className="grid gap-px" style={{ gridTemplateColumns: "repeat(13, 1fr)" }}>
           {cells.map((cell) => {
             const inPrimary = primary?.range.has(cell.hc) ?? false;
             const inSecondary = secondary?.range.has(cell.hc) ?? false;
+            const facing = showFacing ? classifyFacing(cell.equity, facingSizingBB) : null;
             return (
               <Cell
                 key={`${cell.row}-${cell.col}`}
@@ -289,6 +356,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition }: HandGridPr
                 inPrimary={inPrimary}
                 inSecondary={inSecondary}
                 showRange={ranges.length > 0}
+                facing={facing}
               />
             );
           })}
@@ -298,13 +366,14 @@ export function HandGrid({ heroCards, communityCards, heroPosition }: HandGridPr
   );
 }
 
-function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange }: {
+function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange, facing }: {
   cell: GridCell;
   hasBoard: boolean;
   showEquity: boolean;
   inPrimary: boolean;
   inSecondary: boolean;
   showRange: boolean;
+  facing: SizingRole | null;
 }) {
   let bg: string;
   let txt: string;
@@ -351,7 +420,7 @@ function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange }:
 
   const title = cell.isHero ? `Your hand: ${cell.hc} (${(cell.equity * 100).toFixed(0)}% equity)`
     : cell.isDead ? `${cell.hc}: blocked`
-    : !hasBoard ? `${cell.hc}: ${(cell.equity * 100).toFixed(0)}% equity vs random${showRange ? (inPrimary && inSecondary ? " — in BOTH ranges" : inPrimary ? " — in primary range" : inSecondary ? " — in comparison range" : " — out of range") : ""}`
+    : !hasBoard ? `${cell.hc}: ${(cell.equity * 100).toFixed(0)}% equity vs random${facing ? ` | Facing: ${ROLE_LABEL[facing]}` : ""}${showRange ? (inPrimary && inSecondary ? " — in BOTH ranges" : inPrimary ? " — in primary range" : inSecondary ? " — in comparison range" : " — out of range") : ""}`
     : cell.total === 0 ? `${cell.hc}: no combos`
     : `${cell.hc}: ${cell.beats}/${cell.total} beat you (${((cell.beats / cell.total) * 100).toFixed(0)}%)`;
 
@@ -365,6 +434,12 @@ function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange }:
         const color = cell.isHero ? "border-t-white border-r-white" : "border-t-cyan-400 border-r-cyan-400";
         return <div className={`absolute top-0 right-0 w-0 h-0 border-t-[8px] border-r-[8px] ${color} border-l-[8px] border-b-[8px] border-l-transparent border-b-transparent`} />;
       })()}
+      {/* Facing letter — bottom right */}
+      {facing && !cell.isDead && (
+        <span className={`absolute bottom-px right-1 text-[9px] font-bold ${cell.isHero ? "text-white/80" : FACING_COLOR[facing]}`}>
+          {facing}
+        </span>
+      )}
       <span className="text-sm font-semibold">{cell.hc}</span>
       {showEqLabel && (
         <span className="text-[10px] opacity-75 mt-0.5">{(cell.equity * 100).toFixed(0)}%</span>
