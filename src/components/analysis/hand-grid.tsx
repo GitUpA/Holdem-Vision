@@ -3,7 +3,7 @@
 /**
  * Vision Hand Grid — 13x13 poker hand class grid.
  *
- * Preflop: highlights hero's hand, optional equity heatmap, position range overlay.
+ * Preflop: equity heatmap, position range overlays (multi-select comparison).
  * Postflop: colors each cell by whether it beats hero on the current board.
  */
 import { useMemo, useState } from "react";
@@ -22,6 +22,9 @@ const POSITIONS = [
   { key: "sb", label: "SB" },
 ] as const;
 
+// Range percentage approximations for display
+const RANGE_PCT: Record<string, number> = { utg: 15, hj: 19, co: 27, btn: 44, sb: 40 };
+
 interface GridCell {
   hc: string;
   row: number;
@@ -39,6 +42,7 @@ interface GridCell {
 interface HandGridProps {
   heroCards: number[];
   communityCards?: number[];
+  heroPosition?: string;
 }
 
 function getHeroHandClass(heroCards: number[]): string {
@@ -118,28 +122,55 @@ function computeGrid(heroCards: number[], communityCards: number[]) {
   return { cells, heroHC, heroEquity: getPreflopEquity(heroHC), totalBeats, totalTies, totalLoses, hasBoard };
 }
 
-export function HandGrid({ heroCards, communityCards }: HandGridProps) {
+export function HandGrid({ heroCards, communityCards, heroPosition }: HandGridProps) {
   const [showEquity, setShowEquity] = useState(false);
-  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
 
   const data = useMemo(() => {
     if (!heroCards || heroCards.length < 2) return null;
     return computeGrid(heroCards, communityCards ?? []);
   }, [heroCards, communityCards]);
 
-  // Get the range set for the selected position
-  const positionRange = useMemo(() => {
-    if (!selectedPosition) return null;
-    return GTO_RFI_RANGES[selectedPosition] ?? null;
-  }, [selectedPosition]);
+  // Get range sets for selected positions (max 2)
+  const ranges = useMemo(() => {
+    return selectedPositions
+      .map(pos => ({ pos, range: GTO_RFI_RANGES[pos] }))
+      .filter(r => r.range);
+  }, [selectedPositions]);
 
   if (!data) return null;
 
   const { cells, heroEquity, totalBeats, totalTies, totalLoses, hasBoard } = data;
   const totalCombos = totalBeats + totalTies + totalLoses;
 
-  // Count hands in selected range
-  const rangeCount = positionRange ? cells.filter(c => positionRange.has(c.hc)).length : 0;
+  const heroPos = heroPosition && !["bb"].includes(heroPosition) ? heroPosition : null;
+
+  const togglePosition = (key: string) => {
+    setSelectedPositions(prev => {
+      if (prev.includes(key)) {
+        // Deselect
+        return prev.filter(p => p !== key);
+      }
+      if (heroPos && key === heroPos) {
+        // Hero always goes to primary (index 0), keep secondary if exists
+        const other = prev.find(p => p !== heroPos);
+        return other ? [heroPos, other] : [heroPos];
+      }
+      if (heroPos && prev.includes(heroPos)) {
+        // Hero is already primary — this new pick replaces secondary
+        return [heroPos, key];
+      }
+      if (prev.length >= 2) {
+        // Replace second selection
+        return [prev[0], key];
+      }
+      return [...prev, key];
+    });
+  };
+
+  // Determine which range slot each position is in (for coloring)
+  const primary = ranges[0] ?? null;
+  const secondary = ranges[1] ?? null;
 
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
@@ -183,27 +214,62 @@ export function HandGrid({ heroCards, communityCards }: HandGridProps) {
         </div>
       </div>
 
-      {/* Position range bar */}
+      {/* Position range bar — multi-select */}
       {!hasBoard && (
         <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-[var(--border)]/50 bg-[var(--muted)]/15">
           <span className="text-[9px] text-muted-foreground mr-1">Range:</span>
-          {POSITIONS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setSelectedPosition(selectedPosition === key ? null : key)}
-              className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
-                selectedPosition === key
-                  ? "bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold-dim)]/50 font-semibold"
-                  : "text-muted-foreground hover:text-foreground border border-transparent hover:border-[var(--border)]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-          {selectedPosition && (
-            <span className="text-[9px] text-muted-foreground ml-auto">
-              {rangeCount} hands
-            </span>
+          {heroPosition && !["bb"].includes(heroPosition) && (
+            <>
+              <button
+                onClick={() => togglePosition(heroPosition)}
+                className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+                  selectedPositions.includes(heroPosition)
+                    ? selectedPositions[0] === heroPosition
+                      ? "bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold-dim)]/50 font-semibold"
+                      : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 font-semibold"
+                    : "text-[var(--gold)] hover:text-[var(--gold)] border border-[var(--gold-dim)]/30 hover:border-[var(--gold-dim)]/50"
+                }`}
+              >
+                Hero ({heroPosition.toUpperCase()})
+              </button>
+              <div className="h-3 w-px bg-[var(--border)]/50 mx-0.5" />
+            </>
+          )}
+          {POSITIONS.map(({ key, label }) => {
+            const isSelected = selectedPositions.includes(key);
+            const isFirst = selectedPositions[0] === key;
+            return (
+              <button
+                key={key}
+                onClick={() => togglePosition(key)}
+                className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+                  isSelected
+                    ? isFirst
+                      ? "bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold-dim)]/50 font-semibold"
+                      : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 font-semibold"
+                    : "text-muted-foreground hover:text-foreground border border-transparent hover:border-[var(--border)]"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+          {ranges.length > 0 && (
+            <div className="flex gap-2 text-[9px] text-muted-foreground ml-auto">
+              {primary && (
+                <span className="text-[var(--gold)]">
+                  {primary.pos.toUpperCase()} ~{RANGE_PCT[primary.pos] ?? "?"}%
+                </span>
+              )}
+              {secondary && (
+                <>
+                  <span>vs</span>
+                  <span className="text-cyan-400">
+                    {secondary.pos.toUpperCase()} ~{RANGE_PCT[secondary.pos] ?? "?"}%
+                  </span>
+                </>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -211,27 +277,33 @@ export function HandGrid({ heroCards, communityCards }: HandGridProps) {
       {/* Grid */}
       <div className="p-2">
         <div className="grid gap-px" style={{ gridTemplateColumns: "repeat(13, 1fr)" }}>
-          {cells.map((cell) => (
-            <Cell
-              key={`${cell.row}-${cell.col}`}
-              cell={cell}
-              hasBoard={hasBoard}
-              showEquity={showEquity}
-              inRange={positionRange?.has(cell.hc) ?? false}
-              showRange={selectedPosition !== null}
-            />
-          ))}
+          {cells.map((cell) => {
+            const inPrimary = primary?.range.has(cell.hc) ?? false;
+            const inSecondary = secondary?.range.has(cell.hc) ?? false;
+            return (
+              <Cell
+                key={`${cell.row}-${cell.col}`}
+                cell={cell}
+                hasBoard={hasBoard}
+                showEquity={showEquity}
+                inPrimary={inPrimary}
+                inSecondary={inSecondary}
+                showRange={ranges.length > 0}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-function Cell({ cell, hasBoard, showEquity, inRange, showRange }: {
+function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange }: {
   cell: GridCell;
   hasBoard: boolean;
   showEquity: boolean;
-  inRange: boolean;
+  inPrimary: boolean;
+  inSecondary: boolean;
   showRange: boolean;
 }) {
   let bg: string;
@@ -263,7 +335,6 @@ function Cell({ cell, hasBoard, showEquity, inRange, showRange }: {
   } else {
     const beatRatio = cell.beats / cell.total;
     const tieRatio = cell.ties / cell.total;
-
     if (beatRatio > 0.7) { bg = "bg-red-700/70"; txt = "text-red-100"; }
     else if (beatRatio > 0.4) { bg = "bg-red-900/50"; txt = "text-red-200"; }
     else if (tieRatio > 0.5) { bg = "bg-yellow-800/40"; txt = "text-yellow-200"; }
@@ -271,26 +342,29 @@ function Cell({ cell, hasBoard, showEquity, inRange, showRange }: {
     else { bg = "bg-emerald-900/30"; txt = "text-emerald-200"; }
   }
 
-  // Range overlay: outline cells that are in the selected position's range
-  const rangeBorder = showRange && !cell.isDead
-    ? inRange
-      ? "ring-2 ring-[var(--gold)] ring-inset"
-      : "opacity-40"
-    : "";
+  // Range overlay: primary = ring outline, secondary = corner paint
+  const dimmed = showRange && !cell.isDead && !cell.isHero && !inPrimary && !inSecondary;
+  const primaryRing = showRange && !cell.isDead && (inPrimary || cell.isHero)
+    ? "ring-2 ring-[var(--gold)] ring-inset" : "";
 
   const showEqLabel = !hasBoard && showEquity && !cell.isHero && !cell.isDead;
 
   const title = cell.isHero ? `Your hand: ${cell.hc} (${(cell.equity * 100).toFixed(0)}% equity)`
     : cell.isDead ? `${cell.hc}: blocked`
-    : !hasBoard ? `${cell.hc}: ${(cell.equity * 100).toFixed(0)}% equity vs random${showRange ? (inRange ? " — IN RANGE" : " — out of range") : ""}`
+    : !hasBoard ? `${cell.hc}: ${(cell.equity * 100).toFixed(0)}% equity vs random${showRange ? (inPrimary && inSecondary ? " — in BOTH ranges" : inPrimary ? " — in primary range" : inSecondary ? " — in comparison range" : " — out of range") : ""}`
     : cell.total === 0 ? `${cell.hc}: no combos`
     : `${cell.hc}: ${cell.beats}/${cell.total} beat you (${((cell.beats / cell.total) * 100).toFixed(0)}%)`;
 
   return (
     <div
-      className={`${bg} ${txt} ${rangeBorder} leading-none flex flex-col items-center justify-center rounded-sm aspect-square select-none cursor-default transition-opacity`}
+      className={`${bg} ${txt} ${primaryRing} ${dimmed ? "opacity-30" : ""} relative leading-none flex flex-col items-center justify-center rounded-sm aspect-square select-none cursor-default overflow-hidden transition-opacity`}
       title={title}
     >
+      {/* Corner paint: secondary range = cyan (or white on hero's blue cell) */}
+      {showRange && !cell.isDead && inSecondary && (() => {
+        const color = cell.isHero ? "border-t-white border-r-white" : "border-t-cyan-400 border-r-cyan-400";
+        return <div className={`absolute top-0 right-0 w-0 h-0 border-t-[8px] border-r-[8px] ${color} border-l-[8px] border-b-[8px] border-l-transparent border-b-transparent`} />;
+      })()}
       <span className="text-sm font-semibold">{cell.hc}</span>
       {showEqLabel && (
         <span className="text-[10px] opacity-75 mt-0.5">{(cell.equity * 100).toFixed(0)}%</span>

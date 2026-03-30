@@ -630,7 +630,11 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
 
               {/* ── Hand Grid (13x13) ── */}
               {ws.heroCards.length >= 2 && (
-                <HandGrid heroCards={ws.heroCards} communityCards={ws.communityCards} />
+                <HandGrid
+                  heroCards={ws.heroCards}
+                  communityCards={ws.communityCards}
+                  heroPosition={ws.gameState?.players[ws.heroSeatIndex]?.position}
+                />
               )}
 
               {/* ── Coaching + Solution (unified in drill mode) ── */}
