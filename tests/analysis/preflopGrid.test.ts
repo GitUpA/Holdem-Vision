@@ -16,7 +16,7 @@ import {
   normalize6Max,
   type PreflopSituation,
 } from "../../convex/lib/analysis/preflopGrid";
-import type { CardIndex } from "../../convex/lib/types/cards";
+import type { CardIndex, Position } from "../../convex/lib/types/cards";
 import { getPreflopEquity } from "../../convex/lib/gto/preflopEquityTable";
 
 // ═══════════════════════════════════════════════════════
