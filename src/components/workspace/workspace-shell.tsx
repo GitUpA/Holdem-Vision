@@ -634,6 +634,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                   heroCards={ws.heroCards}
                   communityCards={ws.communityCards}
                   heroPosition={ws.gameState?.players[ws.heroSeatIndex]?.position}
+                  stackDepthBB={ws.gameState ? ws.gameState.players[ws.heroSeatIndex]?.currentStack / (ws.blinds?.big ?? 1) : 100}
                   facingBetBB={ws.legalActions?.callAmount ? ws.legalActions.callAmount / (ws.blinds?.big ?? 1) : 0}
                   facingPosition={(() => {
                     if (!ws.gameState) return undefined;

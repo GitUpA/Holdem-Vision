@@ -29,6 +29,7 @@ import {
   GTO_BVB,
   GTO_4BET,
 } from "../gto/tables/preflopRanges";
+import { HAND_STRENGTH_ORDER } from "../gto/preflopClassification";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -149,31 +150,64 @@ export function computePotAtAction(
 }
 
 // ═══════════════════════════════════════════════════════
+// STACK DEPTH ADJUSTMENT
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Compress a range based on stack depth.
+ *
+ * At 100BB: full range (no compression).
+ * At 40BB: remove bottom ~20% of range (speculative hands lose implied odds).
+ * At 20BB: remove bottom ~40% (shove/fold territory — only premiums + high cards).
+ * Below 15BB: keep only top ~40% of the range.
+ *
+ * Uses HAND_STRENGTH_ORDER to identify which hands to drop from the bottom.
+ */
+export function compressRangeByStack(range: Set<string>, stackDepthBB: number): Set<string> {
+  if (stackDepthBB >= 80) return range; // deep stack — no compression
+
+  // Compression factor: 0 at 80BB, 1 at 10BB
+  const compression = Math.min(1, Math.max(0, (80 - stackDepthBB) / 70));
+  // Remove bottom X% of the range by hand strength
+  const dropPct = compression * 0.5; // at 10BB, drop bottom 50%
+
+  // Rank each hand in the range by strength order
+  const rankedHands = [...range].sort((a, b) => {
+    const idxA = HAND_STRENGTH_ORDER.indexOf(a);
+    const idxB = HAND_STRENGTH_ORDER.indexOf(b);
+    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+  });
+
+  const keepCount = Math.max(1, Math.ceil(rankedHands.length * (1 - dropPct)));
+  return new Set(rankedHands.slice(0, keepCount));
+}
+
+// ═══════════════════════════════════════════════════════
 // STAGE C: Get opponent's range
 // ═══════════════════════════════════════════════════════
 
 export function getOpponentRange(
   situation: PreflopSituation,
-  _stackDepthBB: number = 100,
+  stackDepthBB: number = 100,
 ): Set<string> | null {
+  let range: Set<string> | null = null;
+
   switch (situation.type) {
     case "rfi":
-      return null; // No opponent — hero is opening
-
+      return null;
     case "facing_open":
     case "facing_open_multiway":
-      return GTO_RFI_RANGES[situation.opener] ?? null;
-
+      range = GTO_RFI_RANGES[situation.opener] ?? null; break;
     case "facing_3bet":
-      return GTO_3BET_RANGES[situation.threeBettor] ?? null;
-
+      range = GTO_3BET_RANGES[situation.threeBettor] ?? null; break;
     case "blind_vs_blind":
-      // SB opened — use SB's RFI range
-      return GTO_RFI_RANGES["sb"] ?? null;
-
+      range = GTO_RFI_RANGES["sb"] ?? null; break;
     case "facing_4bet":
-      return GTO_4BET.value ? new Set([...GTO_4BET.value, ...GTO_4BET.bluffs]) : null;
+      range = GTO_4BET.value ? new Set([...GTO_4BET.value, ...GTO_4BET.bluffs]) : null; break;
   }
+
+  // Compress for short stacks
+  return range ? compressRangeByStack(range, stackDepthBB) : null;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -183,23 +217,20 @@ export function getOpponentRange(
 export function getHeroContinueRange(
   situation: PreflopSituation,
   heroPosition: Position,
-  _stackDepthBB: number = 100,
+  stackDepthBB: number = 100,
 ): Set<string> {
   const combined = new Set<string>();
 
   switch (situation.type) {
     case "rfi": {
-      // Hero is opening — use RFI range
       const rfi = GTO_RFI_RANGES[heroPosition];
       if (rfi) for (const h of rfi) combined.add(h);
-      return combined;
+      break;
     }
 
     case "facing_open":
     case "facing_open_multiway": {
-      // Hero faces a raise — cold-call + 3-bet + mixed (NOT RFI)
       if (heroPosition === "bb") {
-        // BB defense keyed by opener
         const opener = situation.opener;
         if (opener === "sb") {
           const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
@@ -217,40 +248,39 @@ export function getHeroContinueRange(
             for (const h of defense.call) combined.add(h);
           }
         }
-        return combined;
+      } else {
+        const coldCall = GTO_COLD_CALL_RANGES[heroPosition];
+        const threeBet = GTO_3BET_RANGES[heroPosition];
+        const mixed = GTO_3BET_MIXED[heroPosition];
+        if (coldCall) for (const h of coldCall) combined.add(h);
+        if (threeBet) for (const h of threeBet) combined.add(h);
+        if (mixed) for (const h of mixed) combined.add(h);
       }
-      const coldCall = GTO_COLD_CALL_RANGES[heroPosition];
-      const threeBet = GTO_3BET_RANGES[heroPosition];
-      const mixed = GTO_3BET_MIXED[heroPosition];
-      if (coldCall) for (const h of coldCall) combined.add(h);
-      if (threeBet) for (const h of threeBet) combined.add(h);
-      if (mixed) for (const h of mixed) combined.add(h);
-      return combined;
+      break;
     }
 
     case "facing_3bet":
     case "facing_4bet": {
-      // Facing a 3-bet/4-bet — only premium continue hands
       if (GTO_4BET.value) for (const h of GTO_4BET.value) combined.add(h);
       if (GTO_4BET.call) for (const h of GTO_4BET.call) combined.add(h);
-      return combined;
+      break;
     }
 
     case "blind_vs_blind": {
-      // BB facing SB open
       if (heroPosition === "bb") {
         const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
         const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
         if (bvb3bet) for (const h of bvb3bet) combined.add(h);
         if (bvbCall) for (const h of bvbCall) combined.add(h);
       } else {
-        // SB opening — use RFI
         const rfi = GTO_RFI_RANGES["sb"];
         if (rfi) for (const h of rfi) combined.add(h);
       }
-      return combined;
+      break;
     }
   }
+
+  return compressRangeByStack(combined, stackDepthBB);
 }
 
 // ═══════════════════════════════════════════════════════

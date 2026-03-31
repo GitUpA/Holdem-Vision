@@ -12,6 +12,7 @@ import {
   computeEquityGrid,
   computePreflopHandGrid,
   getHeroHandClass,
+  compressRangeByStack,
   type PreflopSituation,
 } from "../../convex/lib/analysis/preflopGrid";
 import type { CardIndex } from "../../convex/lib/types/cards";
@@ -293,6 +294,68 @@ describe("computeEquityGrid", () => {
 // ═══════════════════════════════════════════════════════
 // STAGE H: computePreflopHandGrid (integration)
 // ═══════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════
+// STACK DEPTH COMPRESSION
+// ═══════════════════════════════════════════════════════
+
+describe("compressRangeByStack", () => {
+  const fullRange = new Set(["AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", "66",
+    "AKs", "AQs", "AJs", "ATs", "AKo", "AQo", "AJo",
+    "KQs", "KJs", "KTs", "QJs", "QTs", "JTs", "T9s", "98s", "87s", "76s", "65s", "A5s", "A4s"]);
+
+  it("no compression at 100BB", () => {
+    const result = compressRangeByStack(fullRange, 100);
+    expect(result.size).toBe(fullRange.size);
+  });
+
+  it("no compression at 80BB", () => {
+    const result = compressRangeByStack(fullRange, 80);
+    expect(result.size).toBe(fullRange.size);
+  });
+
+  it("removes some hands at 40BB", () => {
+    const result = compressRangeByStack(fullRange, 40);
+    expect(result.size).toBeLessThan(fullRange.size);
+    expect(result.size).toBeGreaterThan(fullRange.size * 0.5);
+    // Premiums always survive
+    expect(result.has("AA")).toBe(true);
+    expect(result.has("KK")).toBe(true);
+  });
+
+  it("removes more hands at 20BB", () => {
+    const at40 = compressRangeByStack(fullRange, 40);
+    const at20 = compressRangeByStack(fullRange, 20);
+    expect(at20.size).toBeLessThan(at40.size);
+    // Still has premiums
+    expect(at20.has("AA")).toBe(true);
+  });
+
+  it("keeps at least top hands at 10BB", () => {
+    const result = compressRangeByStack(fullRange, 10);
+    expect(result.size).toBeGreaterThan(0);
+    expect(result.has("AA")).toBe(true);
+    expect(result.has("KK")).toBe(true);
+    // Suited connectors dropped
+    expect(result.has("65s")).toBe(false);
+  });
+
+  it("opponent range shrinks at short stacks", () => {
+    const s: PreflopSituation = { type: "facing_open", opener: "utg" };
+    const deep = getOpponentRange(s, 100)!;
+    const shallow = getOpponentRange(s, 30)!;
+    expect(shallow.size).toBeLessThan(deep.size);
+    expect(shallow.has("AA")).toBe(true);
+  });
+
+  it("hero continue range shrinks at short stacks", () => {
+    const s: PreflopSituation = { type: "facing_open", opener: "utg" };
+    const deep = getHeroContinueRange(s, "btn", 100);
+    const shallow = getHeroContinueRange(s, "btn", 30);
+    expect(shallow.size).toBeLessThan(deep.size);
+    expect(shallow.has("AA")).toBe(true);
+  });
+});
 
 describe("computePreflopHandGrid", { timeout: 30_000 }, () => {
   it("produces 169 cells", () => {
