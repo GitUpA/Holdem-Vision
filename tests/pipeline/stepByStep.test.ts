@@ -18,8 +18,8 @@ import { GTO_PROFILE, PRESET_PROFILES } from "../../convex/lib/opponents/presets
 import { comboToHandClass, cardsToCombo } from "../../convex/lib/opponents/combos";
 import { cardToString, rankValue } from "../../convex/lib/primitives/card";
 import { computeHandGrid } from "../../convex/lib/analysis/handGrid";
-import { getPreflopEquity } from "../../convex/lib/gto/preflopEquityTable";
-import { GTO_RFI_RANGES } from "../../convex/lib/gto/tables/preflopRanges";
+import { computePreflopHandGrid, type PreflopGridResult } from "../../convex/lib/analysis/preflopGrid";
+import type { Position } from "../../convex/lib/types/cards";
 import { positionDisplayName } from "../../convex/lib/primitives/position";
 import type { CardIndex } from "../../convex/lib/types/cards";
 import type { GameState, PlayerState } from "../../convex/lib/state/gameState";
@@ -153,21 +153,38 @@ describe("Step-by-Step Analysis", () => {
           console.log(`Legal: ${legalActionsStr(legal)}`);
 
           // ── VISION GRID ──
-          const gridData = computeHandGrid(heroCards, state.communityCards as CardIndex[]);
-          const heroEq = getPreflopEquity(handClass);
           if (state.currentStreet === "preflop") {
-            // Find facing position
             const preflopRaises = state.actionHistory.filter(
-              (a: { street: string; actionType: string }) => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet")
+              (a: { street: string; actionType: string; seatIndex: number }) => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet")
             );
-            const facingPos = preflopRaises.length > 0 ? preflopRaises[preflopRaises.length - 1].position : null;
-            const facingRange = facingPos ? GTO_RFI_RANGES[facingPos] : null;
-            console.log(`  [GRID] Hero: ${handClass} (${(heroEq * 100).toFixed(0)}% vs random)${facingPos ? ` | Facing: ${facingPos.toUpperCase()}` : ""}`);
-            if (facingRange) {
-              const inRange = facingRange.has(handClass);
-              console.log(`  [GRID] Hero in ${facingPos?.toUpperCase()} range: ${inRange ? "YES" : "NO"}`);
-            }
+            const heroPosition = state.players[0]?.position as Position;
+            // Detect situation: did hero raise and then get re-raised?
+            const heroRaised = preflopRaises.some((a: { seatIndex: number }) => a.seatIndex === 0);
+            const nonHeroRaises = preflopRaises.filter((a: { seatIndex: number }) => a.seatIndex !== 0);
+            const firstOpener = nonHeroRaises.length > 0 ? nonHeroRaises[0] : null;
+            const lastRaiser = preflopRaises.length > 0 ? preflopRaises[preflopRaises.length - 1] : null;
+            const is3Bet = heroRaised && nonHeroRaises.length > 0;
+            const heroOpenAmt = preflopRaises.find((a: { seatIndex: number }) => a.seatIndex === 0)?.amount ?? 0;
+            const openerPos = is3Bet ? undefined : (firstOpener?.position as Position | undefined);
+            const openerAmt = is3Bet ? heroOpenAmt : (firstOpener?.amount ?? 0);
+
+            const gridResult: PreflopGridResult = computePreflopHandGrid({
+              heroCards,
+              heroPosition,
+              openerPosition: openerPos,
+              openerSizingBB: openerAmt,
+              facing3Bet: is3Bet,
+              threeBettorPosition: is3Bet ? (lastRaiser?.position as Position) : undefined,
+              threeBetSizeBB: is3Bet ? (lastRaiser?.amount ?? 0) : undefined,
+            }, 0); // 0 trials = static equity (fast)
+
+            const heroCell = gridResult.cells.find(c => c.isHero);
+            const facingLabel = heroCell?.facing ? ` | Facing: ${heroCell.facing}` : "";
+            const vsLabel = is3Bet ? ` vs ${(lastRaiser?.position ?? "?").toUpperCase()} 3bet` : openerPos ? ` vs ${openerPos.toUpperCase()}` : "";
+            console.log(`  [GRID] Hero: ${gridResult.heroHandClass} (${(gridResult.heroEquity * 100).toFixed(0)}% eq) | Situation: ${gridResult.situation.type}${vsLabel}${facingLabel}`);
+            console.log(`  [GRID] In hero range: ${heroCell?.inHeroRange ? "YES" : "NO"} | In opp range: ${heroCell?.inOpponentRange ? "YES" : "NO"} | Pot: ${gridResult.potSizeBB.toFixed(1)}BB`);
           } else {
+            const gridData = computeHandGrid(heroCards, state.communityCards as CardIndex[]);
             console.log(`  [GRID] Postflop: ${gridData.totalBeats} beat, ${gridData.totalTies} tie, ${gridData.totalLoses} win (of ${gridData.totalBeats + gridData.totalTies + gridData.totalLoses} combos)`);
           }
 

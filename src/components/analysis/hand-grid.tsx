@@ -17,6 +17,7 @@ import {
   type PreflopGridCell,
   type SizingRole,
 } from "../../../convex/lib/analysis/preflopGrid";
+import { computeHandGrid, type HandClassGridCell } from "../../../convex/lib/analysis/handGrid";
 import type { CardIndex, Position } from "../../../convex/lib/types/cards";
 
 // ═══════════════════════════════════════════════════════
@@ -40,56 +41,6 @@ const FACING_COLOR: Record<SizingRole, string> = {
 const ROLE_LABEL: Record<SizingRole, string> = {
   V: "Value", M: "Mixed", B: "Bluff-catch", F: "Fold",
 };
-
-// ═══════════════════════════════════════════════════════
-// POSTFLOP GRID (stays here — browser-only with evaluateHand)
-// ═══════════════════════════════════════════════════════
-
-interface PostflopCell {
-  hc: string; row: number; col: number;
-  type: "pair" | "suited" | "offsuit";
-  isHero: boolean; isDead: boolean;
-  beats: number; ties: number; loses: number; total: number;
-}
-
-function computePostflopGrid(heroCards: number[], communityCards: number[]) {
-  const heroHC = getHeroHandClass(heroCards);
-  const deadCards = new Set([...heroCards, ...communityCards]);
-  const heroEval = evaluateHand([...heroCards, ...communityCards] as CardIndex[]);
-  let totalBeats = 0, totalTies = 0, totalLoses = 0;
-
-  const cells: PostflopCell[] = RL.flatMap((_, row) =>
-    RL.map((_, col) => {
-      const type: "pair" | "suited" | "offsuit" = row === col ? "pair" : row < col ? "suited" : "offsuit";
-      const hc = row === col ? RL[row] + RL[col] : row < col ? RL[row] + RL[col] + "s" : RL[col] + RL[row] + "o";
-      const isHero = hc === heroHC;
-      let beats = 0, ties = 0, loses = 0, total = 0;
-      const rank1 = GRID_TO_RANK[row]; const rank2 = GRID_TO_RANK[col];
-
-      if (type === "pair") {
-        for (let s1 = 0; s1 < 4; s1++) for (let s2 = s1 + 1; s2 < 4; s2++) {
-          const c1 = rank1 * 4 + s1; const c2 = rank1 * 4 + s2;
-          if (deadCards.has(c1) || deadCards.has(c2)) continue; total++;
-          const cmp = compareHandRanks(evaluateHand([c1, c2, ...communityCards] as CardIndex[]).rank, heroEval.rank);
-          if (cmp > 0) beats++; else if (cmp === 0) ties++; else loses++;
-        }
-      } else {
-        const r1 = row < col ? rank1 : rank2; const r2 = row < col ? rank2 : rank1;
-        for (let s1 = 0; s1 < 4; s1++) for (let s2 = 0; s2 < 4; s2++) {
-          if (type === "suited" && s1 !== s2) continue;
-          if (type === "offsuit" && s1 === s2) continue;
-          const c1 = r1 * 4 + s1; const c2 = r2 * 4 + s2;
-          if (deadCards.has(c1) || deadCards.has(c2)) continue; total++;
-          const cmp = compareHandRanks(evaluateHand([c1, c2, ...communityCards] as CardIndex[]).rank, heroEval.rank);
-          if (cmp > 0) beats++; else if (cmp === 0) ties++; else loses++;
-        }
-      }
-      totalBeats += beats; totalTies += ties; totalLoses += loses;
-      return { hc, row, col, type, isHero, isDead: total === 0, beats, ties, loses, total };
-    })
-  );
-  return { cells, heroHC, totalBeats, totalTies, totalLoses };
-}
 
 function getHeroHandClass(heroCards: number[]): string {
   const r0 = Math.floor(heroCards[0] / 4); const r1 = Math.floor(heroCards[1] / 4);
@@ -167,7 +118,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
   // ── POSTFLOP: local computation ──
   const postflopData = useMemo(() => {
     if (!hasBoard || !heroCards || heroCards.length < 2) return null;
-    return computePostflopGrid(heroCards, community);
+    return computeHandGrid(heroCards as CardIndex[], community as CardIndex[]);
   }, [heroCards, community, hasBoard]);
 
   // ── RANGE OVERLAYS (preflop only) ──
@@ -282,7 +233,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
 
   if (hasBoard && postflopData) {
     // POSTFLOP RENDER
-    const { cells, totalBeats, totalTies, totalLoses } = postflopData;
+    const { grid, totalBeats, totalTies, totalLoses } = postflopData;
     const totalCombos = totalBeats + totalTies + totalLoses;
     return (
       <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
@@ -298,7 +249,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
         </div>
         <div className="p-2">
           <div className="grid gap-px" style={{ gridTemplateColumns: "repeat(13, 1fr)" }}>
-            {cells.map(cell => <PostflopCellView key={`${cell.row}-${cell.col}`} cell={cell} />)}
+            {grid.map(row => row.map(cell => <PostflopCellView key={`${cell.row}-${cell.col}`} cell={cell} />))}
           </div>
         </div>
       </div>
@@ -484,7 +435,7 @@ function PreflopCellView({ cell, showEquity, effectiveEquity, inPrimary, inSecon
   );
 }
 
-function PostflopCellView({ cell }: { cell: PostflopCell }) {
+function PostflopCellView({ cell }: { cell: HandClassGridCell }) {
   let bg: string, txt: string;
   if (cell.isHero) { bg = "bg-blue-600"; txt = "text-white font-bold"; }
   else if (cell.isDead || cell.total === 0) { bg = "bg-muted/20"; txt = "text-muted-foreground/30"; }
@@ -496,12 +447,12 @@ function PostflopCellView({ cell }: { cell: PostflopCell }) {
     else if (br > 0.1) { bg = "bg-orange-900/30"; txt = "text-orange-200"; }
     else { bg = "bg-emerald-900/30"; txt = "text-emerald-200"; }
   }
-  const title = cell.isHero ? `Your hand: ${cell.hc}`
-    : cell.total === 0 ? `${cell.hc}: no combos`
-    : `${cell.hc}: ${cell.beats}/${cell.total} beat you (${((cell.beats/cell.total)*100).toFixed(0)}%)`;
+  const title = cell.isHero ? `Your hand: ${cell.handClass}`
+    : cell.total === 0 ? `${cell.handClass}: no combos`
+    : `${cell.handClass}: ${cell.beats}/${cell.total} beat you (${((cell.beats/cell.total)*100).toFixed(0)}%)`;
   return (
     <div className={`${bg} ${txt} leading-none flex items-center justify-center rounded-sm aspect-square select-none cursor-default`} title={title}>
-      <span className="text-sm font-semibold">{cell.hc}</span>
+      <span className="text-sm font-semibold">{cell.handClass}</span>
     </div>
   );
 }
