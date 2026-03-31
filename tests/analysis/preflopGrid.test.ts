@@ -358,6 +358,34 @@ describe("compressRangeByStack", () => {
 });
 
 // ═══════════════════════════════════════════════════════
+// RAISE SIZING ADJUSTMENT
+// ═══════════════════════════════════════════════════════
+
+describe("raise sizing adjustment", () => {
+  it("standard sizing (3BB) does not compress opponent range", () => {
+    const s: PreflopSituation = { type: "facing_open", opener: "co" };
+    const standard = getOpponentRange(s, 100, 3)!;
+    const noSize = getOpponentRange(s, 100, 0)!;
+    expect(standard.size).toBe(noSize.size);
+  });
+
+  it("large sizing (6BB) compresses opponent range", () => {
+    const s: PreflopSituation = { type: "facing_open", opener: "co" };
+    const standard = getOpponentRange(s, 100, 3)!;
+    const large = getOpponentRange(s, 100, 6)!;
+    expect(large.size).toBeLessThan(standard.size);
+    expect(large.has("AA")).toBe(true);
+  });
+
+  it("very large sizing (10BB) compresses more", () => {
+    const s: PreflopSituation = { type: "facing_open", opener: "co" };
+    const at6 = getOpponentRange(s, 100, 6)!;
+    const at10 = getOpponentRange(s, 100, 10)!;
+    expect(at10.size).toBeLessThan(at6.size);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
 // MULTIWAY CALLERS
 // ═══════════════════════════════════════════════════════
 

@@ -189,6 +189,7 @@ export function compressRangeByStack(range: Set<string>, stackDepthBB: number): 
 export function getOpponentRange(
   situation: PreflopSituation,
   stackDepthBB: number = 100,
+  openerSizingBB: number = 0,
 ): Set<string> | null {
   let range: Set<string> | null = null;
 
@@ -206,8 +207,26 @@ export function getOpponentRange(
       range = GTO_4BET.value ? new Set([...GTO_4BET.value, ...GTO_4BET.bluffs]) : null; break;
   }
 
-  // Compress for short stacks
-  return range ? compressRangeByStack(range, stackDepthBB) : null;
+  if (!range) return null;
+
+  // Stack compression
+  let compressed = compressRangeByStack(range, stackDepthBB);
+
+  // Sizing adjustment: larger opens imply tighter ranges.
+  // Standard open is ~2.5-3BB. Above 4BB, drop bottom X% of range.
+  if (openerSizingBB > 4 && compressed.size > 3) {
+    const excessSizing = openerSizingBB - 4;
+    const dropPct = Math.min(0.4, excessSizing * 0.08); // 5BB→8%, 8BB→32%, 9BB→40%
+    const ranked = [...compressed].sort((a, b) => {
+      const idxA = HAND_STRENGTH_ORDER.indexOf(a);
+      const idxB = HAND_STRENGTH_ORDER.indexOf(b);
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    });
+    const keepCount = Math.max(3, Math.ceil(ranked.length * (1 - dropPct)));
+    compressed = new Set(ranked.slice(0, keepCount));
+  }
+
+  return compressed;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -464,7 +483,7 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
   const heroHandClass = getHeroHandClass(heroCards);
   const threeBettorPos = params.threeBettorPosition ?? null;
   const situation = classifyPreflopSituation(heroPosition, openerPosition, numCallers, facing3Bet, threeBettorPos);
-  const opponentRange = getOpponentRange(situation, stackDepthBB);
+  const opponentRange = getOpponentRange(situation, stackDepthBB, openerSizingBB);
   const heroContinueRange = getHeroContinueRange(situation, heroPosition, stackDepthBB);
   const equityMap = computeEquityGrid(heroCards, opponentRange, mcTrials);
   const potSizeBB = computePotAtAction(blindsBB, openerSizingBB, numCallers, facing3Bet, threeBetSizeBB);
