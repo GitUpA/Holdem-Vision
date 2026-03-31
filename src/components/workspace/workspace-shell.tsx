@@ -635,6 +635,18 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                   communityCards={ws.communityCards}
                   heroPosition={ws.gameState?.players[ws.heroSeatIndex]?.position}
                   facingBetBB={ws.legalActions?.callAmount ? ws.legalActions.callAmount / (ws.blinds?.big ?? 1) : 0}
+                  facingPosition={(() => {
+                    if (!ws.gameState) return undefined;
+                    const preflopRaises = ws.gameState.actionHistory.filter(
+                      a => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet")
+                    );
+                    if (preflopRaises.length === 0) return undefined;
+                    return preflopRaises[preflopRaises.length - 1].position;
+                  })()}
+                  preflopActions={ws.gameState?.actionHistory
+                    .filter(a => a.street === "preflop")
+                    .map(a => ({ position: a.position, actionType: a.actionType, amount: a.amount }))
+                  }
                 />
               )}
 

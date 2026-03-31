@@ -17,6 +17,9 @@ import { currentLegalActions } from "../../convex/lib/state/stateMachine";
 import { GTO_PROFILE, PRESET_PROFILES } from "../../convex/lib/opponents/presets";
 import { comboToHandClass, cardsToCombo } from "../../convex/lib/opponents/combos";
 import { cardToString, rankValue } from "../../convex/lib/primitives/card";
+import { computeHandGrid } from "../../convex/lib/analysis/handGrid";
+import { getPreflopEquity } from "../../convex/lib/gto/preflopEquityTable";
+import { GTO_RFI_RANGES } from "../../convex/lib/gto/tables/preflopRanges";
 import { positionDisplayName } from "../../convex/lib/primitives/position";
 import type { CardIndex } from "../../convex/lib/types/cards";
 import type { GameState, PlayerState } from "../../convex/lib/state/gameState";
@@ -148,6 +151,25 @@ describe("Step-by-Step Analysis", () => {
           // Players still in
           console.log(`Active: ${activePlayers(state, 0).join(" | ")}`);
           console.log(`Legal: ${legalActionsStr(legal)}`);
+
+          // ── VISION GRID ──
+          const gridData = computeHandGrid(heroCards, state.communityCards as CardIndex[]);
+          const heroEq = getPreflopEquity(handClass);
+          if (state.currentStreet === "preflop") {
+            // Find facing position
+            const preflopRaises = state.actionHistory.filter(
+              (a: { street: string; actionType: string }) => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet")
+            );
+            const facingPos = preflopRaises.length > 0 ? preflopRaises[preflopRaises.length - 1].position : null;
+            const facingRange = facingPos ? GTO_RFI_RANGES[facingPos] : null;
+            console.log(`  [GRID] Hero: ${handClass} (${(heroEq * 100).toFixed(0)}% vs random)${facingPos ? ` | Facing: ${facingPos.toUpperCase()}` : ""}`);
+            if (facingRange) {
+              const inRange = facingRange.has(handClass);
+              console.log(`  [GRID] Hero in ${facingPos?.toUpperCase()} range: ${inRange ? "YES" : "NO"}`);
+            }
+          } else {
+            console.log(`  [GRID] Postflop: ${gridData.totalBeats} beat, ${gridData.totalTies} tie, ${gridData.totalLoses} win (of ${gridData.totalBeats + gridData.totalTies + gridData.totalLoses} combos)`);
+          }
 
           // ── SYSTEM COACHING ──
           console.log(`\n  [COACHING]`);

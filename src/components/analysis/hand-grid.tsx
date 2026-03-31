@@ -9,7 +9,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { evaluateHand, compareHandRanks } from "../../../convex/lib/primitives/handEvaluator";
 import { getPreflopEquity } from "../../../convex/lib/gto/preflopEquityTable";
-import { GTO_RFI_RANGES } from "../../../convex/lib/gto/tables/preflopRanges";
+import { GTO_RFI_RANGES, GTO_3BET_RANGES, GTO_COLD_CALL_RANGES, GTO_3BET_MIXED, GTO_BB_DEFENSE, GTO_BVB } from "../../../convex/lib/gto/tables/preflopRanges";
 
 const RL = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 const GRID_TO_RANK = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
@@ -44,10 +44,17 @@ type SizingRole = "V" | "M" | "B" | "F";
 /**
  * Facing: what should I do with this hand facing a bet of sizingBB?
  * V = call/raise for value | M = mixed/borderline | B = bluff-catch | F = fold
+ *
+ * Range-first: if the hand isn't in hero's continue range, it's F regardless of equity.
+ * Then equity determines V vs M vs B within the range.
  */
-function classifyFacing(equity: number, sizingBB: number): SizingRole {
+function classifyFacing(equity: number, sizingBB: number, inHeroRange: boolean): SizingRole {
+  // Not in hero's continue range → fold
+  if (!inHeroRange) return "F";
+
   if (sizingBB <= 0) return "M";
-  const potOdds = sizingBB / (3 + sizingBB * 2);
+  // Pot odds: call / (pot + call). Pot = blinds (1.5BB) + raiser's bet + call.
+  const potOdds = sizingBB / (1.5 + sizingBB + sizingBB);
   const surplus = equity - potOdds;
   const polarization = Math.min(1, Math.max(0, (sizingBB - 2) / 10));
 
@@ -66,11 +73,20 @@ const ROLE_LABEL: Record<SizingRole, string> = {
   V: "Value", M: "Mixed", B: "Bluff-catch", F: "Fold",
 };
 
+interface PreflopAction {
+  position: string;
+  actionType: string;
+  amount?: number;
+}
+
 interface HandGridProps {
   heroCards: number[];
   communityCards?: number[];
   heroPosition?: string;
   facingBetBB?: number;
+  facingPosition?: string;
+  /** Preflop actions for position labels */
+  preflopActions?: PreflopAction[];
 }
 
 function getHeroHandClass(heroCards: number[]): string {
@@ -150,24 +166,70 @@ function computeGrid(heroCards: number[], communityCards: number[]) {
   return { cells, heroHC, heroEquity: getPreflopEquity(heroHC), totalBeats, totalTies, totalLoses, hasBoard };
 }
 
-export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0 }: HandGridProps) {
-  const [showEquity, setShowEquity] = useState(false);
+export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions }: HandGridProps) {
+  const [showEquity, setShowEquity] = useState(true); // ON by default
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [facingSizingBB, setFacingSizingBB] = useState(0);
   const [showFacing, setShowFacing] = useState(false);
+  const [autoDefaultsApplied, setAutoDefaultsApplied] = useState(false);
 
-  // Auto-sync to live bet
+  // Reset auto-defaults when hero cards change (new hand)
   useEffect(() => {
-    if (facingBetBB > 0) {
+    setAutoDefaultsApplied(false);
+  }, [heroCards[0], heroCards[1]]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-defaults: when facing a bet, select hero + facing position and turn on facing slider
+  useEffect(() => {
+    if (autoDefaultsApplied) return;
+    const hPos = heroPosition && !["bb"].includes(heroPosition) ? heroPosition : null;
+    if (facingBetBB > 0 && facingPosition) {
+      setFacingSizingBB(facingBetBB);
+      setShowFacing(true);
+      // Auto-select hero as primary + facing position as secondary
+      const positions: string[] = [];
+      if (hPos) positions.push(hPos);
+      if (facingPosition !== hPos) positions.push(facingPosition);
+      setSelectedPositions(positions);
+      setAutoDefaultsApplied(true);
+    } else if (facingBetBB > 0) {
       setFacingSizingBB(facingBetBB);
       setShowFacing(true);
     }
-  }, [facingBetBB]);
+  }, [facingBetBB, facingPosition, heroPosition, autoDefaultsApplied]);
 
   const data = useMemo(() => {
     if (!heroCards || heroCards.length < 2) return null;
     return computeGrid(heroCards, communityCards ?? []);
   }, [heroCards, communityCards]);
+
+  const heroPos = heroPosition && !["bb"].includes(heroPosition) ? heroPosition : null;
+
+  // Build position → action label map from preflop actions
+  const positionLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    if (!preflopActions) return labels;
+    const bb = 1; // normalize — amounts are already in chips, we show relative
+    for (const a of preflopActions) {
+      const pos = a.position;
+      if (a.actionType === "fold") {
+        labels.set(pos, "Fold");
+      } else if (a.actionType === "raise" || a.actionType === "bet") {
+        const amt = a.amount ? (a.amount / bb).toFixed(0) : "?";
+        // Count raises to determine open vs 3bet vs 4bet
+        const priorRaises = preflopActions.filter(
+          p => (p.actionType === "raise" || p.actionType === "bet") &&
+            preflopActions.indexOf(p) < preflopActions.indexOf(a)
+        ).length;
+        const verb = priorRaises === 0 ? "Open" : priorRaises === 1 ? "3bet" : "4bet";
+        labels.set(pos, `${verb} ${amt}`);
+      } else if (a.actionType === "call") {
+        labels.set(pos, "Call");
+      } else if (a.actionType === "check") {
+        labels.set(pos, "Check");
+      }
+    }
+    return labels;
+  }, [preflopActions]);
 
   // Get range sets for selected positions (max 2)
   const ranges = useMemo(() => {
@@ -176,33 +238,202 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
       .filter(r => r.range);
   }, [selectedPositions]);
 
+  // The opponent range for equity calculation = the non-hero selected range
+  const opponentRangeEntry = useMemo(() => {
+    return ranges.find(r => r.pos !== heroPos) ?? null;
+  }, [ranges, heroPos]);
+
+  // Async equity vs range — computes in chunks so UI stays responsive
+  // Cache results per position key so toggling off/on doesn't recompute
+  const [equityCache] = useState(() => new Map<string, Map<string, number>>());
+  const [equityVsRange, setEquityVsRange] = useState<Map<string, number> | null>(null);
+  const [equityComputing, setEquityComputing] = useState(false);
+  const [equityProgress, setEquityProgress] = useState(0); // 0-169
+
+  useEffect(() => {
+    const oppPos = opponentRangeEntry?.pos;
+    const oppRange = opponentRangeEntry?.range;
+    if (!oppRange || !oppPos || oppRange.size === 0) {
+      setEquityVsRange(null);
+      setEquityComputing(false);
+      setEquityProgress(0);
+      return;
+    }
+
+    // Check cache first
+    const cached = equityCache.get(oppPos);
+    if (cached) {
+      setEquityVsRange(cached);
+      setEquityComputing(false);
+      setEquityProgress(169);
+      return;
+    }
+
+    // Build opponent combos once
+    const oppCombos: [number, number][] = [];
+    for (const hc of oppRange) {
+      const isP = hc.length === 2;
+      const isS = hc.endsWith("s");
+      const r1 = 12 - RL.indexOf(hc[0]);
+      const r2 = 12 - RL.indexOf(hc[1]);
+      if (isP) {
+        for (let s1 = 0; s1 < 4; s1++) for (let s2 = s1 + 1; s2 < 4; s2++)
+          oppCombos.push([r1 * 4 + s1, r1 * 4 + s2]);
+      } else {
+        for (let s1 = 0; s1 < 4; s1++) for (let s2 = 0; s2 < 4; s2++) {
+          if (isS && s1 !== s2) continue;
+          if (!isS && s1 === s2) continue;
+          oppCombos.push([r1 * 4 + s1, r2 * 4 + s2]);
+        }
+      }
+    }
+    if (oppCombos.length === 0) return;
+
+    setEquityComputing(true);
+    setEquityProgress(0);
+
+    // Build work list: 169 hand classes
+    const work: { hc: string; rank1: number; rank2: number; type: "pair" | "suited" | "offsuit" }[] = [];
+    for (let row = 0; row < 13; row++) {
+      for (let col = 0; col < 13; col++) {
+        const type: "pair" | "suited" | "offsuit" = row === col ? "pair" : row < col ? "suited" : "offsuit";
+        const hc = row === col ? RL[row] + RL[col] : row < col ? RL[row] + RL[col] + "s" : RL[col] + RL[row] + "o";
+        work.push({ hc, rank1: GRID_TO_RANK[row], rank2: GRID_TO_RANK[col], type });
+      }
+    }
+
+    const result = new Map<string, number>();
+    let idx = 0;
+    let cancelled = false;
+    const trials = 300;
+    const CHUNK_SIZE = 13; // one row per frame
+
+    function processChunk() {
+      if (cancelled) return;
+      const end = Math.min(idx + CHUNK_SIZE, work.length);
+
+      for (; idx < end; idx++) {
+        const { hc, rank1, rank2, type } = work[idx];
+        let heroC1: number, heroC2: number;
+        if (type === "pair") { heroC1 = rank1 * 4; heroC2 = rank1 * 4 + 1; }
+        else if (type === "suited") { heroC1 = rank1 * 4; heroC2 = rank2 * 4; }
+        else { heroC1 = rank1 * 4; heroC2 = rank2 * 4 + 1; }
+
+        const heroDead = new Set([heroC1, heroC2]);
+        const validOpp = oppCombos.filter(([a, b]) => !heroDead.has(a) && !heroDead.has(b));
+        if (validOpp.length === 0) { result.set(hc, 0.5); continue; }
+
+        const deck: number[] = [];
+        for (let i = 0; i < 52; i++) if (!heroDead.has(i)) deck.push(i);
+
+        let wins = 0, total = 0;
+        for (let t = 0; t < trials; t++) {
+          const opp = validOpp[Math.floor(Math.random() * validOpp.length)];
+          const available = deck.filter(c => c !== opp[0] && c !== opp[1]);
+          if (available.length < 5) continue;
+          for (let i = available.length - 1; i > available.length - 6; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [available[i], available[j]] = [available[j], available[i]];
+          }
+          const board = available.slice(available.length - 5);
+          const heroEval = evaluateHand([heroC1, heroC2, ...board]);
+          const oppEval = evaluateHand([opp[0], opp[1], ...board]);
+          const cmp = compareHandRanks(heroEval.rank, oppEval.rank);
+          if (cmp > 0) wins++; else if (cmp === 0) wins += 0.5;
+          total++;
+        }
+        result.set(hc, total > 0 ? wins / total : 0.5);
+      }
+
+      setEquityProgress(idx);
+
+      if (idx < work.length) {
+        // Yield to browser, then continue
+        requestAnimationFrame(processChunk);
+      } else {
+        // Done — cache and set
+        const final = new Map(result);
+        if (oppPos) equityCache.set(oppPos, final);
+        setEquityVsRange(final);
+        setEquityComputing(false);
+      }
+    }
+
+    requestAnimationFrame(processChunk);
+
+    return () => { cancelled = true; };
+  }, [ranges]);
+
   if (!data) return null;
 
-  const { cells, heroEquity, totalBeats, totalTies, totalLoses, hasBoard } = data;
+  const { cells, heroEquity: heroEquityVsRandom, totalBeats, totalTies, totalLoses, hasBoard } = data;
   const totalCombos = totalBeats + totalTies + totalLoses;
+  const hasRangeEquity = equityVsRange !== null;
+  // Hero's equity: vs range if available, otherwise vs random
+  const heroEquity = (hasRangeEquity ? equityVsRange.get(data.heroHC) : null) ?? heroEquityVsRandom;
 
-  const heroPos = heroPosition && !["bb"].includes(heroPosition) ? heroPosition : null;
+  // Hero's continue range: hands hero plays FACING a raise from this position
+  // (cold-call + 3-bet + mixed — NOT the opening/RFI range)
+  const heroContinueRange = useMemo(() => {
+    if (!heroPos) {
+      // BB: use defense range if we know who opened
+      if (heroPosition === "bb" && facingPosition) {
+        // SB opener = blind vs blind, use GTO_BVB data
+        if (facingPosition === "sb") {
+          const combined = new Set<string>();
+          const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
+          const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
+          if (bvb3bet) for (const h of bvb3bet) combined.add(h);
+          if (bvbCall) for (const h of bvbCall) combined.add(h);
+          if (combined.size > 0) return combined;
+        }
+        const key = facingPosition === "co" ? "vs_co"
+          : facingPosition === "btn" ? "vs_btn"
+          : facingPosition === "hj" ? "vs_hj"
+          : "vs_utg";
+        const defense = GTO_BB_DEFENSE[key];
+        if (defense) {
+          const combined = new Set<string>();
+          for (const h of defense.threebet) combined.add(h);
+          for (const h of defense.call) combined.add(h);
+          return combined;
+        }
+      }
+      return new Set<string>();
+    }
+    const combined = new Set<string>();
+    const coldCall = GTO_COLD_CALL_RANGES[heroPos];
+    const threeBet = GTO_3BET_RANGES[heroPos];
+    const mixed = GTO_3BET_MIXED[heroPos];
+    if (coldCall) for (const h of coldCall) combined.add(h);
+    if (threeBet) for (const h of threeBet) combined.add(h);
+    if (mixed) for (const h of mixed) combined.add(h);
+    return combined;
+  }, [heroPos, heroPosition, facingPosition]);
 
   const togglePosition = (key: string) => {
     setSelectedPositions(prev => {
-      if (prev.includes(key)) {
-        // Deselect
-        return prev.filter(p => p !== key);
-      }
-      if (heroPos && key === heroPos) {
-        // Hero always goes to primary (index 0), keep secondary if exists
+      if (key === heroPos) {
+        // Clicking hero: toggle hero off/on. Keep secondary if exists.
+        if (prev.includes(key)) {
+          return prev.filter(p => p !== key);
+        }
         const other = prev.find(p => p !== heroPos);
         return other ? [heroPos, other] : [heroPos];
       }
-      if (heroPos && prev.includes(heroPos)) {
-        // Hero is already primary — this new pick replaces secondary
+
+      // Clicking any non-hero position:
+      if (prev.includes(key)) {
+        // Deselect that position, keep hero if selected
+        return prev.filter(p => p !== key);
+      }
+
+      // Auto-include hero as primary, this position as secondary
+      if (heroPos) {
         return [heroPos, key];
       }
-      if (prev.length >= 2) {
-        // Replace second selection
-        return [prev[0], key];
-      }
-      return [...prev, key];
+      // No hero position (BB) — just select this one
+      return [key];
     });
   };
 
@@ -214,8 +445,13 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
       {/* Primary header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)] bg-[var(--muted)]/30">
-        <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--gold-dim)]">
+        <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--gold-dim)] flex items-center gap-2">
           Vision Hand Grid
+          {equityComputing && (
+            <span className="text-[8px] font-normal text-muted-foreground animate-pulse">
+              computing {Math.round((equityProgress / 169) * 100)}%
+            </span>
+          )}
         </h3>
         <div className="flex items-center gap-2">
           {hasBoard && totalCombos > 0 ? (
@@ -276,19 +512,26 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
           {POSITIONS.map(({ key, label }) => {
             const isSelected = selectedPositions.includes(key);
             const isFirst = selectedPositions[0] === key;
+            const actionLabel = positionLabels.get(key);
+            const isFolded = actionLabel === "Fold";
             return (
               <button
                 key={key}
-                onClick={() => togglePosition(key)}
+                onClick={() => !isFolded && togglePosition(key)}
                 className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
-                  isSelected
-                    ? isFirst
-                      ? "bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold-dim)]/50 font-semibold"
-                      : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 font-semibold"
-                    : "text-muted-foreground hover:text-foreground border border-transparent hover:border-[var(--border)]"
+                  isFolded
+                    ? "text-muted-foreground/30 border border-transparent cursor-default line-through"
+                    : isSelected
+                      ? isFirst
+                        ? "bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold-dim)]/50 font-semibold"
+                        : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 font-semibold"
+                      : "text-muted-foreground hover:text-foreground border border-transparent hover:border-[var(--border)]"
                 }`}
               >
                 {label}
+                {actionLabel && !isFolded && (
+                  <span className="text-[8px] opacity-60 ml-0.5">{actionLabel}</span>
+                )}
               </button>
             );
           })}
@@ -312,10 +555,17 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
         </div>
       )}
 
-      {/* ── Facing: what should I do facing this bet? ── */}
+      {/* ── Facing: who bet, how much, and what should I do? ── */}
       {!hasBoard && (
         <div className="flex items-center gap-2 px-4 py-1.5 border-b border-[var(--border)]/50 bg-[var(--muted)]/10">
           <span className="text-[9px] text-muted-foreground">Facing:</span>
+          {facingPosition && facingBetBB > 0 ? (
+            <span className="text-[10px] text-cyan-400 font-semibold">
+              {facingPosition.toUpperCase()} {facingBetBB.toFixed(1)}BB
+            </span>
+          ) : (
+            <span className="text-[10px] text-muted-foreground/60">—</span>
+          )}
           <button onClick={() => setShowFacing(!showFacing)}
             className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
               showFacing
@@ -346,7 +596,11 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
           {cells.map((cell) => {
             const inPrimary = primary?.range.has(cell.hc) ?? false;
             const inSecondary = secondary?.range.has(cell.hc) ?? false;
-            const facing = showFacing ? classifyFacing(cell.equity, facingSizingBB) : null;
+            // Use range-adjusted equity for all cells when a range is selected
+            const effectiveEquity = hasRangeEquity
+              ? (equityVsRange!.get(cell.hc) ?? cell.equity)
+              : cell.equity;
+            const facing = showFacing ? classifyFacing(effectiveEquity, facingSizingBB, heroContinueRange.has(cell.hc)) : null;
             return (
               <Cell
                 key={`${cell.row}-${cell.col}`}
@@ -357,6 +611,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
                 inSecondary={inSecondary}
                 showRange={ranges.length > 0}
                 facing={facing}
+                effectiveEquity={effectiveEquity}
               />
             );
           })}
@@ -366,7 +621,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
   );
 }
 
-function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange, facing }: {
+function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange, facing, effectiveEquity }: {
   cell: GridCell;
   hasBoard: boolean;
   showEquity: boolean;
@@ -374,6 +629,7 @@ function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange, f
   inSecondary: boolean;
   showRange: boolean;
   facing: SizingRole | null;
+  effectiveEquity: number;
 }) {
   let bg: string;
   let txt: string;
@@ -385,7 +641,7 @@ function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange, f
     bg = "bg-muted/20";
     txt = "text-muted-foreground/30";
   } else if (!hasBoard && showEquity) {
-    const eq = cell.equity;
+    const eq = effectiveEquity;
     if (eq >= 0.75) { bg = "bg-red-600/60"; txt = "text-red-100"; }
     else if (eq >= 0.65) { bg = "bg-orange-600/50"; txt = "text-orange-100"; }
     else if (eq >= 0.58) { bg = "bg-amber-700/45"; txt = "text-amber-100"; }
@@ -418,9 +674,11 @@ function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange, f
 
   const showEqLabel = !hasBoard && showEquity && !cell.isHero && !cell.isDead;
 
-  const title = cell.isHero ? `Your hand: ${cell.hc} (${(cell.equity * 100).toFixed(0)}% equity)`
+  const vsRange = effectiveEquity !== cell.equity;
+
+  const title = cell.isHero ? `Your hand: ${cell.hc} (${(effectiveEquity * 100).toFixed(0)}% equity${vsRange ? " vs range" : " vs random"})`
     : cell.isDead ? `${cell.hc}: blocked`
-    : !hasBoard ? `${cell.hc}: ${(cell.equity * 100).toFixed(0)}% equity vs random${facing ? ` | Facing: ${ROLE_LABEL[facing]}` : ""}${showRange ? (inPrimary && inSecondary ? " — in BOTH ranges" : inPrimary ? " — in primary range" : inSecondary ? " — in comparison range" : " — out of range") : ""}`
+    : !hasBoard ? `${cell.hc}: ${(effectiveEquity * 100).toFixed(0)}%${vsRange ? " vs range" : " vs random"}${facing ? ` | Facing: ${ROLE_LABEL[facing]}` : ""}${showRange ? (inPrimary && inSecondary ? " — in BOTH ranges" : inPrimary ? " — in primary range" : inSecondary ? " — in comparison range" : " — out of range") : ""}`
     : cell.total === 0 ? `${cell.hc}: no combos`
     : `${cell.hc}: ${cell.beats}/${cell.total} beat you (${((cell.beats / cell.total) * 100).toFixed(0)}%)`;
 
@@ -442,10 +700,10 @@ function Cell({ cell, hasBoard, showEquity, inPrimary, inSecondary, showRange, f
       )}
       <span className="text-sm font-semibold">{cell.hc}</span>
       {showEqLabel && (
-        <span className="text-[10px] opacity-75 mt-0.5">{(cell.equity * 100).toFixed(0)}%</span>
+        <span className="text-[10px] opacity-75 mt-0.5">{(effectiveEquity * 100).toFixed(0)}%</span>
       )}
       {cell.isHero && !hasBoard && (
-        <span className="text-[10px] opacity-85 mt-0.5">{(cell.equity * 100).toFixed(0)}%</span>
+        <span className="text-[10px] opacity-85 mt-0.5">{(effectiveEquity * 100).toFixed(0)}%</span>
       )}
     </div>
   );

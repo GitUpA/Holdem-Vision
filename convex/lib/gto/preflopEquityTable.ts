@@ -56,7 +56,7 @@ export const PREFLOP_EQUITY: Record<string, number> = {
   J5s: 0.526, J4s: 0.516, J3s: 0.506, J2s: 0.497,
 
   // ── Offsuit jacks ──
-  J9o: 0.545, J8o: 0.530, J7o: 0.515, J6o: 0.503,
+  J9o: 0.545, J8o: 0.500, J7o: 0.490, J6o: 0.480,
   J5o: 0.493, J4o: 0.482, J3o: 0.472, J2o: 0.462,
 
   // ── Suited tens ──
