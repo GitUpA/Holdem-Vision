@@ -357,6 +357,30 @@ describe("compressRangeByStack", () => {
   });
 });
 
+// ═══════════════════════════════════════════════════════
+// MULTIWAY CALLERS
+// ═══════════════════════════════════════════════════════
+
+describe("multiway callers", () => {
+  it("hero continue range tightens with callers", () => {
+    const sHeads: PreflopSituation = { type: "facing_open", opener: "utg" };
+    const sMulti: PreflopSituation = { type: "facing_open_multiway", opener: "utg", callers: 2 };
+    const headsUp = getHeroContinueRange(sHeads, "btn", 100);
+    const multiway = getHeroContinueRange(sMulti, "btn", 100);
+    expect(multiway.size).toBeLessThan(headsUp.size);
+    expect(multiway.has("AA")).toBe(true);
+  });
+
+  it("pot size increases with callers", () => {
+    const blinds = { sb: 0.5, bb: 1 };
+    const headsUp = computePotAtAction(blinds, 3, 0, false, null);
+    const oneCall = computePotAtAction(blinds, 3, 1, false, null);
+    const twoCalls = computePotAtAction(blinds, 3, 2, false, null);
+    expect(oneCall).toBeGreaterThan(headsUp);
+    expect(twoCalls).toBeGreaterThan(oneCall);
+  });
+});
+
 describe("computePreflopHandGrid", { timeout: 30_000 }, () => {
   it("produces 169 cells", () => {
     const result = computePreflopHandGrid({

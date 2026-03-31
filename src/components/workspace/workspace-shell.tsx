@@ -648,6 +648,10 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                     .filter(a => a.street === "preflop")
                     .map(a => ({ position: a.position, actionType: a.actionType, amount: a.amount }))
                   }
+                  numCallers={ws.gameState?.actionHistory
+                    .filter(a => a.street === "preflop" && a.actionType === "call" && a.seatIndex !== ws.heroSeatIndex)
+                    .length ?? 0
+                  }
                 />
               )}
 

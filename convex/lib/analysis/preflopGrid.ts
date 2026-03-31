@@ -280,7 +280,13 @@ export function getHeroContinueRange(
     }
   }
 
-  return compressRangeByStack(combined, stackDepthBB);
+  // Multiway adjustment: each additional caller tightens the continue range
+  // because equity drops multiway and speculative hands lose value.
+  // Model: treat each caller as reducing effective stack by 15BB (less implied odds).
+  const numCallers = (situation.type === "facing_open_multiway") ? situation.callers : 0;
+  const effectiveStack = stackDepthBB - (numCallers * 15);
+
+  return compressRangeByStack(combined, effectiveStack);
 }
 
 // ═══════════════════════════════════════════════════════

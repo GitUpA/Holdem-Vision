@@ -67,13 +67,14 @@ interface HandGridProps {
   facingPosition?: string;
   preflopActions?: PreflopAction[];
   stackDepthBB?: number;
+  numCallers?: number;
 }
 
 // ═══════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════
 
-export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100 }: HandGridProps) {
+export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100, numCallers = 0 }: HandGridProps) {
   const [showEquity, setShowEquity] = useState(true);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [facingSizingBB, setFacingSizingBB] = useState(0);
@@ -114,6 +115,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
       openerPosition: (facingPosition ?? undefined) as Position | undefined,
       openerSizingBB: facingBetBB,
       stackDepthBB,
+      numCallers,
     }, 0); // 0 trials = use static equity (no MC yet)
   }, [heroCards, heroPosition, hasBoard, facingBetBB, facingPosition]);
 
