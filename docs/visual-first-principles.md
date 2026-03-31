@@ -134,6 +134,62 @@ interface HandGridProps {
 }
 ```
 
+## Precision Analysis — Where the Math Is and Isn't Exact
+
+Each layer builds on the one below. The precision boundary is clear: Layers 1-2 are mathematically grounded. Layer 3 introduces approximation. Everything above inherits that approximation.
+
+### Layer 1 — The Grid: EXACT
+The 13×13 hand class matrix is a mathematical fact. 169 unique starting hand classes, correctly mapped to rank/suit combinations. No approximation.
+
+### Layer 2 — Equity vs Random: NEAR-EXACT (~1-2% imprecision)
+Static preflop equity values sourced from poker literature consensus. These are well-established numbers computed from exhaustive enumeration by multiple independent tools (ProPokerTools, Equilab, etc.). Individual values may be ~1-2% off from a fresh computation, but the relative ordering across all 169 hands is correct. The imprecision is consistent — no hand is dramatically wrong.
+
+### Layer 3 — Position Ranges: THE PRECISION BOUNDARY
+This is where approximation enters. Two distinct limitations:
+
+**Binary vs continuous.** A solver computes Nash equilibrium frequencies: "76s opens 43% from UTG." Our data stores this as binary: "76s is IN the UTG range" or "76s is NOT." The solver's answer is deterministic — given the same game tree, different solvers converge on the same frequencies. Our binary approximation loses the frequency information.
+
+**Third-party interpretation.** We don't run a solver. We source ranges from published GTO charts (PioSolver summaries, GTO Wizard, Upswing, PokerCoaching). These charts are already simplified summaries of solver output — the chart authors decided where to draw the binary line. Different authors draw it in slightly different places for borderline hands.
+
+**What would fix it:** Running a preflop solver directly would produce exact mixed frequencies per hand class per position. The pipeline architecture already supports this — `PreflopGridCell.equity` and the classification system could display continuous frequencies instead of binary membership. The limitation is data source, not architecture.
+
+### Layer 4 — Equity vs Range (MC): EXACT given its inputs
+The Monte Carlo computation is mathematically correct. It samples opponent hands from the given range, deals random boards, and evaluates winners using `evaluateHand()`. The result converges to the true equity with sufficient trials.
+
+**However:** the equity is exact against whatever range Layer 3 provides. If Layer 3's range is wrong (a borderline hand included that shouldn't be, or excluded that should be), the equity is precisely computed against an imprecise input. The MC math adds no error — it inherits Layer 3's approximation.
+
+### Layer 5 — Facing Classification: HEURISTIC
+Two sources of approximation:
+
+**Pot odds math is exact.** `callCost / (potSize + callCost)` is pure arithmetic. The pot size computation from blinds + raises + callers is correct.
+
+**Classification thresholds are heuristic.** The boundaries between V/M/B/F (surplus > 0.15 = Value, surplus > 0.05 = Mixed, etc.) are hand-tuned constants, not derived from solver output. They produce reasonable results but are arbitrary — a solver would compute exact calling frequencies rather than discrete buckets.
+
+**Continue range check inherits Layer 3.** The "not in hero's continue range = Fold" rule uses the same binary range data. A hand correctly excluded from the range gets F even if a solver would continue with it 30% of the time.
+
+### Variable Adjustments: DIRECTIONAL HEURISTICS
+
+**Stack depth compression:** "Below 80BB, drop bottom X% of range." The direction is correct (short stacks play tighter) but the formula (linear compression) is a heuristic. Real short-stack ranges are structurally different — they're solved shove/fold charts, not compressed versions of 100BB ranges.
+
+**Multiway callers:** "Each caller reduces effective stack by 15BB." Correct direction (more opponents = tighter) but the 15BB number is made up. Real multiway adjustments depend on the callers' specific ranges and the pot geometry.
+
+**Raise sizing:** "Opens above 4BB drop bottom 8% per BB." Correct direction (larger opens = tighter range) but the formula is a heuristic. A solver would compute different opening frequencies at different sizings.
+
+**Table size normalization:** "MP in 9-max uses HJ ranges from 6-max." Correct direction (MP is middle position) but 9-max MP is actually tighter than 6-max HJ because there are more players behind. The normalization is approximate.
+
+### Summary
+
+| Layer | Precision | What limits it |
+|-------|-----------|----------------|
+| Grid (13×13) | Exact | Nothing |
+| Equity vs random | ~98% | Literature consensus, not fresh computation |
+| Position ranges | **Approximate** | Binary simplification of solver frequencies, third-party sourced |
+| Equity vs range (MC) | Exact computation | Inherits range approximation from Layer 3 |
+| Facing classification | Heuristic | Hand-tuned thresholds, binary continue range |
+| Stack/multiway/sizing | Directional | Formulas are heuristics, not solver-computed |
+
+**The single fix that would make everything precise:** solver-computed preflop frequencies per hand class per position. The pipeline architecture is ready for this data — it would replace binary Sets with frequency maps, and every downstream computation would automatically become exact.
+
 ## Next Steps
 
 ### 1. Headless Audit Integration
