@@ -150,6 +150,19 @@ export function computePotAtAction(
 }
 
 // ═══════════════════════════════════════════════════════
+// POSITION NORMALIZATION (map non-6max to 6max equivalents)
+// ═══════════════════════════════════════════════════════
+
+/** Map any table-size position to the nearest 6-max equivalent for range lookup. */
+export function normalize6Max(pos: string): string {
+  switch (pos) {
+    case "utg1": case "utg2": return "utg";
+    case "mp": case "mp1": return "hj";
+    default: return pos;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
 // STACK DEPTH ADJUSTMENT
 // ═══════════════════════════════════════════════════════
 
@@ -198,9 +211,9 @@ export function getOpponentRange(
       return null;
     case "facing_open":
     case "facing_open_multiway":
-      range = GTO_RFI_RANGES[situation.opener] ?? null; break;
+      range = GTO_RFI_RANGES[normalize6Max(situation.opener)] ?? null; break;
     case "facing_3bet":
-      range = GTO_3BET_RANGES[situation.threeBettor] ?? null; break;
+      range = GTO_3BET_RANGES[normalize6Max(situation.threeBettor)] ?? null; break;
     case "blind_vs_blind":
       range = GTO_RFI_RANGES["sb"] ?? null; break;
     case "facing_4bet":
@@ -239,10 +252,11 @@ export function getHeroContinueRange(
   stackDepthBB: number = 100,
 ): Set<string> {
   const combined = new Set<string>();
+  const normPos = normalize6Max(heroPosition);
 
   switch (situation.type) {
     case "rfi": {
-      const rfi = GTO_RFI_RANGES[heroPosition];
+      const rfi = GTO_RFI_RANGES[normPos];
       if (rfi) for (const h of rfi) combined.add(h);
       break;
     }
@@ -250,7 +264,7 @@ export function getHeroContinueRange(
     case "facing_open":
     case "facing_open_multiway": {
       if (heroPosition === "bb") {
-        const opener = situation.opener;
+        const opener = normalize6Max(situation.opener);
         if (opener === "sb") {
           const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
           const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
@@ -268,9 +282,9 @@ export function getHeroContinueRange(
           }
         }
       } else {
-        const coldCall = GTO_COLD_CALL_RANGES[heroPosition];
-        const threeBet = GTO_3BET_RANGES[heroPosition];
-        const mixed = GTO_3BET_MIXED[heroPosition];
+        const coldCall = GTO_COLD_CALL_RANGES[normPos];
+        const threeBet = GTO_3BET_RANGES[normPos];
+        const mixed = GTO_3BET_MIXED[normPos];
         if (coldCall) for (const h of coldCall) combined.add(h);
         if (threeBet) for (const h of threeBet) combined.add(h);
         if (mixed) for (const h of mixed) combined.add(h);

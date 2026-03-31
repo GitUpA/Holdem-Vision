@@ -13,10 +13,12 @@ import { getPreflopEquity } from "../../../convex/lib/gto/preflopEquityTable";
 import { GTO_RFI_RANGES } from "../../../convex/lib/gto/tables/preflopRanges";
 import {
   computePreflopHandGrid,
+  normalize6Max,
   type PreflopGridResult,
   type PreflopGridCell,
   type SizingRole,
 } from "../../../convex/lib/analysis/preflopGrid";
+import { positionsForTableSize, positionDisplayName } from "../../../convex/lib/primitives/position";
 import { computeHandGrid, type HandClassGridCell } from "../../../convex/lib/analysis/handGrid";
 import type { CardIndex, Position } from "../../../convex/lib/types/cards";
 
@@ -26,14 +28,7 @@ import type { CardIndex, Position } from "../../../convex/lib/types/cards";
 
 const RL = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 const GRID_TO_RANK = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-const POSITIONS = [
-  { key: "utg", label: "UTG" },
-  { key: "hj", label: "HJ" },
-  { key: "co", label: "CO" },
-  { key: "btn", label: "BTN" },
-  { key: "sb", label: "SB" },
-] as const;
-const RANGE_PCT: Record<string, number> = { utg: 15, hj: 19, co: 27, btn: 44, sb: 40 };
+const RANGE_PCT: Record<string, number> = { utg: 15, hj: 19, co: 27, btn: 44, sb: 40, mp: 19, utg1: 15, utg2: 15, mp1: 19 };
 
 const FACING_COLOR: Record<SizingRole, string> = {
   V: "text-green-400", M: "text-slate-400", B: "text-amber-300", F: "text-red-400/60",
@@ -68,13 +63,14 @@ interface HandGridProps {
   preflopActions?: PreflopAction[];
   stackDepthBB?: number;
   numCallers?: number;
+  numPlayers?: number;
 }
 
 // ═══════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════
 
-export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100, numCallers = 0 }: HandGridProps) {
+export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100, numCallers = 0, numPlayers = 6 }: HandGridProps) {
   const [showEquity, setShowEquity] = useState(true);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [facingSizingBB, setFacingSizingBB] = useState(0);
@@ -106,6 +102,14 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
   const hasBoard = community.length >= 3;
   const heroPos = heroPosition && !["bb"].includes(heroPosition) ? heroPosition : null;
 
+  // Dynamic position list based on table size (exclude BB — no static opening range)
+  const positions = useMemo(() => {
+    const all = positionsForTableSize(Math.max(2, Math.min(10, numPlayers)));
+    return all
+      .filter(p => p !== "bb")
+      .map(p => ({ key: p, label: positionDisplayName(p) }));
+  }, [numPlayers]);
+
   // ── PREFLOP: use pure pipeline ──
   const preflopResult = useMemo<PreflopGridResult | null>(() => {
     if (hasBoard || !heroCards || heroCards.length < 2) return null;
@@ -127,7 +131,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
 
   // ── RANGE OVERLAYS (preflop only) ──
   const ranges = useMemo(() => {
-    return selectedPositions.map(pos => ({ pos, range: GTO_RFI_RANGES[pos] })).filter(r => r.range);
+    return selectedPositions.map(pos => ({ pos, range: GTO_RFI_RANGES[normalize6Max(pos)] })).filter(r => r.range);
   }, [selectedPositions]);
 
   const opponentRangeEntry = useMemo(() => ranges.find(r => r.pos !== heroPos) ?? null, [ranges, heroPos]);
@@ -309,7 +313,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
             <div className="h-3 w-px bg-[var(--border)]/50 mx-0.5" />
           </>
         )}
-        {POSITIONS.map(({ key, label }) => {
+        {positions.map(({ key, label }) => {
           const isSelected = selectedPositions.includes(key);
           const isFirst = selectedPositions[0] === key;
           const actionLabel = positionLabels.get(key);

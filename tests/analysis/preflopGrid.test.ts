@@ -13,6 +13,7 @@ import {
   computePreflopHandGrid,
   getHeroHandClass,
   compressRangeByStack,
+  normalize6Max,
   type PreflopSituation,
 } from "../../convex/lib/analysis/preflopGrid";
 import type { CardIndex } from "../../convex/lib/types/cards";
@@ -354,6 +355,37 @@ describe("compressRangeByStack", () => {
     const shallow = getHeroContinueRange(s, "btn", 30);
     expect(shallow.size).toBeLessThan(deep.size);
     expect(shallow.has("AA")).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// POSITION NORMALIZATION (7+ players)
+// ═══════════════════════════════════════════════════════
+
+describe("normalize6Max", () => {
+  it("passes through 6-max positions", () => {
+    expect(normalize6Max("utg")).toBe("utg");
+    expect(normalize6Max("hj")).toBe("hj");
+    expect(normalize6Max("co")).toBe("co");
+    expect(normalize6Max("btn")).toBe("btn");
+    expect(normalize6Max("sb")).toBe("sb");
+    expect(normalize6Max("bb")).toBe("bb");
+  });
+
+  it("maps 7+ player positions to 6-max equivalents", () => {
+    expect(normalize6Max("utg1")).toBe("utg");
+    expect(normalize6Max("utg2")).toBe("utg");
+    expect(normalize6Max("mp")).toBe("hj");
+    expect(normalize6Max("mp1")).toBe("hj");
+  });
+
+  it("opponent range works for mp position", () => {
+    const s: PreflopSituation = { type: "facing_open", opener: "mp" as Position };
+    const range = getOpponentRange(s, 100)!;
+    expect(range).not.toBeNull();
+    expect(range.has("AA")).toBe(true);
+    // mp normalizes to hj, so range should be ~19%
+    expect(range.size).toBeGreaterThan(20);
   });
 });
 
