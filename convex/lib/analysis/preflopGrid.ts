@@ -45,6 +45,7 @@ export interface PreflopGridParams {
   numCallers?: number;              // default 0
   facing3Bet?: boolean;             // default false
   threeBetSizeBB?: number | null;
+  threeBettorPosition?: Position | null;
   blindsBB?: { sb: number; bb: number };
 }
 
@@ -53,7 +54,7 @@ export type PreflopSituation =
   | { type: "rfi" }
   | { type: "facing_open"; opener: Position }
   | { type: "facing_open_multiway"; opener: Position; callers: number }
-  | { type: "facing_3bet"; opener: Position }
+  | { type: "facing_3bet"; threeBettor: Position }
   | { type: "blind_vs_blind" }
   | { type: "facing_4bet" };
 
@@ -93,10 +94,11 @@ export function classifyPreflopSituation(
   openerPosition: Position | null | undefined,
   numCallers: number,
   facing3Bet: boolean,
+  threeBettorPosition?: Position | null,
 ): PreflopSituation {
   // Facing a 3-bet (hero opened, got re-raised)
-  if (facing3Bet && openerPosition) {
-    return { type: "facing_3bet", opener: openerPosition };
+  if (facing3Bet && threeBettorPosition) {
+    return { type: "facing_3bet", threeBettor: threeBettorPosition };
   }
 
   // No opener — hero is first to act (RFI)
@@ -163,7 +165,7 @@ export function getOpponentRange(
       return GTO_RFI_RANGES[situation.opener] ?? null;
 
     case "facing_3bet":
-      return GTO_3BET_RANGES[situation.opener] ?? null;
+      return GTO_3BET_RANGES[situation.threeBettor] ?? null;
 
     case "blind_vs_blind":
       // SB opened — use SB's RFI range
@@ -396,6 +398,15 @@ export function getHeroHandClass(heroCards: CardIndex[]): string {
   return RL[12 - hi] + (hi === lo ? RL[12 - lo] : RL[12 - lo] + (suited ? "s" : "o"));
 }
 
+function emptyResult(heroPosition: Position, blindsBB: { sb: number; bb: number } = { sb: 0.5, bb: 1 }): PreflopGridResult {
+  const cells: PreflopGridCell[] = [];
+  for (let row = 0; row < 13; row++) for (let col = 0; col < 13; col++) {
+    const hc = row === col ? RL[row] + RL[col] : row < col ? RL[row] + RL[col] + "s" : RL[col] + RL[row] + "o";
+    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc), facing: null, inHeroRange: false, inOpponentRange: false });
+  }
+  return { cells, heroHandClass: "", heroEquity: 0, situation: { type: "rfi" }, opponentRange: null, heroContinueRange: new Set(), potSizeBB: blindsBB.sb + blindsBB.bb };
+}
+
 export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: number = 300): PreflopGridResult {
   const {
     heroCards,
@@ -409,14 +420,24 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
     blindsBB = { sb: 0.5, bb: 1 },
   } = params;
 
+  if (!heroCards || heroCards.length < 2) {
+    // Not enough cards — return empty grid
+    return emptyResult(heroPosition, { sb: blindsBB.sb, bb: blindsBB.bb });
+  }
+
   const heroHandClass = getHeroHandClass(heroCards);
-  const situation = classifyPreflopSituation(heroPosition, openerPosition, numCallers, facing3Bet);
+  const threeBettorPos = params.threeBettorPosition ?? null;
+  const situation = classifyPreflopSituation(heroPosition, openerPosition, numCallers, facing3Bet, threeBettorPos);
   const opponentRange = getOpponentRange(situation, stackDepthBB);
   const heroContinueRange = getHeroContinueRange(situation, heroPosition, stackDepthBB);
   const equityMap = computeEquityGrid(heroCards, opponentRange, mcTrials);
   const potSizeBB = computePotAtAction(blindsBB, openerSizingBB, numCallers, facing3Bet, threeBetSizeBB);
 
-  const callCost = facing3Bet && threeBetSizeBB ? threeBetSizeBB : openerSizingBB;
+  // Call cost subtracts what hero already posted as a blind
+  const heroPosted = heroPosition === "bb" ? blindsBB.bb
+    : heroPosition === "sb" ? blindsBB.sb : 0;
+  const rawCallCost = facing3Bet && threeBetSizeBB ? threeBetSizeBB : openerSizingBB;
+  const callCost = Math.max(0, rawCallCost - heroPosted);
   const facingGrid = callCost > 0
     ? classifyFacingGrid(equityMap, heroContinueRange, callCost, potSizeBB)
     : null;

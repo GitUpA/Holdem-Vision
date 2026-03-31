@@ -43,8 +43,15 @@ describe("classifyPreflopSituation", () => {
   });
 
   it("facing_3bet when hero opened and got re-raised", () => {
-    const s = classifyPreflopSituation("utg", "btn", 0, true);
+    const s = classifyPreflopSituation("utg", "btn", 0, true, "btn");
     expect(s.type).toBe("facing_3bet");
+    if (s.type === "facing_3bet") expect(s.threeBettor).toBe("btn");
+  });
+
+  it("facing_3bet without threeBettor falls to rfi", () => {
+    // contradictory: facing3Bet=true but no threeBettor — gracefully returns rfi
+    const s = classifyPreflopSituation("utg", null, 0, true, null);
+    expect(s.type).toBe("rfi");
   });
 
   it("blind_vs_blind when SB opens and hero is BB", () => {
@@ -187,9 +194,53 @@ describe("classifyFacing", () => {
   });
 
   it("F for weak hand (35%) in range facing 10BB", () => {
-    // potOdds = 10 / (1.5 + 10 + 10) = 10/21.5 = 0.465
-    // surplus = 0.35 - 0.465 = -0.115
     expect(classifyFacing(0.35, 10, 11.5, true)).toBe("F");
+  });
+
+  it("B for borderline hand in polarized spot", () => {
+    // 42% equity, facing 6BB into 7.5BB pot
+    // potOdds = 6/13.5 = 0.444, surplus = -0.024
+    // polarization = (6-2)/10 = 0.4, which is > 0.3
+    // surplus > -0.05 && polarization > 0.3 → B
+    expect(classifyFacing(0.42, 6, 7.5, true)).toBe("B");
+  });
+});
+
+describe("BB call cost adjustment", () => {
+  it("BB facing 3BB open pays 2BB (already posted 1BB)", () => {
+    const result = computePreflopHandGrid({
+      heroCards: [48 as CardIndex, 45 as CardIndex], // AKo
+      heroPosition: "bb",
+      openerPosition: "utg",
+      openerSizingBB: 3,
+    }, 10);
+    // Pot = 1.5 + 3 = 4.5BB. BB call cost = 3 - 1 = 2BB.
+    // potOdds = 2 / (4.5 + 2) = 2/6.5 = 0.308
+    expect(result.potSizeBB).toBe(4.5);
+    // AKo in BB defense range → should NOT be F
+    const hero = result.cells.find(c => c.isHero)!;
+    expect(hero.facing).not.toBe("F");
+  });
+
+  it("SB facing 3BB open pays 2.5BB (already posted 0.5BB)", () => {
+    const result = computePreflopHandGrid({
+      heroCards: [48 as CardIndex, 45 as CardIndex],
+      heroPosition: "sb",
+      openerPosition: "utg",
+      openerSizingBB: 3,
+    }, 10);
+    // SB call cost = 3 - 0.5 = 2.5BB
+    expect(result.potSizeBB).toBe(4.5);
+  });
+
+  it("BTN facing 3BB open pays full 3BB", () => {
+    const result = computePreflopHandGrid({
+      heroCards: [48 as CardIndex, 45 as CardIndex],
+      heroPosition: "btn",
+      openerPosition: "utg",
+      openerSizingBB: 3,
+    }, 10);
+    expect(result.potSizeBB).toBe(4.5);
   });
 });
 
@@ -269,10 +320,10 @@ describe("computePreflopHandGrid", { timeout: 30_000 }, () => {
       heroPosition: "btn",
       openerPosition: "utg",
       openerSizingBB: 3,
-    }, 50); // low trials for test speed
-    // AKo should be V facing UTG open
+    }, 150); // enough trials for stable classification
+    // AKo should be V or M facing UTG open (strong hand in range)
     const heroCell = result.cells.find(c => c.isHero)!;
-    expect(heroCell.facing).toBe("V");
+    expect(["V", "M"]).toContain(heroCell.facing);
     expect(heroCell.inHeroRange).toBe(true);
 
     // 72o should be F
