@@ -221,7 +221,7 @@ export const PREFLOP_SITUATIONS: Readonly<Record<PreflopSituationId, PreflopSitu
     id: "bb_vs_sb_complete",
     displayName: "BB vs SB Complete",
     description: "SB limped in. Their range is wide and capped — raise aggressively.",
-    engineKey: "preflop.open",
+    engineKey: "preflop.sb_complete",
     opponentRangeSource: { type: "sb_complete_range" },
     heroRangeSource: { type: "bb_raise_vs_sb_complete" },
     opponentCountRule: { type: "fixed", count: 1 },
