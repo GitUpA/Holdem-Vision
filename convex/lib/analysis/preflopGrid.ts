@@ -22,8 +22,8 @@ import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
 import { getPreflopEquity } from "../gto/preflopEquityTable";
 // Range table imports removed — range resolution now in convex/lib/preflop/situationRanges.ts
 // Re-export from canonical location for backward compatibility
-export { normalize6Max, compressRangeByStack } from "../preflop/rangeUtils";
-import { normalize6Max, compressRangeByStack } from "../preflop/rangeUtils";
+export { normalize6Max, compressRangeByStack, getHeroHandClass } from "../preflop/rangeUtils";
+import { RANK_LABELS, GRID_TO_RANK, getHeroHandClass } from "../preflop/rangeUtils";
 import {
   classifySituation,
   PREFLOP_SITUATIONS,
@@ -84,8 +84,8 @@ export interface PreflopGridResult {
   potSizeBB: number;
 }
 
-const RL = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
-const GRID_TO_RANK = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+// RL and GRID_TO_RANK moved to ../preflop/rangeUtils.ts as RANK_LABELS and GRID_TO_RANK
+const RL = RANK_LABELS; // local alias for brevity in grid loops
 
 // classifyPreflopSituation — REMOVED (Phase 3 cleanup)
 // Use classifySituation() from convex/lib/preflop/situationRegistry instead.
@@ -264,14 +264,7 @@ export function classifyFacingGrid(
 // STAGE H: Orchestrator
 // ═══════════════════════════════════════════════════════
 
-export function getHeroHandClass(heroCards: CardIndex[]): string {
-  const r0 = Math.floor(heroCards[0] / 4);
-  const r1 = Math.floor(heroCards[1] / 4);
-  const suited = (heroCards[0] % 4) === (heroCards[1] % 4);
-  const hi = Math.max(r0, r1);
-  const lo = Math.min(r0, r1);
-  return RL[12 - hi] + (hi === lo ? RL[12 - lo] : RL[12 - lo] + (suited ? "s" : "o"));
-}
+// getHeroHandClass moved to ../preflop/rangeUtils.ts — re-exported above
 
 function emptyResult(heroPosition: Position, tableSize: number = 6, blindsBB: { sb: number; bb: number } = { sb: 0.5, bb: 1 }): PreflopGridResult {
   const defaultOpp = Math.max(1, Math.min(9, tableSize - 1));

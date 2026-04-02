@@ -11,6 +11,7 @@
  */
 import type { CardIndex } from "../types/cards";
 import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
+import { RANK_LABELS, GRID_TO_RANK } from "../preflop/rangeUtils";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -58,11 +59,7 @@ export interface HandGridData {
 // CONSTANTS
 // ═══════════════════════════════════════════════════════
 
-/** Rank labels, high to low (grid rows/cols) */
-const RANK_LABELS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
-
-/** Rank index to CardIndex rank value (A=12, K=11, ..., 2=0) */
-const GRID_TO_RANK = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+// RANK_LABELS and GRID_TO_RANK imported from ../preflop/rangeUtils
 
 // ═══════════════════════════════════════════════════════
 // COMPUTATION

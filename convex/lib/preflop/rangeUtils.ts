@@ -9,6 +9,22 @@
 
 import { HAND_STRENGTH_ORDER } from "../gto/preflopClassification";
 
+/** Rank labels: A=0, K=1, ..., 2=12. Used by the 13×13 grid. */
+export const RANK_LABELS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
+
+/** Grid row/col → internal rank (A=12, K=11, ..., 2=0). */
+export const GRID_TO_RANK = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+
+/** Derive the hand class string (e.g. "AKs", "TT", "72o") from two card indices. */
+export function getHeroHandClass(heroCards: number[]): string {
+  const r0 = Math.floor(heroCards[0] / 4);
+  const r1 = Math.floor(heroCards[1] / 4);
+  const suited = (heroCards[0] % 4) === (heroCards[1] % 4);
+  const hi = Math.max(r0, r1);
+  const lo = Math.min(r0, r1);
+  return RANK_LABELS[12 - hi] + (hi === lo ? RANK_LABELS[12 - lo] : RANK_LABELS[12 - lo] + (suited ? "s" : "o"));
+}
+
 /**
  * Map any table-size position to the nearest 6-max equivalent for range lookup.
  *

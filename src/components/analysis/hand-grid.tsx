@@ -13,11 +13,11 @@ import { getPreflopEquity } from "../../../convex/lib/gto/preflopEquityTable";
 import { GTO_RFI_RANGES } from "../../../convex/lib/gto/tables/preflopRanges";
 import {
   computePreflopHandGrid,
-  normalize6Max,
   type PreflopGridResult,
   type PreflopGridCell,
   type SizingRole,
 } from "../../../convex/lib/analysis/preflopGrid";
+import { RANK_LABELS, GRID_TO_RANK, getHeroHandClass, normalize6Max } from "../../../convex/lib/preflop/rangeUtils";
 import { positionsForTableSize, positionDisplayName } from "../../../convex/lib/primitives/position";
 import { computeHandGrid, type HandClassGridCell } from "../../../convex/lib/analysis/handGrid";
 import type { CardIndex, Position } from "../../../convex/lib/types/cards";
@@ -26,8 +26,7 @@ import type { CardIndex, Position } from "../../../convex/lib/types/cards";
 // CONSTANTS
 // ═══════════════════════════════════════════════════════
 
-const RL = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
-const GRID_TO_RANK = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+const RL = RANK_LABELS; // local alias for brevity
 const RANGE_PCT: Record<string, number> = { utg: 15, hj: 19, co: 27, btn: 44, sb: 40, mp: 19, utg1: 15, utg2: 15, mp1: 19 };
 
 const FACING_COLOR: Record<SizingRole, string> = {
@@ -36,13 +35,6 @@ const FACING_COLOR: Record<SizingRole, string> = {
 const ROLE_LABEL: Record<SizingRole, string> = {
   V: "Value", M: "Mixed", B: "Bluff-catch", F: "Fold",
 };
-
-function getHeroHandClass(heroCards: number[]): string {
-  const r0 = Math.floor(heroCards[0] / 4); const r1 = Math.floor(heroCards[1] / 4);
-  const suited = (heroCards[0] % 4) === (heroCards[1] % 4);
-  const hi = Math.max(r0, r1); const lo = Math.min(r0, r1);
-  return RL[12 - hi] + (hi === lo ? RL[12 - lo] : RL[12 - lo] + (suited ? "s" : "o"));
-}
 
 // ═══════════════════════════════════════════════════════
 // PROPS

@@ -567,3 +567,35 @@ export const GTO_BB_RAISE_VS_SB_COMPLETE = new Set([
   "K9s", "Q9s", "J9s",
 ]);
 
+// ═══════════════════════════════════════════════════════
+// GENERIC LIMP RANGE (recreational player ~35%)
+// ═══════════════════════════════════════════════════════
+
+/**
+ * What a typical recreational player (fish) is likely holding when they limp.
+ * Wide, capped range — suited everything, pairs, connectors, broadways.
+ * No premiums (they would have raised).
+ *
+ * Future: derive from opponent profile (fish ~40%, nit ~15%, TAG rarely limps).
+ */
+export const GTO_GENERIC_LIMP_RANGE = new Set([
+  // Pairs (set-mining)
+  "22", "33", "44", "55", "66", "77", "88", "99",
+  // Suited aces
+  "A2s", "A3s", "A4s", "A5s", "A6s", "A7s", "A8s", "A9s", "ATs",
+  // Suited kings/queens
+  "K2s", "K3s", "K4s", "K5s", "K6s", "K7s", "K8s", "K9s", "KTs",
+  "Q2s", "Q3s", "Q4s", "Q5s", "Q6s", "Q7s", "Q8s", "Q9s", "QTs",
+  // Suited jacks+
+  "J7s", "J8s", "J9s", "JTs",
+  "T8s", "T9s",
+  // Suited connectors/gappers
+  "54s", "65s", "76s", "87s", "98s",
+  "53s", "64s", "75s", "86s", "97s",
+  // Offsuit broadways
+  "ATo", "AJo",
+  "KTo", "KJo", "KQo",
+  "QTo", "QJo",
+  "JTo",
+]);
+

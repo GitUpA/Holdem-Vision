@@ -1,4 +1,4 @@
-export { normalize6Max, compressRangeByStack } from "./rangeUtils";
+export { normalize6Max, compressRangeByStack, RANK_LABELS, GRID_TO_RANK, getHeroHandClass } from "./rangeUtils";
 
 export {
   type PreflopSituationId,
