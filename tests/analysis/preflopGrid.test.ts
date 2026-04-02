@@ -3,19 +3,19 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  classifyPreflopSituation,
   computePotAtAction,
-  getOpponentRange,
-  getHeroContinueRange,
   classifyFacing,
   classifyFacingGrid,
   computeEquityGrid,
   computePreflopHandGrid,
   getHeroHandClass,
-  compressRangeByStack,
-  normalize6Max,
-  type PreflopSituation,
 } from "../../convex/lib/analysis/preflopGrid";
+import {
+  classifySituation,
+  type PreflopSituationContext,
+} from "../../convex/lib/preflop/situationRegistry";
+import { resolveOpponentRange, resolveHeroRange } from "../../convex/lib/preflop/situationRanges";
+import { normalize6Max, compressRangeByStack } from "../../convex/lib/preflop/rangeUtils";
 import type { CardIndex, Position } from "../../convex/lib/types/cards";
 import { getPreflopEquity } from "../../convex/lib/gto/preflopEquityTable";
 
@@ -23,47 +23,71 @@ import { getPreflopEquity } from "../../convex/lib/gto/preflopEquityTable";
 // STAGE B: classifyPreflopSituation
 // ═══════════════════════════════════════════════════════
 
-describe("classifyPreflopSituation", () => {
+/** Helper to classify with defaults. */
+function classify(overrides: Partial<Parameters<typeof classifySituation>[0]>): PreflopSituationContext {
+  return classifySituation({
+    heroPosition: "btn",
+    openerPosition: null,
+    numCallers: 0,
+    numLimpers: 0,
+    facing3Bet: false,
+    ...overrides,
+  });
+}
+
+describe("classifySituation", () => {
   it("RFI when no opener", () => {
-    const s = classifyPreflopSituation("co", null, 0, false);
-    expect(s.type).toBe("rfi");
+    const s = classify({ heroPosition: "co" });
+    expect(s.id).toBe("rfi");
   });
 
   it("facing_open when single raiser", () => {
-    const s = classifyPreflopSituation("btn", "utg", 0, false);
-    expect(s.type).toBe("facing_open");
-    if (s.type === "facing_open") expect(s.opener).toBe("utg");
+    const s = classify({ heroPosition: "btn", openerPosition: "utg" });
+    expect(s.id).toBe("facing_open");
+    expect(s.openerPosition).toBe("utg");
   });
 
   it("facing_open_multiway when raiser + callers", () => {
-    const s = classifyPreflopSituation("btn", "utg", 2, false);
-    expect(s.type).toBe("facing_open_multiway");
-    if (s.type === "facing_open_multiway") {
-      expect(s.opener).toBe("utg");
-      expect(s.callers).toBe(2);
-    }
+    const s = classify({ heroPosition: "btn", openerPosition: "utg", numCallers: 2 });
+    expect(s.id).toBe("facing_open_multiway");
+    expect(s.openerPosition).toBe("utg");
+    expect(s.numCallers).toBe(2);
   });
 
   it("facing_3bet when hero opened and got re-raised", () => {
-    const s = classifyPreflopSituation("utg", "btn", 0, true, "btn");
-    expect(s.type).toBe("facing_3bet");
-    if (s.type === "facing_3bet") expect(s.threeBettor).toBe("btn");
+    const s = classify({ heroPosition: "utg", openerPosition: "btn", facing3Bet: true, threeBettorPosition: "btn" });
+    expect(s.id).toBe("facing_3bet");
+    expect(s.threeBettorPosition).toBe("btn");
   });
 
   it("facing_3bet without threeBettor falls to rfi", () => {
-    // contradictory: facing3Bet=true but no threeBettor — gracefully returns rfi
-    const s = classifyPreflopSituation("utg", null, 0, true, null);
-    expect(s.type).toBe("rfi");
+    const s = classify({ heroPosition: "utg", facing3Bet: true });
+    expect(s.id).toBe("rfi");
   });
 
   it("blind_vs_blind when SB opens and hero is BB", () => {
-    const s = classifyPreflopSituation("bb", "sb", 0, false);
-    expect(s.type).toBe("blind_vs_blind");
+    const s = classify({ heroPosition: "bb", openerPosition: "sb" });
+    expect(s.id).toBe("blind_vs_blind");
   });
 
-  it("facing_open when SB opens with callers (not pure BvB)", () => {
-    const s = classifyPreflopSituation("bb", "sb", 1, false);
-    expect(s.type).toBe("facing_open_multiway");
+  it("facing_open_multiway when SB opens with callers (not pure BvB)", () => {
+    const s = classify({ heroPosition: "bb", openerPosition: "sb", numCallers: 1 });
+    expect(s.id).toBe("facing_open_multiway");
+  });
+
+  it("facing_limpers when limpers and hero is not BB", () => {
+    const s = classify({ heroPosition: "co", numLimpers: 1 });
+    expect(s.id).toBe("facing_limpers");
+  });
+
+  it("bb_vs_limpers when limpers and hero is BB", () => {
+    const s = classify({ heroPosition: "bb", numLimpers: 2 });
+    expect(s.id).toBe("bb_vs_limpers");
+  });
+
+  it("bb_vs_sb_complete when SB limps and hero is BB", () => {
+    const s = classify({ heroPosition: "bb", numLimpers: 1, isSBComplete: true });
+    expect(s.id).toBe("bb_vs_sb_complete");
   });
 });
 
@@ -103,15 +127,15 @@ describe("computePotAtAction", () => {
 // STAGE C: getOpponentRange
 // ═══════════════════════════════════════════════════════
 
-describe("getOpponentRange", () => {
+describe("resolveOpponentRange", () => {
   it("returns null for RFI (no opponent)", () => {
-    const s: PreflopSituation = { type: "rfi" };
-    expect(getOpponentRange(s)).toBeNull();
+    const ctx = classify({ heroPosition: "co" });
+    expect(resolveOpponentRange(ctx)).toBeNull();
   });
 
   it("returns UTG range when facing UTG open", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "utg" };
-    const range = getOpponentRange(s)!;
+    const ctx = classify({ heroPosition: "btn", openerPosition: "utg" });
+    const range = resolveOpponentRange(ctx)!;
     expect(range).not.toBeNull();
     expect(range.has("AA")).toBe(true);
     expect(range.has("72o")).toBe(false);
@@ -119,27 +143,27 @@ describe("getOpponentRange", () => {
   });
 
   it("returns BTN range (wider) when facing BTN open", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "btn" };
-    const range = getOpponentRange(s)!;
+    const ctx = classify({ heroPosition: "bb", openerPosition: "btn" });
+    const range = resolveOpponentRange(ctx)!;
     expect(range.size).toBeGreaterThan(50); // BTN ~44%
   });
 });
 
 // ═══════════════════════════════════════════════════════
-// STAGE D: getHeroContinueRange
+// resolveHeroRange
 // ═══════════════════════════════════════════════════════
 
-describe("getHeroContinueRange", () => {
+describe("resolveHeroRange", () => {
   it("RFI uses opening range", () => {
-    const s: PreflopSituation = { type: "rfi" };
-    const range = getHeroContinueRange(s, "btn");
+    const ctx = classify({ heroPosition: "btn" });
+    const range = resolveHeroRange(ctx);
     expect(range.has("AA")).toBe(true);
     expect(range.has("K8o")).toBe(true); // BTN opens wide
   });
 
   it("facing_open uses cold-call + 3-bet, NOT RFI", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "utg" };
-    const range = getHeroContinueRange(s, "btn");
+    const ctx = classify({ heroPosition: "btn", openerPosition: "utg" });
+    const range = resolveHeroRange(ctx);
     expect(range.has("AA")).toBe(true); // 3-bet range
     expect(range.has("TT")).toBe(true); // cold-call range
     // J6o is in BTN RFI but NOT in cold-call or 3-bet
@@ -147,23 +171,23 @@ describe("getHeroContinueRange", () => {
   });
 
   it("BB defense vs BTN is wide", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "btn" };
-    const range = getHeroContinueRange(s, "bb");
+    const ctx = classify({ heroPosition: "bb", openerPosition: "btn" });
+    const range = resolveHeroRange(ctx);
     expect(range.has("AA")).toBe(true);
     expect(range.has("76s")).toBe(true); // BB defends wide vs BTN
     expect(range.size).toBeGreaterThan(40);
   });
 
   it("BB defense vs UTG is tight", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "utg" };
-    const range = getHeroContinueRange(s, "bb");
+    const ctx = classify({ heroPosition: "bb", openerPosition: "utg" });
+    const range = resolveHeroRange(ctx);
     expect(range.has("AA")).toBe(true);
     expect(range.size).toBeLessThan(40); // tighter vs UTG
   });
 
   it("BB vs SB uses BvB data", () => {
-    const s: PreflopSituation = { type: "blind_vs_blind" };
-    const range = getHeroContinueRange(s, "bb");
+    const ctx = classify({ heroPosition: "bb", openerPosition: "sb" });
+    const range = resolveHeroRange(ctx);
     expect(range.has("AA")).toBe(true);
     expect(range.size).toBeGreaterThan(30);
   });
@@ -342,17 +366,17 @@ describe("compressRangeByStack", () => {
   });
 
   it("opponent range shrinks at short stacks", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "utg" };
-    const deep = getOpponentRange(s, 100)!;
-    const shallow = getOpponentRange(s, 30)!;
+    const ctx = classify({ heroPosition: "btn", openerPosition: "utg" });
+    const deep = resolveOpponentRange(ctx, 100)!;
+    const shallow = resolveOpponentRange(ctx, 30)!;
     expect(shallow.size).toBeLessThan(deep.size);
     expect(shallow.has("AA")).toBe(true);
   });
 
   it("hero continue range shrinks at short stacks", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "utg" };
-    const deep = getHeroContinueRange(s, "btn", 100);
-    const shallow = getHeroContinueRange(s, "btn", 30);
+    const ctx = classify({ heroPosition: "btn", openerPosition: "utg" });
+    const deep = resolveHeroRange(ctx, 100);
+    const shallow = resolveHeroRange(ctx, 30);
     expect(shallow.size).toBeLessThan(deep.size);
     expect(shallow.has("AA")).toBe(true);
   });
@@ -380,8 +404,8 @@ describe("normalize6Max", () => {
   });
 
   it("opponent range works for mp position", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "mp" as Position };
-    const range = getOpponentRange(s, 100)!;
+    const ctx = classify({ heroPosition: "btn", openerPosition: "mp" as Position });
+    const range = resolveOpponentRange(ctx, 100)!;
     expect(range).not.toBeNull();
     expect(range.has("AA")).toBe(true);
     // mp normalizes to hj, so range should be ~19%
@@ -395,24 +419,24 @@ describe("normalize6Max", () => {
 
 describe("raise sizing adjustment", () => {
   it("standard sizing (3BB) does not compress opponent range", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "co" };
-    const standard = getOpponentRange(s, 100, 3)!;
-    const noSize = getOpponentRange(s, 100, 0)!;
+    const ctx = classify({ heroPosition: "btn", openerPosition: "co" });
+    const standard = resolveOpponentRange(ctx, 100, 3)!;
+    const noSize = resolveOpponentRange(ctx, 100, 0)!;
     expect(standard.size).toBe(noSize.size);
   });
 
   it("large sizing (6BB) compresses opponent range", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "co" };
-    const standard = getOpponentRange(s, 100, 3)!;
-    const large = getOpponentRange(s, 100, 6)!;
+    const ctx = classify({ heroPosition: "btn", openerPosition: "co" });
+    const standard = resolveOpponentRange(ctx, 100, 3)!;
+    const large = resolveOpponentRange(ctx, 100, 6)!;
     expect(large.size).toBeLessThan(standard.size);
     expect(large.has("AA")).toBe(true);
   });
 
   it("very large sizing (10BB) compresses more", () => {
-    const s: PreflopSituation = { type: "facing_open", opener: "co" };
-    const at6 = getOpponentRange(s, 100, 6)!;
-    const at10 = getOpponentRange(s, 100, 10)!;
+    const ctx = classify({ heroPosition: "btn", openerPosition: "co" });
+    const at6 = resolveOpponentRange(ctx, 100, 6)!;
+    const at10 = resolveOpponentRange(ctx, 100, 10)!;
     expect(at10.size).toBeLessThan(at6.size);
   });
 });
@@ -423,10 +447,10 @@ describe("raise sizing adjustment", () => {
 
 describe("multiway callers", () => {
   it("hero continue range tightens with callers", () => {
-    const sHeads: PreflopSituation = { type: "facing_open", opener: "utg" };
-    const sMulti: PreflopSituation = { type: "facing_open_multiway", opener: "utg", callers: 2 };
-    const headsUp = getHeroContinueRange(sHeads, "btn", 100);
-    const multiway = getHeroContinueRange(sMulti, "btn", 100);
+    const ctxHeads = classify({ heroPosition: "btn", openerPosition: "utg", numCallers: 0 });
+    const ctxMulti = classify({ heroPosition: "btn", openerPosition: "utg", numCallers: 2 });
+    const headsUp = resolveHeroRange(ctxHeads, 100);
+    const multiway = resolveHeroRange(ctxMulti, 100);
     expect(multiway.size).toBeLessThan(headsUp.size);
     expect(multiway.has("AA")).toBe(true);
   });

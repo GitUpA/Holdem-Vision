@@ -20,16 +20,7 @@ import type { CardIndex } from "../types/cards";
 import type { Position } from "../types/cards";
 import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
 import { getPreflopEquity } from "../gto/preflopEquityTable";
-import {
-  GTO_RFI_RANGES,
-  GTO_3BET_RANGES,
-  GTO_COLD_CALL_RANGES,
-  GTO_3BET_MIXED,
-  GTO_BB_DEFENSE,
-  GTO_BVB,
-  GTO_4BET,
-} from "../gto/tables/preflopRanges";
-import { HAND_STRENGTH_ORDER } from "../gto/preflopClassification";
+// Range table imports removed — range resolution now in convex/lib/preflop/situationRanges.ts
 // Re-export from canonical location for backward compatibility
 export { normalize6Max, compressRangeByStack } from "../preflop/rangeUtils";
 import { normalize6Max, compressRangeByStack } from "../preflop/rangeUtils";
@@ -64,14 +55,10 @@ export interface PreflopGridParams {
   blindsBB?: { sb: number; bb: number };
 }
 
-/** The preflop situation classification. */
-export type PreflopSituation =
-  | { type: "rfi" }
-  | { type: "facing_open"; opener: Position }
-  | { type: "facing_open_multiway"; opener: Position; callers: number }
-  | { type: "facing_3bet"; threeBettor: Position }
-  | { type: "blind_vs_blind" }
-  | { type: "facing_4bet" };
+// PreflopSituation type — REMOVED (Phase 3 cleanup)
+// Use PreflopSituationContext from convex/lib/preflop/situationRegistry instead.
+// Re-export for any remaining external consumers:
+export type { PreflopSituationContext as PreflopSituation } from "../preflop/situationRegistry";
 
 export type SizingRole = "V" | "M" | "B" | "F";
 
@@ -100,41 +87,8 @@ export interface PreflopGridResult {
 const RL = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 const GRID_TO_RANK = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 
-// ═══════════════════════════════════════════════════════
-// STAGE B: Classify the preflop situation
-// ═══════════════════════════════════════════════════════
-
-export function classifyPreflopSituation(
-  heroPosition: Position,
-  openerPosition: Position | null | undefined,
-  numCallers: number,
-  facing3Bet: boolean,
-  threeBettorPosition?: Position | null,
-): PreflopSituation {
-  // Facing a 3-bet (hero opened, got re-raised)
-  if (facing3Bet && threeBettorPosition) {
-    return { type: "facing_3bet", threeBettor: threeBettorPosition };
-  }
-
-  // No opener — hero is first to act (RFI)
-  if (!openerPosition) {
-    return { type: "rfi" };
-  }
-
-  // Blind vs blind: SB opened, hero is BB (or vice versa)
-  const blinds = new Set(["sb", "bb"]);
-  if (blinds.has(heroPosition) && blinds.has(openerPosition) && numCallers === 0) {
-    return { type: "blind_vs_blind" };
-  }
-
-  // Facing a single open with callers behind
-  if (numCallers > 0) {
-    return { type: "facing_open_multiway", opener: openerPosition, callers: numCallers };
-  }
-
-  // Facing a single open, heads up decision
-  return { type: "facing_open", opener: openerPosition };
-}
+// classifyPreflopSituation — REMOVED (Phase 3 cleanup)
+// Use classifySituation() from convex/lib/preflop/situationRegistry instead.
 
 // ═══════════════════════════════════════════════════════
 // STAGE G: Compute pot size at hero's action point
@@ -170,132 +124,8 @@ export function computePotAtAction(
 // normalize6Max and compressRangeByStack moved to ../preflop/rangeUtils.ts
 // Re-exported above for backward compatibility.
 
-// ═══════════════════════════════════════════════════════
-// STAGE C: Get opponent's range
-// ═══════════════════════════════════════════════════════
-
-export function getOpponentRange(
-  situation: PreflopSituation,
-  stackDepthBB: number = 100,
-  openerSizingBB: number = 0,
-): Set<string> | null {
-  let range: Set<string> | null = null;
-
-  switch (situation.type) {
-    case "rfi":
-      return null;
-    case "facing_open":
-    case "facing_open_multiway":
-      range = GTO_RFI_RANGES[normalize6Max(situation.opener)] ?? null; break;
-    case "facing_3bet":
-      range = GTO_3BET_RANGES[normalize6Max(situation.threeBettor)] ?? null; break;
-    case "blind_vs_blind":
-      range = GTO_RFI_RANGES["sb"] ?? null; break;
-    case "facing_4bet":
-      range = GTO_4BET.value ? new Set([...GTO_4BET.value, ...GTO_4BET.bluffs]) : null; break;
-  }
-
-  if (!range) return null;
-
-  // Stack compression
-  let compressed = compressRangeByStack(range, stackDepthBB);
-
-  // Sizing adjustment: larger opens imply tighter ranges.
-  // Standard open is ~2.5-3BB. Above 4BB, drop bottom X% of range.
-  if (openerSizingBB > 4 && compressed.size > 3) {
-    const excessSizing = openerSizingBB - 4;
-    const dropPct = Math.min(0.4, excessSizing * 0.08); // 5BB→8%, 8BB→32%, 9BB→40%
-    const ranked = [...compressed].sort((a, b) => {
-      const idxA = HAND_STRENGTH_ORDER.indexOf(a);
-      const idxB = HAND_STRENGTH_ORDER.indexOf(b);
-      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-    });
-    const keepCount = Math.max(3, Math.ceil(ranked.length * (1 - dropPct)));
-    compressed = new Set(ranked.slice(0, keepCount));
-  }
-
-  return compressed;
-}
-
-// ═══════════════════════════════════════════════════════
-// STAGE D: Get hero's continue range
-// ═══════════════════════════════════════════════════════
-
-export function getHeroContinueRange(
-  situation: PreflopSituation,
-  heroPosition: Position,
-  stackDepthBB: number = 100,
-): Set<string> {
-  const combined = new Set<string>();
-  const normPos = normalize6Max(heroPosition);
-
-  switch (situation.type) {
-    case "rfi": {
-      const rfi = GTO_RFI_RANGES[normPos];
-      if (rfi) for (const h of rfi) combined.add(h);
-      break;
-    }
-
-    case "facing_open":
-    case "facing_open_multiway": {
-      if (heroPosition === "bb") {
-        const opener = normalize6Max(situation.opener);
-        if (opener === "sb") {
-          const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
-          const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
-          if (bvb3bet) for (const h of bvb3bet) combined.add(h);
-          if (bvbCall) for (const h of bvbCall) combined.add(h);
-        } else {
-          const key = opener === "co" ? "vs_co"
-            : opener === "btn" ? "vs_btn"
-            : opener === "hj" ? "vs_hj"
-            : "vs_utg";
-          const defense = GTO_BB_DEFENSE[key];
-          if (defense) {
-            for (const h of defense.threebet) combined.add(h);
-            for (const h of defense.call) combined.add(h);
-          }
-        }
-      } else {
-        const coldCall = GTO_COLD_CALL_RANGES[normPos];
-        const threeBet = GTO_3BET_RANGES[normPos];
-        const mixed = GTO_3BET_MIXED[normPos];
-        if (coldCall) for (const h of coldCall) combined.add(h);
-        if (threeBet) for (const h of threeBet) combined.add(h);
-        if (mixed) for (const h of mixed) combined.add(h);
-      }
-      break;
-    }
-
-    case "facing_3bet":
-    case "facing_4bet": {
-      if (GTO_4BET.value) for (const h of GTO_4BET.value) combined.add(h);
-      if (GTO_4BET.call) for (const h of GTO_4BET.call) combined.add(h);
-      break;
-    }
-
-    case "blind_vs_blind": {
-      if (heroPosition === "bb") {
-        const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
-        const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
-        if (bvb3bet) for (const h of bvb3bet) combined.add(h);
-        if (bvbCall) for (const h of bvbCall) combined.add(h);
-      } else {
-        const rfi = GTO_RFI_RANGES["sb"];
-        if (rfi) for (const h of rfi) combined.add(h);
-      }
-      break;
-    }
-  }
-
-  // Multiway adjustment: each additional caller tightens the continue range
-  // because equity drops multiway and speculative hands lose value.
-  // Model: treat each caller as reducing effective stack by 15BB (less implied odds).
-  const numCallers = (situation.type === "facing_open_multiway") ? situation.callers : 0;
-  const effectiveStack = stackDepthBB - (numCallers * 15);
-
-  return compressRangeByStack(combined, effectiveStack);
-}
+// getOpponentRange, getHeroContinueRange — REMOVED (Phase 3 cleanup)
+// Use resolveOpponentRange() / resolveHeroRange() from convex/lib/preflop/situationRanges instead.
 
 // ═══════════════════════════════════════════════════════
 // STAGE E: Compute equity for all 169 hand classes vs a range
