@@ -189,7 +189,7 @@ export function computeEquityGrid(
 
       const heroDead = new Set([heroC1, heroC2]);
       const validOpp = oppCombos.filter(([a, b]) => !heroDead.has(a) && !heroDead.has(b));
-      if (validOpp.length === 0) { result.set(hc, 0.5); continue; }
+      if (validOpp.length === 0) { result.set(hc, getPreflopEquity(hc, numOpponents)); continue; }
 
       const deck: number[] = [];
       for (let i = 0; i < 52; i++) if (!heroDead.has(i)) deck.push(i);
@@ -210,7 +210,7 @@ export function computeEquityGrid(
         if (cmp > 0) wins++; else if (cmp === 0) wins += 0.5;
         total++;
       }
-      result.set(hc, total > 0 ? wins / total : 0.5);
+      result.set(hc, total > 0 ? wins / total : getPreflopEquity(hc, numOpponents));
     }
   }
   return result;

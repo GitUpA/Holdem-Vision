@@ -288,20 +288,41 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
     return hero?.stack ?? 0;
   }, [ws.gameState, ws.seats]);
 
-  // Derive preflop grid props from game state (no IIFEs in JSX)
+  // Derive preflop grid props from game state
   const gridPreflopProps = useMemo(() => {
-    if (!ws.gameState) return { facingPosition: undefined, preflopActions: undefined, numCallers: 0, numLimpers: 0 };
+    if (!ws.gameState) return {
+      facingPosition: undefined, preflopActions: undefined, numCallers: 0, numLimpers: 0,
+      facing3Bet: false, facing4Bet: false, threeBettorPosition: undefined as string | undefined,
+      isSBComplete: false, openerSizingBB: 0,
+    };
     const pf = ws.gameState.actionHistory.filter(a => a.street === "preflop");
     const firstRaiseIdx = pf.findIndex(a => a.actionType === "raise" || a.actionType === "bet");
     const preflopRaises = pf.filter(a => a.actionType === "raise" || a.actionType === "bet");
+    const limpers = pf.filter((a, i) => a.actionType === "call" && (firstRaiseIdx === -1 || i < firstRaiseIdx) && a.seatIndex !== ws.heroSeatIndex);
+
+    // SB complete: single limper is SB (or BTN in HU) and no raise
+    const isSBComplete = limpers.length === 1 && firstRaiseIdx === -1 && limpers.some(a => {
+      const pos = ws.gameState!.players[a.seatIndex].position;
+      return pos === "sb" || (pos === "btn" && ws.numPlayers === 2);
+    });
+
+    // Opener sizing: first raise amount in BB
+    const bbSize = ws.blinds?.big ?? 1;
+    const openerSizingBB = preflopRaises.length > 0 ? (preflopRaises[0].amount ?? 0) / bbSize : 0;
+
     return {
       facingPosition: preflopRaises.length > 0 ? preflopRaises[preflopRaises.length - 1].position : undefined,
       preflopActions: pf.map(a => ({ position: a.position, actionType: a.actionType, amount: a.amount })),
       numCallers: firstRaiseIdx === -1 ? 0
         : pf.filter((a, i) => a.actionType === "call" && i > firstRaiseIdx && a.seatIndex !== ws.heroSeatIndex).length,
-      numLimpers: pf.filter((a, i) => a.actionType === "call" && (firstRaiseIdx === -1 || i < firstRaiseIdx) && a.seatIndex !== ws.heroSeatIndex).length,
+      numLimpers: limpers.length,
+      facing3Bet: preflopRaises.length >= 2,
+      facing4Bet: preflopRaises.length >= 3,
+      threeBettorPosition: preflopRaises.length >= 2 ? preflopRaises[1].position : undefined,
+      isSBComplete,
+      openerSizingBB,
     };
-  }, [ws.gameState, ws.heroSeatIndex]);
+  }, [ws.gameState, ws.heroSeatIndex, ws.numPlayers, ws.blinds]);
 
   // Compute preflop grid result once at workspace level — shared by HandGrid + coaching
   const preflopGridResult = useMemo(() => {
@@ -311,10 +332,14 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
       heroCards: ws.heroCards as CardIndex[],
       heroPosition: (heroPosition ?? "btn") as Position,
       openerPosition: (gridPreflopProps.facingPosition ?? undefined) as Position | undefined,
-      openerSizingBB: ws.legalActions?.callAmount ? ws.legalActions.callAmount / (ws.blinds?.big ?? 1) : 0,
+      openerSizingBB: gridPreflopProps.openerSizingBB,
       stackDepthBB: ws.gameState ? ws.gameState.players[ws.heroSeatIndex]?.currentStack / (ws.blinds?.big ?? 1) : 100,
       numCallers: gridPreflopProps.numCallers,
       numLimpers: gridPreflopProps.numLimpers,
+      facing3Bet: gridPreflopProps.facing3Bet,
+      facing4Bet: gridPreflopProps.facing4Bet,
+      threeBettorPosition: gridPreflopProps.threeBettorPosition as Position | undefined,
+      isSBComplete: gridPreflopProps.isSBComplete,
       tableSize: ws.numPlayers,
     }, 0);
   }, [ws.heroCards, ws.communityCards.length, ws.gameState, ws.heroSeatIndex, ws.legalActions, ws.blinds, ws.numPlayers, gridPreflopProps]);
