@@ -23,8 +23,14 @@ Standard 13×13 hand class layout. 169 cells covering every possible starting ha
 
 **What it teaches:** The full hand universe. Every poker decision starts here.
 
+**How students use it at the table:** The grid becomes a mental map. After enough exposure,
+a player sees "J9s" and instantly knows where it sits — diagonal above center, suited,
+stronger than T8s but weaker than QTs. They stop thinking in cards and start thinking in
+hand classes. This is the fundamental shift from beginner to intermediate.
+
 **Component:** `src/components/analysis/hand-grid.tsx`
 **Computation:** `convex/lib/analysis/handGrid.ts` (pure TS for headless/tests)
+**Math fidelity:** 10/10 — pure combinatorics, see `visual-math-fidelity.md`
 
 ## Layer 2: Equity Heatmap
 
@@ -42,6 +48,14 @@ Header shows: "X stronger, Y same, Z weaker" relative to hero's hand.
 **Data source:** `convex/lib/gto/preflopEquityTable.ts` — 9 lookup tables (1-9 opponents), computed via 100K MC trials each. The table is selected based on the number of active opponents: UTG at 6-max sees 5-opponent equity (AA = 49%), BTN sees 2-opponent equity (AA = 73%).
 
 **What it teaches:** Relative hand strength in context. AA isn't 85% when 5 opponents are behind you — it's 49%. Position matters even for premiums.
+
+**How students use it at the table:** The color gradient builds spatial memory. After studying
+the heatmap, a player in UTG instinctively knows "I need red and orange cells, not yellow."
+The position-aware equity creates the first "aha" moment — the student realizes that the same
+hand has dramatically different value depending on how many opponents are left to act.
+They stop overvaluing hands like ATo from early position.
+
+**Math fidelity:** 9.5/10 — 100K MC trials per cell, see `visual-math-fidelity.md`
 
 ## Layer 3: Position Ranges
 
@@ -69,6 +83,21 @@ Header shows: "BTN ~44% vs CO ~27%" when comparing two positions.
 
 **What it teaches:** Position determines range width. UTG opens tight (15%), BTN opens wide (44%). But range also depends on situation — facing limpers, BB gets a free flop, iso-raising is different from opening.
 
+**How students use it at the table:** This is where the learning becomes practical. The
+student memorizes ~6 visual shapes (UTG tight cluster, BTN wide wash, BB defense band)
+rather than 1,000 individual hand decisions. When they sit at a table and get dealt J9s
+on the CO, they recall the visual — "J9s is inside the gold outline from CO, it's an open."
+When they face a raise from UTG, they click UTG's range and see how narrow it is — "UTG has
+a 15% range, my KTo is on the edge, fold." This visual shortcut replaces months of chart
+memorization.
+
+**The reality gap:** Players don't implement binary ranges in practice. Nobody opens J9s
+100% from CO and folds it 100% from UTG. Real play involves mixed frequencies — J9s might
+be a 70% open from CO and 0% from UTG. Our binary display is a teaching simplification.
+The student learns the approximate shape first, then refines with experience.
+
+**Math fidelity:** 4/10 — binary approximation of continuous solver frequencies, see `visual-math-fidelity.md`
+
 ## Layer 4: Equity vs Range
 
 When an opponent's range is selected (secondary position), all 169 cells recalculate equity against that specific range via Monte Carlo.
@@ -82,6 +111,19 @@ When an opponent's range is selected (secondary position), all 169 cells recalcu
 **Example:** Q9o drops from 55% (vs random) to ~40% (vs HJ's 19% range). The heatmap shifts, the facing letter updates, everything reflects the real matchup.
 
 **What it teaches:** Raw equity ≠ equity in context. Your hand's value changes dramatically based on who you're against.
+
+**How students use it at the table:** This layer creates the second "aha" moment. The student
+selects UTG's range and watches their Q9o drop from 55% to 40%. They viscerally understand:
+"my hand is weaker against a strong range." At the table, when UTG raises and they hold Q9o,
+they remember the color shift — not the exact number, but the feeling of the grid going from
+warm to cool. That visual memory drives the fold decision faster than any chart lookup.
+
+**The realistic limitation:** The equity is computed against a binary range. If the opponent's
+range were frequency-weighted (76s at 43% instead of 0%), the hero's equity would shift
+slightly. For teaching purposes the difference is small (~1-3%), but it compounds in
+close spots near the range boundary.
+
+**Math fidelity:** 6/10 — correct MC against binary (approximate) range, see `visual-math-fidelity.md`
 
 ## Layer 5: Facing
 
@@ -105,6 +147,24 @@ Third header bar showing who bet and how much: "Facing: HJ 3.0BB"
 - `classifyFacing()` function combines range membership + equity + pot odds
 
 **What it teaches:** "Should I play this hand facing this bet?" — one letter, one answer. Equity alone doesn't make a hand playable.
+
+**How students use it at the table:** The V/M/B/F system is the ultimate compression. A
+student facing a 3BB open on the CO looks at their hand, recalls the grid letter, and acts.
+"V" = raise or call confidently. "F" = fold, don't overthink. "M" = this is where reads
+matter. The range-first rule teaches the hardest lesson in beginner poker: J8o at 44% equity
+is still a fold because it's not in your continue range. Equity doesn't make a hand playable —
+playability, position, and range construction do.
+
+Over time, the student internalizes this without the grid. They stop calculating pot odds
+for junk hands. They stop calling raises with "but it's suited." The V/M/B/F framework
+becomes their inner voice.
+
+**The realistic limitation:** The V/M/B/F thresholds are heuristics. A solver would compute
+continuous calling frequencies. The "M" bucket covers a wide range of hands that a solver
+would treat very differently. But for learning, the discrete buckets are more actionable
+than continuous frequencies — "M means think harder" is better than "call 37.2%."
+
+**Math fidelity:** 5/10 — hand-tuned thresholds on binary ranges, see `visual-math-fidelity.md`
 
 ## Postflop Transition
 
