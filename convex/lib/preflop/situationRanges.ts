@@ -27,6 +27,33 @@ import {
 import { HAND_STRENGTH_ORDER } from "../gto/preflopClassification";
 
 // ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+
+/** Resolve BB defense range (call + 3-bet) by opener position. */
+function resolveBBDefense(openerPosition: string): Set<string> | null {
+  const opener = normalize6Max(openerPosition);
+  if (opener === "sb") {
+    const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
+    const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
+    const combined = new Set<string>();
+    if (bvb3bet) for (const h of bvb3bet) combined.add(h);
+    if (bvbCall) for (const h of bvbCall) combined.add(h);
+    return combined;
+  }
+  const key = opener === "co" ? "vs_co"
+    : opener === "btn" ? "vs_btn"
+    : opener === "hj" ? "vs_hj"
+    : "vs_utg";
+  const defense = GTO_BB_DEFENSE[key];
+  if (!defense) return null;
+  const combined = new Set<string>();
+  for (const h of defense.threebet) combined.add(h);
+  for (const h of defense.call) combined.add(h);
+  return combined;
+}
+
+// ═══════════════════════════════════════════════════════
 // RANGE RESOLUTION
 // ═══════════════════════════════════════════════════════
 
@@ -43,54 +70,15 @@ function resolveRange(
       return GTO_RFI_RANGES[normalize6Max(pos)] ?? null;
     }
 
-    case "bb_defense_by_opener": {
-      if (!ctx.openerPosition) return null;
-      const opener = normalize6Max(ctx.openerPosition);
-      if (opener === "sb") {
-        // BvB defense
-        const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
-        const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
-        const combined = new Set<string>();
-        if (bvb3bet) for (const h of bvb3bet) combined.add(h);
-        if (bvbCall) for (const h of bvbCall) combined.add(h);
-        return combined;
-      }
-      const key = opener === "co" ? "vs_co"
-        : opener === "btn" ? "vs_btn"
-        : opener === "hj" ? "vs_hj"
-        : "vs_utg";
-      const defense = GTO_BB_DEFENSE[key];
-      if (!defense) return null;
-      const combined = new Set<string>();
-      for (const h of defense.threebet) combined.add(h);
-      for (const h of defense.call) combined.add(h);
-      return combined;
-    }
+    // bb_defense_by_opener: REMOVED — no registry entry uses it.
+    // BB defense is handled within cold_call_plus_3bet and bvb_defense.
 
     case "cold_call_plus_3bet": {
-      const normPos = normalize6Max(ctx.heroPosition);
+      // BB's "continue range" IS the defense range — call + 3-bet vs opener
       if (ctx.heroPosition === "bb" && ctx.openerPosition) {
-        // BB uses defense ranges, not cold-call
-        const opener = normalize6Max(ctx.openerPosition);
-        if (opener === "sb") {
-          const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
-          const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
-          const combined = new Set<string>();
-          if (bvb3bet) for (const h of bvb3bet) combined.add(h);
-          if (bvbCall) for (const h of bvbCall) combined.add(h);
-          return combined;
-        }
-        const key = opener === "co" ? "vs_co"
-          : opener === "btn" ? "vs_btn"
-          : opener === "hj" ? "vs_hj"
-          : "vs_utg";
-        const defense = GTO_BB_DEFENSE[key];
-        if (!defense) return null;
-        const combined = new Set<string>();
-        for (const h of defense.threebet) combined.add(h);
-        for (const h of defense.call) combined.add(h);
-        return combined;
+        return resolveBBDefense(ctx.openerPosition);
       }
+      const normPos = normalize6Max(ctx.heroPosition);
       const combined = new Set<string>();
       const coldCall = GTO_COLD_CALL_RANGES[normPos];
       const threeBet = GTO_3BET_RANGES[normPos];
@@ -102,17 +90,11 @@ function resolveRange(
     }
 
     case "bvb_defense": {
-      const combined = new Set<string>();
       if (ctx.heroPosition === "bb") {
-        const bvb3bet = (GTO_BVB as Record<string, Set<string>>)["bb_3bet_vs_sb"];
-        const bvbCall = (GTO_BVB as Record<string, Set<string>>)["bb_call_vs_sb"];
-        if (bvb3bet) for (const h of bvb3bet) combined.add(h);
-        if (bvbCall) for (const h of bvbCall) combined.add(h);
-      } else {
-        const rfi = GTO_RFI_RANGES["sb"];
-        if (rfi) for (const h of rfi) combined.add(h);
+        return resolveBBDefense("sb");
       }
-      return combined;
+      // SB: uses opening range
+      return GTO_RFI_RANGES["sb"] ? new Set(GTO_RFI_RANGES["sb"]) : null;
     }
 
     case "four_bet":

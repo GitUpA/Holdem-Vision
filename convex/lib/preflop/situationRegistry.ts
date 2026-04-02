@@ -9,6 +9,8 @@
 
 import type { Position } from "../types/cards";
 import type { SituationKey } from "../types/opponents";
+import type { GameState } from "../state/gameState";
+import type { ArchetypeId } from "../gto/archetypeClassifier";
 import { playersBehind } from "../primitives/position";
 
 // ═══════════════════════════════════════════════════════
@@ -46,7 +48,6 @@ export interface PreflopSituationContext {
 export type RangeSource =
   | { type: "none" }
   | { type: "rfi_by_position" }
-  | { type: "bb_defense_by_opener" }
   | { type: "cold_call_plus_3bet" }
   | { type: "bvb_defense" }
   | { type: "four_bet" }
@@ -376,4 +377,108 @@ export function resolveOpponentCount(
       break;
   }
   return Math.max(1, Math.min(9, count));
+}
+
+// ═══════════════════════════════════════════════════════
+// ARCHETYPE RESOLUTION
+// ═══════════════════════════════════════════════════════
+
+const ARCHETYPE_MAP: Record<PreflopSituationId, ArchetypeId> = {
+  rfi: "rfi_opening",
+  facing_open: "three_bet_pots",
+  facing_open_multiway: "three_bet_pots",
+  facing_3bet: "four_bet_five_bet",
+  facing_4bet: "four_bet_five_bet",
+  blind_vs_blind: "blind_vs_blind",
+  facing_limpers: "rfi_opening",
+  bb_vs_limpers: "bb_defense_vs_rfi",
+  bb_vs_sb_complete: "blind_vs_blind",
+  bb_uncontested: "rfi_opening",
+};
+
+/** Resolve the preflop archetype from a situation context. Position-aware for BB. */
+export function resolveArchetype(ctx: PreflopSituationContext): ArchetypeId {
+  // BB facing an open uses bb_defense archetype, not three_bet_pots
+  if ((ctx.id === "facing_open" || ctx.id === "facing_open_multiway")
+      && ctx.heroPosition === "bb") {
+    return "bb_defense_vs_rfi";
+  }
+  return ARCHETYPE_MAP[ctx.id];
+}
+
+// ═══════════════════════════════════════════════════════
+// CLASSIFIER FROM GAME STATE
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Classify a preflop situation from game state (engine, coaching, audit).
+ * Derives all params from the action history, then delegates to classifySituation().
+ */
+export function classifySituationFromState(
+  state: GameState,
+  seatIndex: number,
+): PreflopSituationContext {
+  const heroPosition = state.players[seatIndex].position;
+  const preflopActions = state.actionHistory.filter(a => a.street === "preflop");
+
+  // Count raises: only "raise" and "bet" actions, NOT "all_in"
+  // (all_in can be a call that doesn't constitute a raise)
+  const raiseActions = preflopActions.filter(
+    a => a.actionType === "raise" || a.actionType === "bet",
+  );
+  const raiseCount = raiseActions.length;
+
+  // Find first raise index in preflopActions for limp detection
+  const firstRaiseIdx = preflopActions.findIndex(
+    a => a.actionType === "raise" || a.actionType === "bet",
+  );
+
+  // Limpers: calls before any raise
+  const limperActions = preflopActions.filter(
+    (a, i) => a.actionType === "call" && (firstRaiseIdx === -1 || i < firstRaiseIdx),
+  );
+  const numLimpers = limperActions.length;
+
+  // Callers of the raise (post-raise calls, NOT limps)
+  const numCallers = firstRaiseIdx === -1 ? 0
+    : preflopActions.filter(
+        (a, i) => a.actionType === "call" && i > firstRaiseIdx,
+      ).length;
+
+  // Opener position: first raiser
+  const openerPosition = raiseActions.length > 0
+    ? state.players[raiseActions[0].seatIndex].position
+    : null;
+
+  // 3-bettor position: second raiser
+  const threeBettorPosition = raiseActions.length >= 2
+    ? state.players[raiseActions[1].seatIndex].position
+    : null;
+
+  // SB complete: SB limped (called, not raised) and no one raised
+  const isSBComplete = numLimpers > 0
+    && limperActions.some(a => state.players[a.seatIndex].position === "sb")
+    && firstRaiseIdx === -1
+    && numLimpers === 1;
+
+  // Everyone else folded: all non-hero players have folded
+  const everyoneElseFolded = state.players.every(
+    (p, i) => i === seatIndex || p.status === "folded" || p.status === "sitting_out",
+  );
+
+  return classifySituation({
+    heroPosition,
+    tableSize: state.numPlayers,
+    openerPosition,
+    numCallers,
+    numLimpers,
+    firstLimperPosition: limperActions.length > 0
+      ? state.players[limperActions[0].seatIndex].position
+      : null,
+    facing3Bet: raiseCount >= 2,
+    threeBettorPosition,
+    facing4Bet: raiseCount >= 3,
+    isSBComplete,
+    everyoneElseFolded,
+  });
 }

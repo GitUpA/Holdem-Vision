@@ -26,6 +26,7 @@ import type { DecisionContext } from "./engines/types";
 import { getEngineOrDefault } from "./engines/engineRegistry";
 // Ensure engine is registered (side-effect import)
 import "./engines/modifiedGtoEngine";
+import { classifySituationFromState, PREFLOP_SITUATIONS } from "../preflop/situationRegistry";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -70,41 +71,8 @@ function classifyPreflop(
   state: GameState,
   seatIndex: number,
 ): SituationKey {
-  const preflopActions = state.actionHistory.filter((a) => a.street === "preflop");
-  const heroPosition = state.players[seatIndex].position;
-
-  // Find first raise
-  const firstRaiseIdx = preflopActions.findIndex(
-    (a) => a.actionType === "raise" || (a.actionType === "bet" && a.seatIndex !== -1),
-  );
-
-  // Count raises
-  const raises = preflopActions.filter(
-    (a) => a.actionType === "raise" || a.actionType === "bet" || a.actionType === "all_in",
-  );
-
-  if (raises.length >= 3) return "preflop.facing_4bet";
-  if (raises.length === 2) return "preflop.facing_3bet";
-  if (raises.length === 1) return "preflop.facing_raise";
-
-  // No raises — check for limpers
-  const limpers = preflopActions.filter(
-    (a) => a.actionType === "call" && (firstRaiseIdx === -1 || preflopActions.indexOf(a) < firstRaiseIdx),
-  );
-
-  if (limpers.length > 0) {
-    if (heroPosition === "bb") {
-      // Check for SB complete
-      const isSBComplete = limpers.length === 1 && limpers.some(
-        (a) => state.players[a.seatIndex].position === "sb",
-      );
-      if (isSBComplete) return "preflop.sb_complete";
-      return "preflop.bb_vs_limpers";
-    }
-    return "preflop.facing_limpers";
-  }
-
-  return "preflop.open";
+  const ctx = classifySituationFromState(state, seatIndex);
+  return PREFLOP_SITUATIONS[ctx.id].engineKey;
 }
 
 function classifyPostflop(

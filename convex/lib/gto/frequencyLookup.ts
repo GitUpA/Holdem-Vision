@@ -51,6 +51,7 @@ import {
 import { equityBasedRecommendation } from "../analysis/equityRecommendation";
 import { comboToHandClass, cardsToCombo } from "../opponents/combos";
 import { classifyPreflopHand, classificationToFrequencies, type PreflopClassification } from "./preflopClassification";
+import { classifySituationFromState, resolveArchetype } from "../preflop/situationRegistry";
 
 // ═══════════════════════════════════════════════════════
 // CONFIG
@@ -118,10 +119,13 @@ export function lookupGtoFrequencies(
   if (street === "preflop") {
     const position = gameState.players[heroSeat].position;
     const handCat = categorizeHand(heroCards, communityCards);
-    const openerPos = findPreflopOpener(gameState, heroSeat);
 
-    const classification = classifyPreflopHand(handClass, archetype.archetypeId, position, openerPos);
-    const frequencies = classificationToFrequencies(classification, archetype.archetypeId);
+    // Use registry for preflop archetype (position-aware, handles BB defense)
+    const sitCtx = classifySituationFromState(gameState, heroSeat);
+    const preflopArchetypeId = resolveArchetype(sitCtx);
+
+    const classification = classifyPreflopHand(handClass, preflopArchetypeId, position, sitCtx.openerPosition ?? undefined);
+    const frequencies = classificationToFrequencies(classification, preflopArchetypeId);
 
     return attachConfidence({
       frequencies,

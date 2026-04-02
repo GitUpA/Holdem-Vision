@@ -8,7 +8,9 @@ export {
   type OpponentCountRule,
   PREFLOP_SITUATIONS,
   classifySituation,
+  classifySituationFromState,
   resolveOpponentCount,
+  resolveArchetype,
 } from "./situationRegistry";
 
 export {
