@@ -21,7 +21,7 @@ import type { CardIndex, Position } from "../../convex/lib/types/cards";
 import { getPreflopEquity } from "../../convex/lib/gto/preflopEquityTable";
 
 // ═══════════════════════════════════════════════════════
-// STAGE B: classifyPreflopSituation
+// Situation Classification (via registry)
 // ═══════════════════════════════════════════════════════
 
 /** Helper to classify with defaults. */
@@ -253,7 +253,7 @@ describe("computePotAtAction", () => {
 });
 
 // ═══════════════════════════════════════════════════════
-// STAGE C: getOpponentRange
+// Opponent Range Resolution (via registry)
 // ═══════════════════════════════════════════════════════
 
 describe("resolveOpponentRange", () => {

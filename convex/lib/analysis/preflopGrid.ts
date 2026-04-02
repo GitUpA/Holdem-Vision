@@ -4,14 +4,13 @@
  * Each stage accepts explicit inputs and returns a typed output.
  * No React, no browser APIs, no mutation. Testable headless.
  *
- * Pipeline:
- *   Params → [B] classifyPreflopSituation
- *          → [C] getOpponentRange
- *          → [D] getHeroContinueRange
- *          → [E] computeEquityGrid (MC)
- *          → [G] computePotAtAction
- *          → [F] classifyFacingGrid
- *          → [H] computePreflopHandGrid (orchestrator)
+ * Pipeline (via situation registry):
+ *   Params → classifySituation (registry)
+ *          → resolveOpponentRange / resolveHeroRange (registry)
+ *          → computeEquityGrid (MC)
+ *          → computePotAtAction
+ *          → classifyFacingGrid
+ *          → computePreflopHandGrid (orchestrator)
  *
  * Pure TypeScript, zero Convex/React imports.
  */
@@ -89,11 +88,8 @@ export interface PreflopGridResult {
 // RL and GRID_TO_RANK moved to ../preflop/rangeUtils.ts as RANK_LABELS and GRID_TO_RANK
 const RL = RANK_LABELS; // local alias for brevity in grid loops
 
-// classifyPreflopSituation — REMOVED (Phase 3 cleanup)
-// Use classifySituation() from convex/lib/preflop/situationRegistry instead.
-
 // ═══════════════════════════════════════════════════════
-// STAGE G: Compute pot size at hero's action point
+// POT ARITHMETIC
 // ═══════════════════════════════════════════════════════
 
 export function computePotAtAction(
@@ -120,17 +116,7 @@ export function computePotAtAction(
 }
 
 // ═══════════════════════════════════════════════════════
-// POSITION NORMALIZATION (map non-6max to 6max equivalents)
-// ═══════════════════════════════════════════════════════
-
-// normalize6Max and compressRangeByStack moved to ../preflop/rangeUtils.ts
-// Re-exported above for backward compatibility.
-
-// getOpponentRange, getHeroContinueRange — REMOVED (Phase 3 cleanup)
-// Use resolveOpponentRange() / resolveHeroRange() from convex/lib/preflop/situationRanges instead.
-
-// ═══════════════════════════════════════════════════════
-// STAGE E: Compute equity for all 169 hand classes vs a range
+// EQUITY COMPUTATION
 // ═══════════════════════════════════════════════════════
 
 export function computeEquityGrid(
@@ -266,7 +252,7 @@ export function classifyFacingGrid(
 // STAGE H: Orchestrator
 // ═══════════════════════════════════════════════════════
 
-// getHeroHandClass moved to ../preflop/rangeUtils.ts — re-exported above
+// getHeroHandClass in ../preflop/rangeUtils.ts — re-exported above
 
 function emptyResult(heroPosition: Position, tableSize: number = 6, blindsBB: { sb: number; bb: number } = { sb: 0.5, bb: 1 }): PreflopGridResult {
   const defaultOpp = Math.max(1, Math.min(9, tableSize - 1));
