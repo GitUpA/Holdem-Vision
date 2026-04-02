@@ -180,41 +180,74 @@ Both cases call this helper. No duplication.
 ## Implementation Steps
 
 ### Step 1: Add `classifySituationFromState` to registry
-- Move limp detection + raise counting logic from `autoPlay.ts` to `situationRegistry.ts`
+- Add function to `situationRegistry.ts` that takes `GameState + seatIndex`
 - Import `GameState` from `../state/gameState`
-- Export the new function
-- Add to barrel `index.ts`
-- Write tests: same scenarios as autoPlay tests, verify identical results
+- **Use `state.raiseCount`** for raise counting (NOT re-derived from action history)
+  - `state.raiseCount` is maintained by the state machine and correctly handles
+    short all-in calls (doesn't count them as raises)
+  - autoPlay's current logic counts `all_in` as raises — this is a bug for short stacks
+  - Fix the bug by using the authoritative `state.raiseCount`
+- Derive `numCallers` (calls AFTER first raise) — new logic, autoPlay doesn't compute this
+- Derive `numLimpers` (calls BEFORE any raise) — same as autoPlay
+- Derive `threeBettorPosition` (position of 2nd raiser) — new logic
+- Derive `openerPosition` (position of 1st raiser)
+- Derive `isSBComplete` — same as autoPlay
+- Derive `everyoneElseFolded` — check active players
+- Export the new function + add to barrel `index.ts`
+- Write tests covering ALL scenarios:
+  - RFI, facing_raise, facing_3bet, facing_4bet
+  - facing_limpers, bb_vs_limpers, sb_complete
+  - bb_uncontested
+  - Short-stack all-in call (should NOT increment raise count)
+  - Hero's own raise in history (UTG opens, gets 3-bet, faces 3-bet)
 
 ### Step 2: Add `archetypeId` to registry entries
-- Import `PreflopArchetypeId` type from archetypeClassifier
-- Add `archetypeId` field to `PreflopSituationEntry` interface
+- Import `ArchetypeId` type from `../gto/archetypeClassifier` (NOT `PreflopArchetypeId` — doesn't exist)
+- Add `archetypeId: ArchetypeId` field to `PreflopSituationEntry` interface
 - Populate for all 10 entries per mapping table above
-- Export function: `situationToArchetype(id: PreflopSituationId): PreflopArchetypeId`
 
 ### Step 3: Engine delegates to registry
-- `autoPlay.classifyPreflop()` → call `classifySituationFromState()`, return `.engineKey`
-- Delete the 30+ lines of inline classification
-- Run full test suite — behavior must be identical
+- `autoPlay.classifyPreflop()` → call `classifySituationFromState()`, return `PREFLOP_SITUATIONS[ctx.id].engineKey`
+- Delete the 40+ lines of inline classification
+- Run full test suite — behavior must be identical EXCEPT the all-in bug fix
+  (short all-in calls no longer misclassified as extra raises)
 
-### Step 4: Extract BB defense helper in range resolver
-- `resolveBBDefense(opener)` extracts shared logic
-- `cold_call_plus_3bet` calls it for BB path
-- `bb_defense_by_opener` calls it directly
-- Add comment explaining BB's continue range IS defense range
+### Step 4: Extract BB defense helper + clean dead code in range resolver
+- Extract `resolveBBDefense(openerPosition)` helper
+- Three consumers (not two):
+  1. `cold_call_plus_3bet` BB branch
+  2. `bvb_defense` BB branch (partial overlap — the `opener === "sb"` sub-path)
+  3. Remove `bb_defense_by_opener` case entirely — it is UNUSED (no registry entry maps to it)
+- Remove `bb_defense_by_opener` from the `RangeSource` type union (dead type)
+- Add comment explaining BB's continue range IS defense range in `cold_call_plus_3bet`
 
-### Step 5: Wire archetype → registry in coaching path
-- `preflopClassification.classifyPreflopHand()` currently takes `archetypeId: string`
-- Add optional `situationId: PreflopSituationId` parameter
-- When `situationId` provided, derive `archetypeId` from registry instead of using
-  the archetype classifier's output
-- Callers that have a `PreflopSituationContext` can pass `.id` directly
-- This doesn't change behavior — just routes through registry
+### Step 5: Callers derive archetypeId from registry
+**NOT:** adding optional param to `classifyPreflopHand()` (that would be dead code —
+no caller has `PreflopSituationContext` to pass).
+
+**Instead:** Update callers to look up `archetypeId` from registry when they have game state:
+- `frequencyLookup.ts`: after calling `classifySituationFromState()`, use
+  `PREFLOP_SITUATIONS[ctx.id].archetypeId` instead of archetype classifier's output
+- `handPipeline.ts`: same pattern
+- `drillPipeline.ts`: same pattern
+- `constrainedDealer.ts`: uses hardcoded `"rfi_opening"` — leave as-is (it's drill-specific)
+
+This means these callers need `classifySituationFromState()` from Step 1 and the
+`archetypeId` field from Step 2. `classifyPreflopHand()` itself doesn't change —
+it still takes `archetypeId: string`. The callers just derive it from the registry
+instead of the independent archetype classifier.
+
+**Note:** The archetype classifier still runs for POSTFLOP. Only preflop routing changes.
+The coaching lens's `tryGtoSolverLookup` path is the last independent consumer —
+it calls `classifyArchetype()` which handles both preflop and postflop. For preflop,
+it will now route through the registry. For postflop, unchanged.
 
 ### Step 6: Tests + cleanup
-- Verify all 1437 tests pass after each step
-- Remove any remaining dead code paths
+- Verify all 1437+ tests pass after each step
+- Remove dead `bb_defense_by_opener` from RangeSource type and resolver
+- Remove dead code paths
 - Type check clean
+- Add tests for the all-in edge case fix
 
 ## What This Does NOT Change
 
@@ -229,15 +262,29 @@ Both cases call this helper. No duplication.
 1. One classifier (`classifySituationFromState`) for all preflop classification
 2. Engine's `classifyPreflop()` is 2 lines (delegate + lookup)
 3. No duplicated BB defense logic in range resolver
-4. `archetypeId` derivable from registry (no independent classifier for preflop archetypes)
-5. All 1437 tests pass
-6. Adding a new preflop situation = 1 registry entry (includes engineKey + archetypeId)
+4. No dead code (`bb_defense_by_opener` removed)
+5. `archetypeId` derivable from registry (callers use it, not independent archetype classifier)
+6. All-in call bug fixed (short stacks no longer misclassified)
+7. All 1437+ tests pass
+8. Adding a new preflop situation = 1 registry entry (includes engineKey + archetypeId)
 
 ## Risk Assessment
 
-**Low risk.** Every step is a pure refactor — same behavior, different code path.
-The registry already produces correct results. We're just making the engine and
-archetype systems delegate to it instead of computing independently.
+**Low risk.** Steps 1-4 are pure refactors — same behavior, different code path.
+Step 5 changes which callers derive archetypeId but produces the same values.
+The only behavioral change is the all-in bug fix (Step 1), which is an improvement.
 
 **Rollback:** Each step is independently committable. If any step breaks, revert
 that one commit.
+
+## Resolved Issues from Validation
+
+| # | Issue | Resolution |
+|---|---|---|
+| 1 | `all_in` over-counting — autoPlay counts all-in calls as raises | Use `state.raiseCount` which handles this correctly |
+| 2 | Step 5 produces dead code (optional param nobody passes) | Rewritten: callers look up archetypeId from registry |
+| 3 | `bb_defense_by_opener` unused range source | Remove from resolver and RangeSource type |
+| 4 | `bvb_defense` is third consumer of BB defense logic | Added as third consumer of extracted helper |
+| 5 | `PreflopArchetypeId` type doesn't exist | Use `ArchetypeId` throughout |
+| 6 | `numCallers` not in autoPlay | Added as new derivation in classifySituationFromState |
+| 7 | `threeBettorPosition` not in autoPlay | Added as new derivation |
