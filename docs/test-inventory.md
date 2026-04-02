@@ -1,4 +1,6 @@
-# Test Inventory — 1290 Tests Across 74 Files
+# Test Inventory — 1437 Tests Across 82 Files
+
+> **Note:** Counts updated 2026-04-01. Run `pnpm test` for current numbers.
 
 ## Summary
 

@@ -75,7 +75,10 @@ Where does more data help most?
 | PokerBench 4-bet | WRONG LABEL | 422 cells, 23% reliable | Data is "facing 4-bet" |
 | PokerBench BvB | WRONG LABEL | 206 cells, 4% reliable | Perspective unclear |
 | Validated ranges | Correct direction | Full preflop coverage | No frequency granularity |
-| Equity tables | Approximate | 14 × 4 entries | Lookup, no MC needed |
+| Equity tables (1-9 opp) | High (100K MC) | 9 × 169 entries | Position-aware, computed |
+| Iso-raise ranges | GTO consensus | 5 positions | New: facing limpers |
+| BB vs limpers | GTO consensus | 3 tiers (1/2/3+) | New: limped pots |
+| SB complete / BB vs SB | GTO consensus | 2 range sets | New: BvB limp |
 
 ### The Label Swap Opportunity
 

@@ -1,5 +1,11 @@
 # Hand Pipeline — Vetted Implementation Plan (v3)
 
+> **STATUS (2026-04-01):** Phases 1-5 largely superseded by the Preflop Situation Registry
+> (`convex/lib/preflop/situationRegistry.ts`). The old functions referenced below
+> (`classifyPreflopSituation`, `getOpponentRange`, `getHeroContinueRange`) have been
+> deleted. Range resolution now flows through the registry. See `docs/plans/situation-registry-plan.md`
+> for the current architecture. Phases 6+ (postflop, confidence model) remain relevant.
+
 ## Reference: `docs/first-principles.md` (10 layers)
 
 ## Critical Findings From Vetting
