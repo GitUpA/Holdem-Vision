@@ -202,7 +202,11 @@ Both cases call this helper. No duplication.
 - Derive `numCallers` (calls AFTER first raise) — new logic, autoPlay doesn't compute this
 - Derive `numLimpers` (calls BEFORE any raise) — same as autoPlay
 - Derive `threeBettorPosition` (position of 2nd raiser) — new logic
-- Derive `openerPosition` (position of 1st raiser)
+- Derive `openerPosition` (position of 1st raiser in history, regardless of hero/opponent.
+  When hero faces a 3-bet, openerPosition is hero's own position — this is correct
+  because range resolution for facing_3bet doesn't use openerPosition.
+  When hero faces an open, openerPosition is the opponent's position — hero hasn't raised.
+  For BvB detection, openerPosition being a blind position is correct either way.)
 - Derive `isSBComplete` — same as autoPlay
 - Derive `everyoneElseFolded` — check active players
 - Export the new function + add to barrel `index.ts`
@@ -239,22 +243,34 @@ Both cases call this helper. No duplication.
 **NOT:** adding optional param to `classifyPreflopHand()` (that would be dead code —
 no caller has `PreflopSituationContext` to pass).
 
-**Instead:** Update callers to use `resolveArchetype(ctx)` from registry when they have game state:
-- `frequencyLookup.ts`: after calling `classifySituationFromState()`, use
-  `resolveArchetype(ctx)` instead of archetype classifier's output
-- `handPipeline.ts`: same pattern
-- `drillPipeline.ts`: same pattern
-- `constrainedDealer.ts`: uses hardcoded `"rfi_opening"` — leave as-is (it's drill-specific)
+**Instead:** Update callers to use `resolveArchetype(ctx)` from registry:
 
-This means these callers need `classifySituationFromState()` from Step 1 and the
-`archetypeId` field from Step 2. `classifyPreflopHand()` itself doesn't change —
-it still takes `archetypeId: string`. The callers just derive it from the registry
-instead of the independent archetype classifier.
+- **`frequencyLookup.ts`**: Keep `classifyArchetype()` call — it's still needed for postflop
+  path AND for the returned `GtoLookupResult.archetype` metadata. In the preflop branch only,
+  derive archetypeId from registry:
+  ```typescript
+  if (street === "preflop") {
+    const ctx = classifySituationFromState(gameState, heroSeat);
+    const archetypeId = resolveArchetype(ctx);
+    const classification = classifyPreflopHand(handClass, archetypeId, position, ctx.openerPosition);
+    // ...
+  }
+  ```
+  
+- **`handPipeline.ts`**: Same pattern. **Bonus bug fix:** currently does NOT pass `openerPosition`
+  to `classifyPreflopHand()`, so BB defense always defaults to "vs_btn". The refactor fixes this
+  by passing `ctx.openerPosition` from the situation context.
 
-**Note:** The archetype classifier still runs for POSTFLOP. Only preflop routing changes.
-The coaching lens's `tryGtoSolverLookup` path is the last independent consumer —
-it calls `classifyArchetype()` which handles both preflop and postflop. For preflop,
-it will now route through the registry. For postflop, unchanged.
+- **`drillPipeline.ts`**: NO CHANGE needed — uses pre-computed `deal.archetype.archetypeId` from
+  constrained dealer, not `classifyArchetype()`. Leave as-is.
+
+- **`constrainedDealer.ts`**: uses hardcoded `"rfi_opening"` — leave as-is (drill-specific)
+
+`classifyPreflopHand()` itself doesn't change — it still takes `archetypeId: string`.
+The callers just derive it from the registry instead of the independent archetype classifier.
+
+**Note:** The archetype classifier still runs for POSTFLOP and for metadata. Only the
+preflop archetypeId derivation changes. `classifyArchetype()` is NOT removed from any file.
 
 ### Step 6: Tests + cleanup
 - Verify all 1437+ tests pass after each step
@@ -266,8 +282,8 @@ it will now route through the registry. For postflop, unchanged.
 ## What This Does NOT Change
 
 - Range data shapes in `preflopRanges.ts` — kept as-is (intentional variety)
-- The archetype classifier itself — still runs for postflop. Only preflop routing changes.
-- `PreflopSituationEntry` fields — additive only (new `archetypeId` field)
+- The archetype classifier itself — still runs for postflop AND metadata. Only preflop archetypeId derivation changes.
+- `PreflopSituationEntry` interface — no changes (archetype resolved via function, not field)
 - Engine `SituationKey` type — no changes
 - Postflop classification — untouched
 
@@ -304,3 +320,8 @@ that one commit.
 | 7 | `threeBettorPosition` not in autoPlay | Added as new derivation |
 | 8 | `state.raiseCount` has same all-in bug as autoPlay | Don't use state.raiseCount — count raise/bet only from action history |
 | 9 | `facing_open` → `three_bet_pots` wrong for BB (should be `bb_defense_vs_rfi`) | Use `resolveArchetype(ctx)` function instead of static field — handles BB override |
+| 10 | `frequencyLookup.ts` must keep `classifyArchetype()` for postflop + metadata | Clarified: only preflop archetypeId changes |
+| 11 | `handPipeline.ts` missing `openerPosition` (pre-existing bug) | Refactor fixes by passing `ctx.openerPosition` |
+| 12 | `drillPipeline.ts` doesn't need updating | Removed from Step 5 list |
+| 13 | Plan contradicts itself on PreflopSituationEntry | Fixed stale text |
+| 14 | `openerPosition` semantics unspecified | Added clarification in Step 1 |
