@@ -330,9 +330,10 @@ export function classifySituation(params: {
     return { ...base, id: "facing_limpers", raiseCount: 0 };
   }
 
-  // Priority 8: Blind vs blind
-  const blinds: Set<Position> = new Set(["sb", "bb"]);
-  if (openerPosition && blinds.has(heroPosition) && blinds.has(openerPosition) && numCallers === 0) {
+  // Priority 8: Blind vs blind (in HU, BTN is the SB)
+  const isBlindPos = (pos: Position, ts: number): boolean =>
+    pos === "sb" || pos === "bb" || (pos === "btn" && ts === 2);
+  if (openerPosition && isBlindPos(heroPosition, tableSize) && isBlindPos(openerPosition, tableSize) && numCallers === 0) {
     return { ...base, id: "blind_vs_blind", raiseCount: 1 };
   }
 
@@ -421,19 +422,30 @@ export function classifySituationFromState(
   const heroPosition = state.players[seatIndex].position;
   const preflopActions = state.actionHistory.filter(a => a.street === "preflop");
 
-  // Count raises: only "raise" and "bet" actions, NOT "all_in"
-  // (all_in can be a call that doesn't constitute a raise)
-  const raiseActions = preflopActions.filter(
-    a => a.actionType === "raise" || a.actionType === "bet",
-  );
+  // Walk actions chronologically to identify raises, tracking the running bet level.
+  // all_in counts as a raise ONLY when amount > current bet level (shove, not call).
+  const raiseActions: typeof preflopActions = [];
+  let currentBetLevel = state.blinds.big; // BB is the initial bet level preflop
+  let firstRaiseIdx = -1;
+
+  for (let i = 0; i < preflopActions.length; i++) {
+    const a = preflopActions[i];
+    if (a.actionType === "raise" || a.actionType === "bet") {
+      raiseActions.push(a);
+      currentBetLevel = a.amount ?? currentBetLevel;
+      if (firstRaiseIdx === -1) firstRaiseIdx = i;
+    } else if (a.actionType === "all_in" && (a.amount ?? 0) > currentBetLevel) {
+      // All-in shove that exceeds current bet = a raise
+      raiseActions.push(a);
+      currentBetLevel = a.amount ?? currentBetLevel;
+      if (firstRaiseIdx === -1) firstRaiseIdx = i;
+    }
+    // all_in with amount <= currentBetLevel = a call, not counted as raise
+  }
+
   const raiseCount = raiseActions.length;
 
-  // Find first raise index in preflopActions for limp detection
-  const firstRaiseIdx = preflopActions.findIndex(
-    a => a.actionType === "raise" || a.actionType === "bet",
-  );
-
-  // Limpers: calls before any raise
+  // Limpers: calls before any raise (including all-in calls)
   const limperActions = preflopActions.filter(
     (a, i) => a.actionType === "call" && (firstRaiseIdx === -1 || i < firstRaiseIdx),
   );
@@ -456,8 +468,12 @@ export function classifySituationFromState(
     : null;
 
   // SB complete: SB limped (called, not raised) and no one raised
+  // In HU, BTN is the SB
   const isSBComplete = numLimpers > 0
-    && limperActions.some(a => state.players[a.seatIndex].position === "sb")
+    && limperActions.some(a => {
+      const pos = state.players[a.seatIndex].position;
+      return pos === "sb" || (pos === "btn" && state.numPlayers === 2);
+    })
     && firstRaiseIdx === -1
     && numLimpers === 1;
 

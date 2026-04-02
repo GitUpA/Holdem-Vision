@@ -12,6 +12,7 @@ import {
 } from "../../convex/lib/analysis/preflopGrid";
 import {
   classifySituation,
+  classifySituationFromState,
   type PreflopSituationContext,
 } from "../../convex/lib/preflop/situationRegistry";
 import { resolveOpponentRange, resolveHeroRange } from "../../convex/lib/preflop/situationRanges";
@@ -88,6 +89,134 @@ describe("classifySituation", () => {
   it("bb_vs_sb_complete when SB limps and hero is BB", () => {
     const s = classify({ heroPosition: "bb", numLimpers: 1, isSBComplete: true });
     expect(s.id).toBe("bb_vs_sb_complete");
+  });
+
+  // ── HU (heads-up) BvB detection ──
+  it("HU: BTN raises, hero is BB → blind_vs_blind", () => {
+    const s = classify({ heroPosition: "bb", openerPosition: "btn", tableSize: 2 });
+    expect(s.id).toBe("blind_vs_blind");
+  });
+
+  it("HU: BB raises, hero is BTN → blind_vs_blind", () => {
+    const s = classify({ heroPosition: "btn", openerPosition: "bb", tableSize: 2 });
+    expect(s.id).toBe("blind_vs_blind");
+  });
+
+  it("3-player: BTN raises, hero is BB → facing_open (not BvB)", () => {
+    const s = classify({ heroPosition: "bb", openerPosition: "btn", tableSize: 3 });
+    expect(s.id).toBe("facing_open");
+  });
+
+  it("HU: BTN completes, hero is BB → bb_vs_sb_complete", () => {
+    const s = classify({ heroPosition: "bb", numLimpers: 1, isSBComplete: true, tableSize: 2 });
+    expect(s.id).toBe("bb_vs_sb_complete");
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// classifySituationFromState — all-in edge cases
+// ═══════════════════════════════════════════════════════
+
+describe("classifySituationFromState all-in handling", () => {
+  // Helper to build a minimal GameState for classification
+  function makeState(overrides: {
+    numPlayers?: number;
+    actions: Array<{ seatIndex: number; actionType: string; amount?: number }>;
+    positions?: string[];
+  }) {
+    const numPlayers = overrides.numPlayers ?? 6;
+    const positions = overrides.positions ?? ["utg", "hj", "co", "btn", "sb", "bb"];
+    return {
+      numPlayers,
+      blinds: { small: 0.5, big: 1 },
+      players: positions.map((pos, i) => ({
+        seatIndex: i,
+        position: pos,
+        status: "active" as const,
+        startingStack: 100,
+        currentStack: 100,
+        totalCommitted: 0,
+        streetCommitted: 0,
+        holeCards: [],
+        hasActedThisStreet: false,
+        cardVisibility: "hidden" as const,
+      })),
+      actionHistory: overrides.actions.map((a, i) => ({
+        seatIndex: a.seatIndex,
+        position: positions[a.seatIndex],
+        street: "preflop" as const,
+        actionType: a.actionType,
+        amount: a.amount,
+        isAllIn: a.actionType === "all_in",
+        sequence: i,
+      })),
+      currentStreet: "preflop" as const,
+      raiseCount: 0,
+      currentBet: 1,
+      minRaiseSize: 1,
+      activePlayerIndex: null,
+      lastAggressorIndex: null,
+      dealerSeatIndex: 3,
+      handNumber: 1,
+      deck: [],
+      communityCards: [],
+      pot: { mainPot: 0, sidePots: [], total: 0, explanation: "" },
+      phase: "preflop" as const,
+    };
+  }
+
+  it("UTG shoves 50BB as first action → facing_open for next player", () => {
+    const state = makeState({
+      actions: [{ seatIndex: 0, actionType: "all_in", amount: 50 }],
+    });
+    const ctx = classifySituationFromState(state as any, 1);
+    expect(ctx.id).toBe("facing_open");
+    expect(ctx.openerPosition).toBe("utg");
+  });
+
+  it("UTG raises 3BB, short-stack HJ calls all-in for 2BB → raiseCount stays 1", () => {
+    const state = makeState({
+      actions: [
+        { seatIndex: 0, actionType: "raise", amount: 3 },
+        { seatIndex: 1, actionType: "all_in", amount: 2 }, // call, not raise (2 < 3)
+      ],
+    });
+    const ctx = classifySituationFromState(state as any, 2);
+    expect(ctx.id).toBe("facing_open");
+    expect(ctx.openerPosition).toBe("utg");
+  });
+
+  it("UTG raises 3BB, HJ shoves 30BB → facing_3bet for next player", () => {
+    const state = makeState({
+      actions: [
+        { seatIndex: 0, actionType: "raise", amount: 3 },
+        { seatIndex: 1, actionType: "all_in", amount: 30 }, // shove > 3 = raise
+      ],
+    });
+    const ctx = classifySituationFromState(state as any, 2);
+    expect(ctx.id).toBe("facing_3bet");
+    expect(ctx.threeBettorPosition).toBe("hj");
+  });
+
+  it("UTG limps, HJ shoves 30BB → facing_open (raise after limp)", () => {
+    const state = makeState({
+      actions: [
+        { seatIndex: 0, actionType: "call", amount: 1 }, // limp
+        { seatIndex: 1, actionType: "all_in", amount: 30 }, // shove = raise
+      ],
+    });
+    const ctx = classifySituationFromState(state as any, 2);
+    expect(ctx.id).toBe("facing_open");
+    expect(ctx.openerPosition).toBe("hj");
+    expect(ctx.numLimpers).toBe(1);
+  });
+
+  it("Short-stack shoves 4BB as first action (4 > 1 BB) → facing_open", () => {
+    const state = makeState({
+      actions: [{ seatIndex: 0, actionType: "all_in", amount: 4 }],
+    });
+    const ctx = classifySituationFromState(state as any, 1);
+    expect(ctx.id).toBe("facing_open");
   });
 });
 
