@@ -266,7 +266,7 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
 
   // PREFLOP RENDER
   const heroHandClass = getHeroHandClass(heroCards);
-  const heroEquityVsRandom = getPreflopEquity(heroHandClass);
+  const heroEquityVsRandom = getPreflopEquity(heroHandClass, Math.max(1, numPlayers - 1));
   const heroEquity = (hasRangeEquity ? equityVsRange!.get(heroHandClass) : null) ?? heroEquityVsRandom;
 
   // Build display cells from pipeline result + async equity overlay

@@ -83,6 +83,21 @@ export const NIT_MODIFIERS: ProfileModifierMap = {
     { hand: 0.1 },
     "Only pocket aces. A nit facing a 4-bet folds virtually everything.",
   ),
+  "preflop.facing_limpers": sm(
+    2.1, 0.7, 0.1, 0.0, 0.9,
+    { hand: 0.3, position: 0.4 },
+    "Nits fold far more than GTO preflop (~12% vs ~27%). They only play premium hands and barely adjust for position.",
+  ),
+  "preflop.bb_vs_limpers": sm(
+    2.1, 0.7, 0.1, 0.0, 0.9,
+    { hand: 0.3, position: 0.4 },
+    "Nits fold far more than GTO preflop (~12% vs ~27%). They only play premium hands and barely adjust for position.",
+  ),
+  "preflop.sb_complete": sm(
+    2.1, 0.7, 0.1, 0.0, 0.9,
+    { hand: 0.3, position: 0.4 },
+    "Nits fold far more than GTO preflop (~12% vs ~27%). They only play premium hands and barely adjust for position.",
+  ),
   "postflop.aggressor.ip": sm(
     1.3, 0.5, -0.1, -0.1, 0.8,
     { hand: 0.4, texture: 0.2, draw: 0.2 },
@@ -151,6 +166,21 @@ export const FISH_MODIFIERS: ProfileModifierMap = {
     0.9, 0.1, -0.5, 0.0, 0.85,
     { hand: 0.15 },
     "Fish rarely get this deep in preflop action. When they continue, they have a real hand.",
+  ),
+  "preflop.facing_limpers": sm(
+    0.4, 0.3, -0.5, -0.2, 0.95,
+    { hand: 0.1, position: 0.1 },
+    "Fish play too many hands — over half of starting hands. They limp often and raise rarely. Position doesn't change their behavior.",
+  ),
+  "preflop.bb_vs_limpers": sm(
+    0.4, 0.3, -0.5, -0.2, 0.95,
+    { hand: 0.1, position: 0.1 },
+    "Fish play too many hands — over half of starting hands. They limp often and raise rarely. Position doesn't change their behavior.",
+  ),
+  "preflop.sb_complete": sm(
+    0.4, 0.3, -0.5, -0.2, 0.95,
+    { hand: 0.1, position: 0.1 },
+    "Fish play too many hands — over half of starting hands. They limp often and raise rarely. Position doesn't change their behavior.",
   ),
   "postflop.aggressor.ip": sm(
     1.3, 0.3, -0.6, -0.2, 0.9,
@@ -221,6 +251,21 @@ export const TAG_MODIFIERS: ProfileModifierMap = {
     { hand: 0.6 },
     "Facing a 4-bet, TAGs play very tight. Only premiums continue, and most are shoving.",
   ),
+  "preflop.facing_limpers": sm(
+    1.2, 1.0, 0.05, 0.0, 0.5,
+    { hand: 0.7, position: 0.8, texture: 0.6 },
+    "TAGs play solid, selective-aggressive (~22% vs GTO ~27%). They choose good starting hands and adjust significantly for position.",
+  ),
+  "preflop.bb_vs_limpers": sm(
+    1.2, 1.0, 0.05, 0.0, 0.5,
+    { hand: 0.7, position: 0.8, texture: 0.6 },
+    "TAGs play solid, selective-aggressive (~22% vs GTO ~27%). They choose good starting hands and adjust significantly for position.",
+  ),
+  "preflop.sb_complete": sm(
+    1.2, 1.0, 0.05, 0.0, 0.5,
+    { hand: 0.7, position: 0.8, texture: 0.6 },
+    "TAGs play solid, selective-aggressive (~22% vs GTO ~27%). They choose good starting hands and adjust significantly for position.",
+  ),
   "postflop.aggressor.ip": sm(
     0.8, 1.2, 0.1, 0.05, 0.6,
     { hand: 0.7, texture: 0.6, foldEq: 0.6, spr: 0.5, draw: 0.6 },
@@ -289,6 +334,21 @@ export const LAG_MODIFIERS: ProfileModifierMap = {
     0.8, 1.2, 0.1, 0.0, 0.6,
     { hand: 0.5 },
     "Facing 4-bets, LAGs tighten significantly but still shove wider than most.",
+  ),
+  "preflop.facing_limpers": sm(
+    0.7, 1.2, 0.1, 0.1, 0.6,
+    { hand: 0.5, position: 0.9, foldEq: 0.5 },
+    "LAGs play more hands than GTO (~32% vs ~27%). They open wider, especially in position.",
+  ),
+  "preflop.bb_vs_limpers": sm(
+    0.7, 1.2, 0.1, 0.1, 0.6,
+    { hand: 0.5, position: 0.9, foldEq: 0.5 },
+    "LAGs play more hands than GTO (~32% vs ~27%). They open wider, especially in position.",
+  ),
+  "preflop.sb_complete": sm(
+    0.7, 1.2, 0.1, 0.1, 0.6,
+    { hand: 0.5, position: 0.9, foldEq: 0.5 },
+    "LAGs play more hands than GTO (~32% vs ~27%). They open wider, especially in position.",
   ),
   "postflop.aggressor.ip": sm(
     0.5, 1.5, 0.15, 0.15, 0.7,

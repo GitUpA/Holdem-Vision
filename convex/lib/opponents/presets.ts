@@ -68,6 +68,42 @@ const nitSituations: Record<SituationKey, BehavioralParams> = {
     explanation:
       "Only AA, maybe KK. A nit facing a 4-bet folds almost everything.",
   }),
+  "preflop.facing_limpers": bp({
+    continuePct: 12,
+    raisePct: 83,
+    positionAwareness: 0.4,
+    bluffFrequency: 0.02,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.8 },
+      { action: "raise", sizingPct: 250, weight: 0.2 },
+    ],
+    explanation:
+      "Nits are ultra-tight. They only enter pots with premium hands — top pairs, AK, AQ suited. From any position, expect at most the top 12% of starting hands.",
+  }),
+  "preflop.bb_vs_limpers": bp({
+    continuePct: 12,
+    raisePct: 83,
+    positionAwareness: 0.4,
+    bluffFrequency: 0.02,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.8 },
+      { action: "raise", sizingPct: 250, weight: 0.2 },
+    ],
+    explanation:
+      "Nits are ultra-tight. They only enter pots with premium hands — top pairs, AK, AQ suited. From any position, expect at most the top 12% of starting hands.",
+  }),
+  "preflop.sb_complete": bp({
+    continuePct: 12,
+    raisePct: 83,
+    positionAwareness: 0.4,
+    bluffFrequency: 0.02,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.8 },
+      { action: "raise", sizingPct: 250, weight: 0.2 },
+    ],
+    explanation:
+      "Nits are ultra-tight. They only enter pots with premium hands — top pairs, AK, AQ suited. From any position, expect at most the top 12% of starting hands.",
+  }),
   "postflop.aggressor.ip": bp({
     continuePct: 65,
     raisePct: 15,
@@ -191,6 +227,42 @@ const fishSituations: Record<SituationKey, BehavioralParams> = {
     sizings: [],
     explanation:
       "Fish rarely get this deep in the preflop action. When they do continue, they have a real hand.",
+  }),
+  "preflop.facing_limpers": bp({
+    continuePct: 55,
+    raisePct: 15,
+    positionAwareness: 0.1,
+    bluffFrequency: 0.02,
+    sizings: [
+      { action: "raise", sizingPct: 200, weight: 0.7 },
+      { action: "raise", sizingPct: 300, weight: 0.3 },
+    ],
+    explanation:
+      "Fish play too many hands — over half of all starting hands. They limp often and raise rarely. Position doesn't change their behavior much.",
+  }),
+  "preflop.bb_vs_limpers": bp({
+    continuePct: 55,
+    raisePct: 15,
+    positionAwareness: 0.1,
+    bluffFrequency: 0.02,
+    sizings: [
+      { action: "raise", sizingPct: 200, weight: 0.7 },
+      { action: "raise", sizingPct: 300, weight: 0.3 },
+    ],
+    explanation:
+      "Fish play too many hands — over half of all starting hands. They limp often and raise rarely. Position doesn't change their behavior much.",
+  }),
+  "preflop.sb_complete": bp({
+    continuePct: 55,
+    raisePct: 15,
+    positionAwareness: 0.1,
+    bluffFrequency: 0.02,
+    sizings: [
+      { action: "raise", sizingPct: 200, weight: 0.7 },
+      { action: "raise", sizingPct: 300, weight: 0.3 },
+    ],
+    explanation:
+      "Fish play too many hands — over half of all starting hands. They limp often and raise rarely. Position doesn't change their behavior much.",
   }),
   "postflop.aggressor.ip": bp({
     continuePct: 30,
@@ -318,6 +390,42 @@ const tagSituations: Record<SituationKey, BehavioralParams> = {
     sizings: [],
     explanation:
       "Facing a 4-bet, TAGs play very tight. Only premium hands continue, and most of those are shoving.",
+  }),
+  "preflop.facing_limpers": bp({
+    continuePct: 22,
+    raisePct: 82,
+    positionAwareness: 0.8,
+    bluffFrequency: 0.08,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.6 },
+      { action: "raise", sizingPct: 250, weight: 0.3 },
+    ],
+    explanation:
+      "TAGs play a solid, selective-aggressive style. They choose good starting hands (~22%) and raise most of them. Position significantly affects their range.",
+  }),
+  "preflop.bb_vs_limpers": bp({
+    continuePct: 22,
+    raisePct: 82,
+    positionAwareness: 0.8,
+    bluffFrequency: 0.08,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.6 },
+      { action: "raise", sizingPct: 250, weight: 0.3 },
+    ],
+    explanation:
+      "TAGs play a solid, selective-aggressive style. They choose good starting hands (~22%) and raise most of them. Position significantly affects their range.",
+  }),
+  "preflop.sb_complete": bp({
+    continuePct: 22,
+    raisePct: 82,
+    positionAwareness: 0.8,
+    bluffFrequency: 0.08,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.6 },
+      { action: "raise", sizingPct: 250, weight: 0.3 },
+    ],
+    explanation:
+      "TAGs play a solid, selective-aggressive style. They choose good starting hands (~22%) and raise most of them. Position significantly affects their range.",
   }),
   "postflop.aggressor.ip": bp({
     continuePct: 70,
@@ -455,6 +563,45 @@ const lagSituations: Record<SituationKey, BehavioralParams> = {
     sizings: [],
     explanation:
       "Facing 4-bets, LAGs tighten significantly but still shove wider than most players.",
+  }),
+  "preflop.facing_limpers": bp({
+    continuePct: 35,
+    raisePct: 80,
+    positionAwareness: 0.9,
+    bluffFrequency: 0.15,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.5 },
+      { action: "raise", sizingPct: 250, weight: 0.3 },
+      { action: "raise", sizingPct: 400, weight: 0.2 },
+    ],
+    explanation:
+      "LAGs play many hands aggressively — top 35%. They put constant pressure with raises from all positions, especially late position.",
+  }),
+  "preflop.bb_vs_limpers": bp({
+    continuePct: 35,
+    raisePct: 80,
+    positionAwareness: 0.9,
+    bluffFrequency: 0.15,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.5 },
+      { action: "raise", sizingPct: 250, weight: 0.3 },
+      { action: "raise", sizingPct: 400, weight: 0.2 },
+    ],
+    explanation:
+      "LAGs play many hands aggressively — top 35%. They put constant pressure with raises from all positions, especially late position.",
+  }),
+  "preflop.sb_complete": bp({
+    continuePct: 35,
+    raisePct: 80,
+    positionAwareness: 0.9,
+    bluffFrequency: 0.15,
+    sizings: [
+      { action: "raise", sizingPct: 300, weight: 0.5 },
+      { action: "raise", sizingPct: 250, weight: 0.3 },
+      { action: "raise", sizingPct: 400, weight: 0.2 },
+    ],
+    explanation:
+      "LAGs play many hands aggressively — top 35%. They put constant pressure with raises from all positions, especially late position.",
   }),
   "postflop.aggressor.ip": bp({
     continuePct: 80,
@@ -594,6 +741,42 @@ const gtoSituations: Record<SituationKey, BehavioralParams> = {
     sizings: [],
     explanation:
       "GTO 4-bet defense is very tight. Only premium hands continue, mostly as shoves.",
+  }),
+  "preflop.facing_limpers": bp({
+    continuePct: 27,
+    raisePct: 81,
+    positionAwareness: 1.0,
+    bluffFrequency: 0.10,
+    sizings: [
+      { action: "raise", sizingPct: 250, weight: 0.5 },
+      { action: "raise", sizingPct: 300, weight: 0.3 },
+    ],
+    explanation:
+      "GTO players open ~27% of hands with full position adjustment. Their range is balanced with a correct ratio of value and speculative hands.",
+  }),
+  "preflop.bb_vs_limpers": bp({
+    continuePct: 27,
+    raisePct: 81,
+    positionAwareness: 1.0,
+    bluffFrequency: 0.10,
+    sizings: [
+      { action: "raise", sizingPct: 250, weight: 0.5 },
+      { action: "raise", sizingPct: 300, weight: 0.3 },
+    ],
+    explanation:
+      "GTO players open ~27% of hands with full position adjustment. Their range is balanced with a correct ratio of value and speculative hands.",
+  }),
+  "preflop.sb_complete": bp({
+    continuePct: 27,
+    raisePct: 81,
+    positionAwareness: 1.0,
+    bluffFrequency: 0.10,
+    sizings: [
+      { action: "raise", sizingPct: 250, weight: 0.5 },
+      { action: "raise", sizingPct: 300, weight: 0.3 },
+    ],
+    explanation:
+      "GTO players open ~27% of hands with full position adjustment. Their range is balanced with a correct ratio of value and speculative hands.",
   }),
   "postflop.aggressor.ip": bp({
     continuePct: 55,

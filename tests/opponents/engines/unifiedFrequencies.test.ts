@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import type { DecisionContext } from "../../../convex/lib/opponents/engines/types";
 import type { GameState, LegalActions } from "../../../convex/lib/state/gameState";
 import type { OpponentProfile, BehavioralParams, SituationKey } from "../../../convex/lib/types/opponents";
+import { ALL_SITUATION_KEYS } from "../../../convex/lib/types/opponents";
 import type { ActionFrequencies, GtoAction } from "../../../convex/lib/gto/tables/types";
 import { getEngineOrDefault } from "../../../convex/lib/opponents/engines/engineRegistry";
 import { paramsToFrequencies } from "../../../convex/lib/opponents/autoPlay";
@@ -27,13 +28,8 @@ const DEFAULT_PARAMS: BehavioralParams = {
 };
 
 function makeResolvedParams(): Record<SituationKey, BehavioralParams> {
-  const keys: SituationKey[] = [
-    "preflop.open", "preflop.facing_raise", "preflop.facing_3bet", "preflop.facing_4bet",
-    "postflop.aggressor.ip", "postflop.aggressor.oop", "postflop.caller.ip", "postflop.caller.oop",
-    "postflop.facing_bet", "postflop.facing_raise", "postflop.facing_allin",
-  ];
   const result = {} as Record<SituationKey, BehavioralParams>;
-  for (const k of keys) result[k] = DEFAULT_PARAMS;
+  for (const k of ALL_SITUATION_KEYS) result[k] = DEFAULT_PARAMS;
   return result;
 }
 

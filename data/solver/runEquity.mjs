@@ -116,10 +116,11 @@ function eval5(cards) {
     kickers = ranks;
   }
 
-  // Encode as single comparable number
+  // Encode as single comparable number (lower = better hand)
+  // Invert kickers: higher rank → lower score contribution
   let score = category * 1000000;
   for (let i = 0; i < kickers.length; i++) {
-    score += kickers[i] * Math.pow(14, 4 - i);
+    score += (12 - kickers[i]) * Math.pow(14, 4 - i);
   }
   return score;
 }

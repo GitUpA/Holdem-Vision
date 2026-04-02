@@ -54,7 +54,7 @@ describe("preset profiles", () => {
   it("all presets resolve fully", () => {
     for (const p of getAllPresets()) {
       const resolved = resolveProfile(p, () => undefined);
-      expect(Object.keys(resolved)).toHaveLength(11);
+      expect(Object.keys(resolved)).toHaveLength(ALL_SITUATION_KEYS.length);
     }
   });
 

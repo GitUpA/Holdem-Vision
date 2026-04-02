@@ -34,7 +34,7 @@ describe("resolveProfile", () => {
     const profile = makeCompleteProfile("tag", "TAG");
     const resolved = resolveProfile(profile, () => undefined);
 
-    expect(Object.keys(resolved)).toHaveLength(11);
+    expect(Object.keys(resolved)).toHaveLength(ALL_SITUATION_KEYS.length);
     for (const key of ALL_SITUATION_KEYS) {
       expect(resolved[key]).toBeDefined();
       expect(resolved[key].continuePct).toBe(50);
@@ -64,7 +64,7 @@ describe("resolveProfile", () => {
     // Inherited from base
     expect(resolved["preflop.facing_raise"].continuePct).toBe(50);
     // All 11 present
-    expect(Object.keys(resolved)).toHaveLength(11);
+    expect(Object.keys(resolved)).toHaveLength(ALL_SITUATION_KEYS.length);
   });
 
   it("resolves multi-level inheritance", () => {
@@ -156,7 +156,7 @@ describe("resolveProfile", () => {
     profile.baseProfileId = "nonexistent";
 
     const resolved = resolveProfile(profile, () => undefined);
-    expect(Object.keys(resolved)).toHaveLength(11);
+    expect(Object.keys(resolved)).toHaveLength(ALL_SITUATION_KEYS.length);
   });
 });
 

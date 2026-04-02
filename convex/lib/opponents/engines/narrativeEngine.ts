@@ -26,6 +26,7 @@ import { formatSituation } from "./types";
 import { getModifierMap } from "./modifierProfiles";
 import { detectMixedStrategy, type MixedStrategyInfo } from "../../gto/mixedStrategy";
 import { classificationToCoachingText } from "../../gto/preflopClassification";
+import { ALL_SITUATION_KEYS } from "../../types/opponents";
 
 // ═══════════════════════════════════════════════════════
 // MAIN ENTRY POINT
@@ -332,19 +333,12 @@ function buildExplanationTree(
 // HELPERS
 // ═══════════════════════════════════════════════════════
 
-/** Build a fallback modifier map from a single modifier (all 11 situations identical). */
+/** Build a fallback modifier map from a single modifier (all situations identical). */
 function buildFallbackModifierMap(
   modifier: NarrativeInput["baseModifier"],
 ): import("./modifiedGtoTypes").ProfileModifierMap {
-  const keys = [
-    "preflop.open", "preflop.facing_raise", "preflop.facing_3bet", "preflop.facing_4bet",
-    "postflop.aggressor.ip", "postflop.aggressor.oop",
-    "postflop.caller.ip", "postflop.caller.oop",
-    "postflop.facing_bet", "postflop.facing_raise", "postflop.facing_allin",
-  ] as const;
-
   const map: Record<string, typeof modifier> = {};
-  for (const key of keys) {
+  for (const key of ALL_SITUATION_KEYS) {
     map[key] = modifier;
   }
   return map as import("./modifiedGtoTypes").ProfileModifierMap;

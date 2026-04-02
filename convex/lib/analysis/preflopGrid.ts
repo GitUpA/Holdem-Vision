@@ -19,6 +19,7 @@
 import type { CardIndex } from "../types/cards";
 import type { Position } from "../types/cards";
 import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
+import { playersBehind } from "../primitives/position";
 import { getPreflopEquity } from "../gto/preflopEquityTable";
 import {
   GTO_RFI_RANGES,
@@ -30,6 +31,9 @@ import {
   GTO_4BET,
 } from "../gto/tables/preflopRanges";
 import { HAND_STRENGTH_ORDER } from "../gto/preflopClassification";
+// Re-export from canonical location for backward compatibility
+export { normalize6Max, compressRangeByStack } from "../preflop/rangeUtils";
+import { normalize6Max, compressRangeByStack } from "../preflop/rangeUtils";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -153,47 +157,8 @@ export function computePotAtAction(
 // POSITION NORMALIZATION (map non-6max to 6max equivalents)
 // ═══════════════════════════════════════════════════════
 
-/** Map any table-size position to the nearest 6-max equivalent for range lookup. */
-export function normalize6Max(pos: string): string {
-  switch (pos) {
-    case "utg1": case "utg2": return "utg";
-    case "mp": case "mp1": return "hj";
-    default: return pos;
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-// STACK DEPTH ADJUSTMENT
-// ═══════════════════════════════════════════════════════
-
-/**
- * Compress a range based on stack depth.
- *
- * At 100BB: full range (no compression).
- * At 40BB: remove bottom ~20% of range (speculative hands lose implied odds).
- * At 20BB: remove bottom ~40% (shove/fold territory — only premiums + high cards).
- * Below 15BB: keep only top ~40% of the range.
- *
- * Uses HAND_STRENGTH_ORDER to identify which hands to drop from the bottom.
- */
-export function compressRangeByStack(range: Set<string>, stackDepthBB: number): Set<string> {
-  if (stackDepthBB >= 80) return range; // deep stack — no compression
-
-  // Compression factor: 0 at 80BB, 1 at 10BB
-  const compression = Math.min(1, Math.max(0, (80 - stackDepthBB) / 70));
-  // Remove bottom X% of the range by hand strength
-  const dropPct = compression * 0.5; // at 10BB, drop bottom 50%
-
-  // Rank each hand in the range by strength order
-  const rankedHands = [...range].sort((a, b) => {
-    const idxA = HAND_STRENGTH_ORDER.indexOf(a);
-    const idxB = HAND_STRENGTH_ORDER.indexOf(b);
-    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-  });
-
-  const keepCount = Math.max(1, Math.ceil(rankedHands.length * (1 - dropPct)));
-  return new Set(rankedHands.slice(0, keepCount));
-}
+// normalize6Max and compressRangeByStack moved to ../preflop/rangeUtils.ts
+// Re-exported above for backward compatibility.
 
 // ═══════════════════════════════════════════════════════
 // STAGE C: Get opponent's range
@@ -330,8 +295,9 @@ export function computeEquityGrid(
   heroCards: CardIndex[],
   opponentRange: Set<string> | null,
   trials: number = 300,
+  numOpponents: number = 1,
 ): Map<string, number> {
-  // No opponent range — use static equity vs random
+  // No opponent range — use static equity vs N random opponents
   if (!opponentRange || opponentRange.size === 0) {
     const result = new Map<string, number>();
     for (let row = 0; row < 13; row++) {
@@ -339,7 +305,7 @@ export function computeEquityGrid(
         const hc = row === col ? RL[row] + RL[col]
           : row < col ? RL[row] + RL[col] + "s"
           : RL[col] + RL[row] + "o";
-        result.set(hc, getPreflopEquity(hc));
+        result.set(hc, getPreflopEquity(hc, numOpponents));
       }
     }
     return result;
@@ -367,7 +333,7 @@ export function computeEquityGrid(
     const result = new Map<string, number>();
     for (let row = 0; row < 13; row++) for (let col = 0; col < 13; col++) {
       const hc = row === col ? RL[row] + RL[col] : row < col ? RL[row] + RL[col] + "s" : RL[col] + RL[row] + "o";
-      result.set(hc, getPreflopEquity(hc));
+      result.set(hc, getPreflopEquity(hc, numOpponents));
     }
     return result;
   }
@@ -467,11 +433,11 @@ export function getHeroHandClass(heroCards: CardIndex[]): string {
   return RL[12 - hi] + (hi === lo ? RL[12 - lo] : RL[12 - lo] + (suited ? "s" : "o"));
 }
 
-function emptyResult(heroPosition: Position, blindsBB: { sb: number; bb: number } = { sb: 0.5, bb: 1 }): PreflopGridResult {
+function emptyResult(heroPosition: Position, blindsBB: { sb: number; bb: number } = { sb: 0.5, bb: 1 }, numOpponents: number = 1): PreflopGridResult {
   const cells: PreflopGridCell[] = [];
   for (let row = 0; row < 13; row++) for (let col = 0; col < 13; col++) {
     const hc = row === col ? RL[row] + RL[col] : row < col ? RL[row] + RL[col] + "s" : RL[col] + RL[row] + "o";
-    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc), facing: null, inHeroRange: false, inOpponentRange: false });
+    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc, numOpponents), facing: null, inHeroRange: false, inOpponentRange: false });
   }
   return { cells, heroHandClass: "", heroEquity: 0, situation: { type: "rfi" }, opponentRange: null, heroContinueRange: new Set(), potSizeBB: blindsBB.sb + blindsBB.bb };
 }
@@ -480,6 +446,7 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
   const {
     heroCards,
     heroPosition,
+    tableSize = 6,
     stackDepthBB = 100,
     openerPosition = null,
     openerSizingBB = 0,
@@ -489,17 +456,46 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
     blindsBB = { sb: 0.5, bb: 1 },
   } = params;
 
+  const behind = playersBehind(heroPosition, tableSize);
+
   if (!heroCards || heroCards.length < 2) {
-    // Not enough cards — return empty grid
-    return emptyResult(heroPosition, { sb: blindsBB.sb, bb: blindsBB.bb });
+    // Not enough cards — return empty grid with table-size-based opponents
+    const defaultOpp = Math.max(1, Math.min(9, tableSize - 1));
+    return emptyResult(heroPosition, { sb: blindsBB.sb, bb: blindsBB.bb }, defaultOpp);
   }
 
   const heroHandClass = getHeroHandClass(heroCards);
   const threeBettorPos = params.threeBettorPosition ?? null;
   const situation = classifyPreflopSituation(heroPosition, openerPosition, numCallers, facing3Bet, threeBettorPos);
+
+  // Derive active opponents from the situation:
+  // RFI: only players behind hero are live (everyone before folded)
+  // Facing open: opener + callers + players behind hero
+  // Facing 3-bet: 3-bettor + callers (usually heads up)
+  // BvB: 1
+  let numOpponents = behind; // default: players behind
+  switch (situation.type) {
+    case "rfi":
+      numOpponents = behind;
+      break;
+    case "facing_open":
+    case "facing_open_multiway":
+      // opener(1) + callers + players behind hero still to act
+      numOpponents = 1 + numCallers + behind;
+      break;
+    case "facing_3bet":
+      // 3-bettor + any callers
+      numOpponents = 1 + numCallers;
+      break;
+    case "blind_vs_blind":
+      numOpponents = 1;
+      break;
+  }
+  numOpponents = Math.max(1, Math.min(9, numOpponents));
+
   const opponentRange = getOpponentRange(situation, stackDepthBB, openerSizingBB);
   const heroContinueRange = getHeroContinueRange(situation, heroPosition, stackDepthBB);
-  const equityMap = computeEquityGrid(heroCards, opponentRange, mcTrials);
+  const equityMap = computeEquityGrid(heroCards, opponentRange, mcTrials, numOpponents);
   const potSizeBB = computePotAtAction(blindsBB, openerSizingBB, numCallers, facing3Bet, threeBetSizeBB);
 
   // Call cost subtracts what hero already posted as a blind
@@ -525,7 +521,7 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
         col,
         type,
         isHero: hc === heroHandClass,
-        equity: equityMap.get(hc) ?? getPreflopEquity(hc),
+        equity: equityMap.get(hc) ?? getPreflopEquity(hc, numOpponents),
         facing: facingGrid?.get(hc) ?? null,
         inHeroRange: heroContinueRange.has(hc),
         inOpponentRange: opponentRange?.has(hc) ?? false,
@@ -536,7 +532,7 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
   return {
     cells,
     heroHandClass,
-    heroEquity: equityMap.get(heroHandClass) ?? getPreflopEquity(heroHandClass),
+    heroEquity: equityMap.get(heroHandClass) ?? getPreflopEquity(heroHandClass, numOpponents),
     situation,
     opponentRange,
     heroContinueRange,

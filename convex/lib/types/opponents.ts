@@ -31,6 +31,9 @@ export type SituationKey =
   | "preflop.facing_raise"    // Facing an open raise
   | "preflop.facing_3bet"     // Facing a 3-bet
   | "preflop.facing_4bet"     // Facing a 4-bet+
+  | "preflop.facing_limpers"  // Facing limper(s) — iso-raise or over-limp
+  | "preflop.bb_vs_limpers"   // BB vs limper(s) — raise or check
+  | "preflop.sb_complete"     // BB vs SB complete — raise or check
   // Postflop as aggressor (preflop raiser or last bettor)
   | "postflop.aggressor.ip"   // In position as aggressor (c-bet spot)
   | "postflop.aggressor.oop"  // Out of position as aggressor
@@ -42,12 +45,15 @@ export type SituationKey =
   | "postflop.facing_raise"   // Facing a raise or check-raise
   | "postflop.facing_allin";  // Facing an all-in
 
-/** All 11 situation keys in canonical order. */
+/** All 14 situation keys in canonical order. */
 export const ALL_SITUATION_KEYS: SituationKey[] = [
   "preflop.open",
   "preflop.facing_raise",
   "preflop.facing_3bet",
   "preflop.facing_4bet",
+  "preflop.facing_limpers",
+  "preflop.bb_vs_limpers",
+  "preflop.sb_complete",
   "postflop.aggressor.ip",
   "postflop.aggressor.oop",
   "postflop.caller.ip",

@@ -77,6 +77,21 @@ export function positionForSeat(
   return pos;
 }
 
+/**
+ * Number of players yet to act AFTER hero in preflop action order.
+ * Preflop order: UTG → UTG+1 → … → CO → BTN → SB → BB.
+ */
+export function playersBehind(heroPosition: Position, tableSize: number): number {
+  const positions = positionsForTableSize(Math.max(2, Math.min(10, tableSize)));
+  // Preflop action order: skip BTN/SB/BB from front, put them at end
+  const blindsAndBtn = positions.slice(0, tableSize <= 2 ? 1 : 3); // btn,sb,bb (or just btn for HU)
+  const rest = positions.slice(tableSize <= 2 ? 1 : 3);            // utg..co
+  const actionOrder = [...rest, ...blindsAndBtn];
+  const idx = actionOrder.indexOf(heroPosition);
+  if (idx === -1) return 0;
+  return actionOrder.length - 1 - idx;
+}
+
 // ─── Position range multipliers ───
 
 /**
