@@ -52,20 +52,29 @@ function classifyAction(
   rangeClass: PreflopRangeClass,
   callCostBB: number,
   potSizeBB: number,
+  isOpeningAction: boolean,  // true for RFI, facing_limpers, bb_vs_limpers, bb_vs_sb_complete
 ): "R" | "C" | "F" {
   // Not in any continue range → fold
   if (!inHeroRange) return "F";
   
   // In raise/3-bet/iso-raise range → raise
-  if (rangeClass === "clear_raise" || rangeClass === "raise" || rangeClass === "mixed_raise") {
+  if (rangeClass === "clear_raise" || rangeClass === "raise") {
     return "R";
   }
   
-  // In call/defense range → call
+  // Mixed raise/call — show the majority action (call), narrative notes raising is valid
+  if (rangeClass === "mixed_raise") return "C";
+  
+  // In call/defense range → call (or check in opening spots)
   if (rangeClass === "call") return "C";
   
-  // Borderline — use equity vs pot odds
+  // Borderline — situation-aware
   if (rangeClass === "borderline") {
+    if (isOpeningAction) {
+      // RFI / iso-raise / BB check-or-raise: borderline = fold (not strong enough to open)
+      return "F";
+    }
+    // Facing a bet: use equity vs pot odds
     const potOdds = callCostBB / (potSizeBB + callCostBB);
     return equity > potOdds + 0.05 ? "C" : "F";
   }
@@ -74,11 +83,15 @@ function classifyAction(
 }
 ```
 
-Key difference from V/M/B/F:
+Key differences from V/M/B/F:
 - Uses `PreflopRangeClass` from the registry pipeline (raise/call/fold/borderline)
 - No hand-tuned "polarization" thresholds
 - No separate "bluff-catch" bucket — if you're calling, you're calling
-- The range class already encodes the decision from the situation registry
+- `mixed_raise` → C (majority action is call; coaching notes raising is also valid)
+- Borderline hands in opening actions → F (not strong enough to open, no "call" possible)
+- Borderline hands facing a bet → equity vs pot odds decides C or F
+- `isOpeningAction` derived from situation type: true for rfi, facing_limpers,
+  bb_vs_limpers, bb_vs_sb_complete, bb_uncontested
 
 ### Boundary Distance → Letter Styling
 
@@ -195,10 +208,40 @@ No separate coaching computation. Grid data → words.
 - Update tests
 - Update visual-first-principles.md Layer 5 description
 
+## The Facing Slider
+
+The old system had a slider that let users adjust bet size and watch V/M/B/F change
+per cell. R/C/F derives from `rangeClass`, which is situation-dependent (position + ranges),
+not bet-size-dependent. The R/C/F letter does NOT change as bet size changes — the range
+class stays the same.
+
+**What DOES change with bet size:** equity math (pot odds, call cost). When facing a larger
+bet, the equity threshold for continuing goes up. This affects borderline hands only.
+
+**Decision: Remove the facing slider.** The slider was a V/M/B/F feature. R/C/F doesn't
+need it because the action is range-derived. The bet size is already shown in the game
+state (coaching shows "facing 3BB open from CO"). The grid shows the action for THAT bet
+size. If the user wants to explore different sizings, that's a postflop concern where
+bet sizing varies — preflop sizings are standard (2.5-3BB opens).
+
+**Also remove `classifyFacingLocal` from hand-grid.tsx** — this was the local re-implementation
+of the old classifier for the slider. Dead code once the slider is removed.
+
 ## What This Does NOT Change
 
 - Equity heatmap (Layer 2) — unchanged
 - Range overlays (Layer 3) — unchanged  
 - MC equity computation (Layer 4) — unchanged
 - Engine auto-play for villains — unchanged (engine still samples frequencies)
+- Multi-profile coaching comparison — unchanged (TAG/NIT/FISH still run through engine)
 - Postflop grid — V/M/B/F was preflop-only anyway
+
+## Resolved Validation Issues
+
+| # | Issue | Resolution |
+|---|---|---|
+| 1 | Borderline RFI hands get "C" (impossible action) | `isOpeningAction` flag: borderline in opening spots → F |
+| 2 | `mixed_raise` maps to R (majority action is call) | Changed to C; coaching narrative notes raising is also valid |
+| 3 | Facing slider becomes pointless with range-derived actions | Remove slider and `classifyFacingLocal` — preflop sizing is standard |
+| 4 | "No engine in coaching" misleading | Clarified: no engine for grid action letter; multi-profile comparison stays |
+| 5 | hand-grid.tsx has local `classifyFacingLocal` | Removed with the slider |
