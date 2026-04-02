@@ -66,37 +66,44 @@ moved to the registry where it belongs.
 `convex/lib/state/gameState.ts`. This import is fine — both are pure TS in convex/lib/.
 The registry doesn't import from React or Convex runtime.
 
-### 2. Add `archetypeId` to registry entries
+### 2. Add archetype resolution to registry
 
-Each `PreflopSituationEntry` gains an `archetypeId` field mapping to the 5 preflop archetypes.
-Use `ArchetypeId` from archetypeClassifier.ts directly (not a narrowed type — the 20
-archetype IDs are a union type, adding a subset would be over-engineering):
+The archetype mapping is NOT a simple static field because `facing_open` maps to
+different archetypes based on hero position:
+- BB facing open → `bb_defense_vs_rfi`
+- Non-BB facing open → `three_bet_pots`
+
+**Solution:** A `resolveArchetype(ctx)` function instead of a static field:
 
 ```typescript
 import type { ArchetypeId } from "../gto/archetypeClassifier";
 
-export interface PreflopSituationEntry {
-  // ... existing fields ...
-  archetypeId: ArchetypeId;  // maps to archetype classifier's preflop IDs
+export function resolveArchetype(ctx: PreflopSituationContext): ArchetypeId {
+  if ((ctx.id === "facing_open" || ctx.id === "facing_open_multiway")
+      && ctx.heroPosition === "bb") {
+    return "bb_defense_vs_rfi";
+  }
+  return ARCHETYPE_MAP[ctx.id];
 }
+
+const ARCHETYPE_MAP: Record<PreflopSituationId, ArchetypeId> = {
+  rfi: "rfi_opening",
+  facing_open: "three_bet_pots",
+  facing_open_multiway: "three_bet_pots",
+  facing_3bet: "four_bet_five_bet",
+  facing_4bet: "four_bet_five_bet",
+  blind_vs_blind: "blind_vs_blind",
+  facing_limpers: "rfi_opening",
+  bb_vs_limpers: "bb_defense_vs_rfi",
+  bb_vs_sb_complete: "blind_vs_blind",
+  bb_uncontested: "rfi_opening",
+};
 ```
 
-Mapping:
-| PreflopSituationId | archetypeId |
-|---|---|
-| rfi | rfi_opening |
-| facing_open | three_bet_pots |
-| facing_open_multiway | three_bet_pots |
-| facing_3bet | four_bet_five_bet |
-| facing_4bet | four_bet_five_bet |
-| blind_vs_blind | blind_vs_blind |
-| facing_limpers | rfi_opening |
-| bb_vs_limpers | bb_defense_vs_rfi |
-| bb_vs_sb_complete | blind_vs_blind |
+No new field on `PreflopSituationEntry`. Callers use `resolveArchetype(ctx)`.
 
 **Note:** `bb_vs_sb_complete` uses `engineKey: "preflop.sb_complete"` (not `"preflop.open"`).
 This matches autoPlay.ts behavior — profiles may have distinct params for SB complete spots.
-| bb_uncontested | rfi_opening |
 
 ### 3. Engine delegates to registry
 
@@ -182,11 +189,16 @@ Both cases call this helper. No duplication.
 ### Step 1: Add `classifySituationFromState` to registry
 - Add function to `situationRegistry.ts` that takes `GameState + seatIndex`
 - Import `GameState` from `../state/gameState`
-- **Use `state.raiseCount`** for raise counting (NOT re-derived from action history)
-  - `state.raiseCount` is maintained by the state machine and correctly handles
-    short all-in calls (doesn't count them as raises)
-  - autoPlay's current logic counts `all_in` as raises — this is a bug for short stacks
-  - Fix the bug by using the authoritative `state.raiseCount`
+- **Count raises from action history** — filter for `raise` and `bet` actions only,
+  explicitly excluding `all_in`. Both `state.raiseCount` and autoPlay's current logic
+  count short all-in calls as raises (bug). The fix: only count `actionType === "raise"`
+  (and `"bet"` for the initial open). All-in is a sizing decision, not a separate action
+  type for classification purposes. If the all-in exceeds `currentBet`, there was already
+  a `raise` action recorded. Short all-in calls that don't exceed `currentBet` should not
+  count as raises.
+  - **Note:** This is a minor behavioral fix. In practice, short-stack preflop all-in calls
+    are rare edge cases (require a player with < open raise size). No existing tests depend
+    on the wrong behavior.
 - Derive `numCallers` (calls AFTER first raise) — new logic, autoPlay doesn't compute this
 - Derive `numLimpers` (calls BEFORE any raise) — same as autoPlay
 - Derive `threeBettorPosition` (position of 2nd raiser) — new logic
@@ -201,10 +213,12 @@ Both cases call this helper. No duplication.
   - Short-stack all-in call (should NOT increment raise count)
   - Hero's own raise in history (UTG opens, gets 3-bet, faces 3-bet)
 
-### Step 2: Add `archetypeId` to registry entries
-- Import `ArchetypeId` type from `../gto/archetypeClassifier` (NOT `PreflopArchetypeId` — doesn't exist)
-- Add `archetypeId: ArchetypeId` field to `PreflopSituationEntry` interface
-- Populate for all 10 entries per mapping table above
+### Step 2: Add `resolveArchetype()` to registry
+- Import `ArchetypeId` type from `../gto/archetypeClassifier`
+- Add `ARCHETYPE_MAP` constant and `resolveArchetype(ctx)` function
+- Handles BB-specific mapping: facing_open + BB → `bb_defense_vs_rfi`
+- Export from barrel `index.ts`
+- No change to `PreflopSituationEntry` interface (function, not field)
 
 ### Step 3: Engine delegates to registry
 - `autoPlay.classifyPreflop()` → call `classifySituationFromState()`, return `PREFLOP_SITUATIONS[ctx.id].engineKey`
@@ -225,9 +239,9 @@ Both cases call this helper. No duplication.
 **NOT:** adding optional param to `classifyPreflopHand()` (that would be dead code —
 no caller has `PreflopSituationContext` to pass).
 
-**Instead:** Update callers to look up `archetypeId` from registry when they have game state:
+**Instead:** Update callers to use `resolveArchetype(ctx)` from registry when they have game state:
 - `frequencyLookup.ts`: after calling `classifySituationFromState()`, use
-  `PREFLOP_SITUATIONS[ctx.id].archetypeId` instead of archetype classifier's output
+  `resolveArchetype(ctx)` instead of archetype classifier's output
 - `handPipeline.ts`: same pattern
 - `drillPipeline.ts`: same pattern
 - `constrainedDealer.ts`: uses hardcoded `"rfi_opening"` — leave as-is (it's drill-specific)
@@ -263,8 +277,8 @@ it will now route through the registry. For postflop, unchanged.
 2. Engine's `classifyPreflop()` is 2 lines (delegate + lookup)
 3. No duplicated BB defense logic in range resolver
 4. No dead code (`bb_defense_by_opener` removed)
-5. `archetypeId` derivable from registry (callers use it, not independent archetype classifier)
-6. All-in call bug fixed (short stacks no longer misclassified)
+5. `archetypeId` derivable from registry via `resolveArchetype(ctx)` (position-aware, handles BB)
+6. All-in call classification fixed (short stacks no longer misclassified)
 7. All 1437+ tests pass
 8. Adding a new preflop situation = 1 registry entry (includes engineKey + archetypeId)
 
@@ -281,10 +295,12 @@ that one commit.
 
 | # | Issue | Resolution |
 |---|---|---|
-| 1 | `all_in` over-counting — autoPlay counts all-in calls as raises | Use `state.raiseCount` which handles this correctly |
+| 1 | `all_in` over-counting — both autoPlay AND state.raiseCount count short all-in calls as raises | Count only `raise`/`bet` actions from history, exclude `all_in` |
 | 2 | Step 5 produces dead code (optional param nobody passes) | Rewritten: callers look up archetypeId from registry |
 | 3 | `bb_defense_by_opener` unused range source | Remove from resolver and RangeSource type |
 | 4 | `bvb_defense` is third consumer of BB defense logic | Added as third consumer of extracted helper |
 | 5 | `PreflopArchetypeId` type doesn't exist | Use `ArchetypeId` throughout |
 | 6 | `numCallers` not in autoPlay | Added as new derivation in classifySituationFromState |
 | 7 | `threeBettorPosition` not in autoPlay | Added as new derivation |
+| 8 | `state.raiseCount` has same all-in bug as autoPlay | Don't use state.raiseCount — count raise/bet only from action history |
+| 9 | `facing_open` → `three_bet_pots` wrong for BB (should be `bb_defense_vs_rfi`) | Use `resolveArchetype(ctx)` function instead of static field — handles BB override |
