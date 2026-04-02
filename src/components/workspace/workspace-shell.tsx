@@ -713,6 +713,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                 onArchetypeClick={setTutorialArchetype}
                 legalActions={ws.legalActions}
                 heroCards={ws.heroCards}
+                preflopGridResult={preflopGridResult}
               />
 
               {/* ── Score feedback + next hand ── */}
@@ -831,7 +832,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
 // ═══════════════════════════════════════════════════════
 
 /** Coaching panel — unified with drill solution in drill mode */
-function CoachingSection({ results, drillSolution, drillScore, isDrill, gameState, heroSeatIndex, onArchetypeClick, legalActions, heroCards }: {
+function CoachingSection({ results, drillSolution, drillScore, isDrill, gameState, heroSeatIndex, onArchetypeClick, legalActions, heroCards, preflopGridResult }: {
   results: Map<string, import("../../../convex/lib/types/analysis").AnalysisResult>;
   drillSolution?: import("@/hooks/use-workspace").SpotSolution;
   drillScore?: import("../../../convex/lib/gto/evScoring").ActionScore | null;
@@ -841,6 +842,7 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
   onArchetypeClick?: (id: ArchetypeId) => void;
   legalActions?: import("../../../convex/lib/state/gameState").LegalActions | null;
   heroCards?: import("../../../convex/lib/types/cards").CardIndex[];
+  preflopGridResult?: import("../../../convex/lib/analysis/preflopGrid").PreflopGridResult | null;
 }) {
   const coachingResult = results.get("coaching");
   if (!coachingResult || coachingResult.visuals.length === 0) return null;
@@ -895,8 +897,9 @@ function CoachingSection({ results, drillSolution, drillScore, isDrill, gameStat
       actionStories,
       gtoFrequencies: gtoAdvice?.solverData?.frequencies,
       gtoOptimalAction: gtoAdvice?.solverData?.optimalAction,
+      preflopGridResult: preflopGridResult ?? undefined,
     });
-  }, [gameState, heroCards, heroSeatIndex, legalActions, handCat, archetype, opponentStory, actionStories, advices]);
+  }, [gameState, heroCards, heroSeatIndex, legalActions, handCat, archetype, opponentStory, actionStories, advices, preflopGridResult]);
 
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">

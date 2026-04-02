@@ -23,7 +23,7 @@ import type { InferredBehavior } from "../opponents/behaviorInference";
 import type { CounterAdvice } from "../pipeline/counterStrategyMap";
 import type { ConfidenceTier } from "../gto/dataConfidence";
 import type { PreflopClassification } from "../gto/preflopClassification";
-import { classificationToCoachingText } from "../gto/preflopClassification";
+import { classifyPreflopHand, classificationToCoachingText } from "../gto/preflopClassification";
 import { cardToDisplay, rankValue, suitValue } from "../primitives/card";
 import { positionDisplayName } from "../primitives/position";
 
@@ -73,6 +73,8 @@ export interface CommentaryInput {
   confidenceTier?: ConfidenceTier;
   /** Preflop range classification — replaces fake GTO percentages for preflop */
   preflopClassification?: PreflopClassification;
+  /** Pre-computed grid result — coaching reads the grid's R/C/F as source of truth */
+  preflopGridResult?: import("./preflopGrid").PreflopGridResult;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -84,6 +86,7 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
     heroCards, communityCards, gameState, heroSeat, legal,
     handCat, archetype, opponentStories, actionStories, gtoFrequencies, gtoOptimalAction,
     counterAdvice, inferredBehavior, confidenceTier, preflopClassification,
+    preflopGridResult,
   } = input;
 
   const street = gameState.currentStreet;
@@ -94,6 +97,16 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
     : "unknown cards";
   const heroHandDesc = handCat?.description ?? "unknown hand";
   const posLabel = heroPosition ? positionDisplayName(heroPosition) : "unknown position";
+
+  // ── Grid-driven preflop: read action from VHG ──
+  const gridHeroCell = preflopGridResult?.cells.find(c => c.isHero);
+  const gridAction = gridHeroCell?.action; // R, C, or F
+  const gridClassification = gridHeroCell
+    ? classifyPreflopHand(gridHeroCell.handClass, preflopGridResult!.situation.id, heroPosition ?? "btn", preflopGridResult!.situation.openerPosition ?? undefined)
+    : undefined;
+
+  // Use grid classification for preflop if available, fall back to provided
+  const effectiveClassification = (street === "preflop" && gridClassification) ? gridClassification : preflopClassification;
 
   // Gather active opponents (not folded, not hero)
   const activeOpponents = gameState.players.filter(
@@ -125,10 +138,30 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
   ));
 
   // ── Part 4: Recommendation ──
-  const { recommendation, confidence, recommendedAction } = buildRecommendation(
-    handCat, opponentStories, actionStories, gtoFrequencies, gtoOptimalAction,
-    legal, street, counterAdvice, confidenceTier, gameState, heroSeat, preflopClassification,
-  );
+  let recommendation: string;
+  let confidence: "clear" | "leaning" | "close_spot";
+  let recommendedAction: ActionType | null;
+
+  if (street === "preflop" && gridAction && effectiveClassification) {
+    // Grid-driven: R/C/F is the truth, classification provides the narrative
+    const actionWord = gridAction === "R" ? "Raise" : gridAction === "C" ? "Call" : "Fold";
+    recommendedAction = (gridAction === "R" ? (legal.canRaise ? "raise" : "bet")
+      : gridAction === "C" ? (legal.canCall ? "call" : "check")
+      : "fold") as ActionType;
+    confidence = gridHeroCell!.actionConfidence === "clear" ? "clear"
+      : gridHeroCell!.actionConfidence === "edge" ? "close_spot" : "leaning";
+    const classText = classificationToCoachingText(effectiveClassification);
+    recommendation = `${actionWord}.${classText}`;
+  } else {
+    // Postflop or no grid: fall back to existing recommendation logic
+    const rec = buildRecommendation(
+      handCat, opponentStories, actionStories, gtoFrequencies, gtoOptimalAction,
+      legal, street, counterAdvice, confidenceTier, gameState, heroSeat, effectiveClassification,
+    );
+    recommendation = rec.recommendation;
+    confidence = rec.confidence;
+    recommendedAction = rec.recommendedAction;
+  }
   parts.push(recommendation);
 
   const narrative = parts.join(" ");
