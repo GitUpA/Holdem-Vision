@@ -21,7 +21,12 @@ import {
   GTO_COLD_CALL_RANGES,
   GTO_BVB,
   GTO_4BET,
+  GTO_ISO_RAISE_RANGES,
+  GTO_BB_RAISE_VS_LIMPERS,
+  GTO_BB_RAISE_VS_SB_COMPLETE,
+  GTO_SB_COMPLETE_RANGE,
 } from "./tables/preflopRanges";
+import type { PreflopSituationId } from "../preflop/situationRegistry";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -117,26 +122,58 @@ function normalizePosition(pos: string): string {
   return p;
 }
 
+/**
+ * Classify a preflop hand by situation ID (from the registry).
+ * Each situation dispatches to the correct range data and coaching language.
+ */
 export function classifyPreflopHand(
   handClass: string,
-  archetypeId: string,
+  situationId: string,
   heroPosition: string,
   openerPosition?: string,
 ): PreflopClassification {
   const pos = normalizePosition(heroPosition);
 
-  switch (archetypeId) {
-    case "rfi_opening":
+  switch (situationId as PreflopSituationId) {
+    case "rfi":
       return classifyRfi(handClass, pos);
-    case "bb_defense_vs_rfi":
-      return classifyBbDefense(handClass, openerPosition ? normalizePosition(openerPosition) : "btn");
-    case "three_bet_pots":
+    case "facing_open":
+      if (pos === "bb") {
+        return classifyBbDefense(handClass, openerPosition ? normalizePosition(openerPosition) : "btn");
+      }
       return classify3Bet(handClass, pos);
+    case "facing_open_multiway":
+      if (pos === "bb") {
+        return classifyBbDefense(handClass, openerPosition ? normalizePosition(openerPosition) : "btn");
+      }
+      return classify3Bet(handClass, pos);
+    case "facing_3bet":
+      return classify4Bet(handClass, pos);
+    case "facing_4bet":
+      return classify4Bet(handClass, pos);
     case "blind_vs_blind":
       return classifyBvB(handClass, pos);
-    case "four_bet_five_bet":
-      return classify4Bet(handClass, pos);
+    case "facing_limpers":
+      return classifyIsoRaise(handClass, pos);
+    case "bb_vs_limpers":
+      return classifyBBvsLimpers(handClass);
+    case "bb_vs_sb_complete":
+      return classifyBBvsSBComplete(handClass);
+    case "bb_uncontested":
+      return {
+        rangeClass: "call",
+        matchedRange: "none",
+        reason: `Everyone folded to your BB. You win the blinds.`,
+        teachingNote: "No decision needed — you win the pot.",
+        boundaryDistance: 20,
+      };
     default:
+      // Legacy archetype IDs for backward compat (drill pipeline, tests)
+      if (situationId === "rfi_opening") return classifyRfi(handClass, pos);
+      if (situationId === "bb_defense_vs_rfi") return classifyBbDefense(handClass, openerPosition ? normalizePosition(openerPosition) : "btn");
+      if (situationId === "three_bet_pots") return classify3Bet(handClass, pos);
+      if (situationId === "blind_vs_blind") return classifyBvB(handClass, pos);
+      if (situationId === "four_bet_five_bet") return classify4Bet(handClass, pos);
       return classifyRfi(handClass, pos);
   }
 }
@@ -419,6 +456,133 @@ function classify4Bet(handClass: string, position: string): PreflopClassificatio
   };
 }
 
+function classifyIsoRaise(handClass: string, position: string): PreflopClassification {
+  const range = GTO_ISO_RAISE_RANGES[position];
+  if (!range) return classifyRfi(handClass, position); // fallback
+
+  if (PREMIUMS.has(handClass)) {
+    return {
+      rangeClass: "clear_raise",
+      matchedRange: "iso_raise",
+      reason: `${handClass} — premium hand. Iso-raise to punish the limper.`,
+      teachingNote: "Always raise premiums vs limpers. Build the pot and isolate.",
+      boundaryDistance: 20,
+    };
+  }
+
+  if (range.has(handClass)) {
+    const dist = boundaryDistance(handClass, range);
+    return {
+      rangeClass: dist >= 5 ? "raise" : "raise",
+      matchedRange: "iso_raise",
+      reason: `${handClass} iso-raises from ${position.toUpperCase()} vs limper(s).`,
+      teachingNote: dist >= 5
+        ? `Limpers have capped ranges — no premiums. Iso-raise to play in position against a weak range.`
+        : `Near the edge of your iso-raise range. Raise vs passive limpers, consider over-limping vs aggressive ones.`,
+      boundaryDistance: dist,
+    };
+  }
+
+  // Not in iso-raise range — check if worth over-limping
+  const dist = boundaryDistance(handClass, range);
+  const isSpeculative = handClass.endsWith("s") && HAND_STRENGTH_ORDER.indexOf(handClass) < 60;
+  if (isSpeculative || dist >= -3) {
+    return {
+      rangeClass: "call",
+      matchedRange: "over_limp",
+      reason: `${handClass} over-limps from ${position.toUpperCase()} — see a cheap flop.`,
+      teachingNote: `Not strong enough to iso-raise, but speculative enough to see a cheap flop. Set-mine or draw to the nuts.`,
+      boundaryDistance: dist,
+    };
+  }
+
+  return makeFold(handClass, position, "iso_raise");
+}
+
+function classifyBBvsLimpers(handClass: string): PreflopClassification {
+  // Try tiers: 1 limper first, then 2, then 3+
+  for (const key of ["1", "2", "3+"]) {
+    const range = GTO_BB_RAISE_VS_LIMPERS[key];
+    if (range?.has(handClass)) {
+      return {
+        rangeClass: PREMIUMS.has(handClass) ? "clear_raise" : "raise",
+        matchedRange: `bb_raise_vs_${key}_limper`,
+        reason: `${handClass} raises from the BB vs limper(s).`,
+        teachingNote: `You're getting a free look but this hand is strong enough to raise for value. You are OOP — raise for value, not isolation.`,
+        boundaryDistance: 10,
+      };
+    }
+  }
+
+  // Not in any raise range — check for free flop
+  const raiseRange1 = GTO_BB_RAISE_VS_LIMPERS["1"];
+  const dist = raiseRange1 ? boundaryDistance(handClass, raiseRange1) : -10;
+
+  if (dist >= -3) {
+    return {
+      rangeClass: "borderline",
+      matchedRange: "none",
+      reason: `${handClass} is borderline for raising from BB vs limper(s).`,
+      teachingNote: `Close to your raising range. Raise against passive limpers, check against trappy ones.`,
+      boundaryDistance: dist,
+    };
+  }
+
+  // BB never folds vs limpers — it's a free flop
+  return {
+    rangeClass: "call",
+    matchedRange: "check",
+    reason: `${handClass} checks in the BB — free flop.`,
+    teachingNote: `You already posted the blind. Check and see the flop for free. Even weak hands have equity.`,
+    boundaryDistance: 0,
+  };
+}
+
+function classifyBBvsSBComplete(handClass: string): PreflopClassification {
+  if (PREMIUMS.has(handClass)) {
+    return {
+      rangeClass: "clear_raise",
+      matchedRange: "bb_raise_vs_sb_complete",
+      reason: `${handClass} — premium. Raise vs SB's capped range.`,
+      teachingNote: "SB completed = no premiums. Raise big for value.",
+      boundaryDistance: 20,
+    };
+  }
+
+  if (GTO_BB_RAISE_VS_SB_COMPLETE.has(handClass)) {
+    const dist = boundaryDistance(handClass, GTO_BB_RAISE_VS_SB_COMPLETE);
+    return {
+      rangeClass: "raise",
+      matchedRange: "bb_raise_vs_sb_complete",
+      reason: `${handClass} raises in the BB vs SB complete.`,
+      teachingNote: dist >= 5
+        ? `SB's limping range is wide and capped. You have range advantage — raise aggressively.`
+        : `Near the edge of your raising range vs SB complete. Raise vs passive SBs, check vs trappy ones.`,
+      boundaryDistance: dist,
+    };
+  }
+
+  // BB never folds vs SB complete — free flop
+  const dist = boundaryDistance(handClass, GTO_BB_RAISE_VS_SB_COMPLETE);
+  if (dist >= -3) {
+    return {
+      rangeClass: "borderline",
+      matchedRange: "none",
+      reason: `${handClass} is borderline for raising vs SB complete.`,
+      teachingNote: `Close. Raise vs loose SBs who complete too wide, check vs tighter ones.`,
+      boundaryDistance: dist,
+    };
+  }
+
+  return {
+    rangeClass: "call",
+    matchedRange: "check",
+    reason: `${handClass} checks in the BB vs SB complete — free flop.`,
+    teachingNote: `SB completed, you see the flop for free. Check and play postflop.`,
+    boundaryDistance: 0,
+  };
+}
+
 // ═══════════════════════════════════════════════════════
 // FREQUENCY DERIVATION (for engine sampling)
 // ═══════════════════════════════════════════════════════
@@ -431,10 +595,15 @@ function classify4Bet(handClass: string, position: string): PreflopClassificatio
  */
 export function classificationToFrequencies(
   classification: PreflopClassification,
-  archetypeId: string,
+  situationId: string,
 ): ActionFrequencies {
-  const raiseAction = (archetypeId === "rfi_opening" || archetypeId === "blind_vs_blind")
-    ? "bet_medium" : "raise_large";
+  // bet_medium for opening actions (no prior raise), raise_large for re-raising
+  const isOpening = situationId === "rfi" || situationId === "blind_vs_blind"
+    || situationId === "facing_limpers" || situationId === "bb_vs_limpers"
+    || situationId === "bb_vs_sb_complete" || situationId === "bb_uncontested"
+    // Legacy archetype IDs for backward compat
+    || situationId === "rfi_opening";
+  const raiseAction = isOpening ? "bet_medium" : "raise_large";
 
   // Base frequencies per tier
   switch (classification.rangeClass) {
