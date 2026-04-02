@@ -31,6 +31,7 @@ import {
   type PreflopSituationId,
 } from "../preflop/situationRegistry";
 import { resolveOpponentRange, resolveHeroRange } from "../preflop/situationRanges";
+import { classifyPreflopHand, type PreflopRangeClass } from "../gto/preflopClassification";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -59,7 +60,14 @@ export interface PreflopGridParams {
 // Re-export for any remaining external consumers:
 export type { PreflopSituationContext as PreflopSituation } from "../preflop/situationRegistry";
 
+/** @deprecated Use ActionLetter instead */
 export type SizingRole = "V" | "M" | "B" | "F";
+
+/** The three fundamental poker actions */
+export type ActionLetter = "R" | "C" | "F";
+
+/** How confident the action is based on range boundary distance */
+export type ActionConfidence = "clear" | "standard" | "edge";
 
 export interface PreflopGridCell {
   handClass: string;
@@ -68,6 +76,9 @@ export interface PreflopGridCell {
   type: "pair" | "suited" | "offsuit";
   isHero: boolean;
   equity: number;
+  action: ActionLetter | null;
+  actionConfidence: ActionConfidence;
+  /** @deprecated Use action instead */
   facing: SizingRole | null;
   inHeroRange: boolean;
   inOpponentRange: boolean;
@@ -249,6 +260,41 @@ export function classifyFacingGrid(
 }
 
 // ═══════════════════════════════════════════════════════
+// ACTION CLASSIFICATION (R/C/F)
+// ═══════════════════════════════════════════════════════
+
+const OPENING_SITUATIONS = new Set(["rfi", "facing_limpers", "bb_vs_limpers", "bb_vs_sb_complete", "bb_uncontested"]);
+
+export function classifyAction(
+  equity: number,
+  inHeroRange: boolean,
+  rangeClass: PreflopRangeClass,
+  callCostBB: number,
+  potSizeBB: number,
+  situationId: string,
+): ActionLetter {
+  if (!inHeroRange) return "F";
+
+  if (rangeClass === "clear_raise" || rangeClass === "raise") return "R";
+  if (rangeClass === "mixed_raise") return "C"; // majority action is call; coaching notes raise is valid
+  if (rangeClass === "call") return "C";
+
+  if (rangeClass === "borderline") {
+    if (OPENING_SITUATIONS.has(situationId)) return "F"; // not strong enough to open
+    const potOdds = callCostBB / (potSizeBB + callCostBB);
+    return equity > potOdds + 0.05 ? "C" : "F";
+  }
+
+  return "F";
+}
+
+export function actionConfidence(boundaryDistance: number): ActionConfidence {
+  if (boundaryDistance >= 8) return "clear";
+  if (boundaryDistance >= 3) return "standard";
+  return "edge";
+}
+
+// ═══════════════════════════════════════════════════════
 // STAGE H: Orchestrator
 // ═══════════════════════════════════════════════════════
 
@@ -259,7 +305,7 @@ function emptyResult(heroPosition: Position, tableSize: number = 6, blindsBB: { 
   const cells: PreflopGridCell[] = [];
   for (let row = 0; row < 13; row++) for (let col = 0; col < 13; col++) {
     const hc = row === col ? RL[row] + RL[col] : row < col ? RL[row] + RL[col] + "s" : RL[col] + RL[row] + "o";
-    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc, defaultOpp), facing: null, inHeroRange: false, inOpponentRange: false });
+    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc, defaultOpp), action: null, actionConfidence: "standard" as ActionConfidence, facing: null, inHeroRange: false, inOpponentRange: false });
   }
   const emptySituation = classifySituation({ heroPosition, tableSize, openerPosition: null, numCallers: 0, numLimpers: 0, facing3Bet: false });
   const emptyPot = blindsBB.sb + blindsBB.bb;
@@ -320,7 +366,7 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
     ? classifyFacingGrid(equityMap, heroContinueRange, callCost, potSizeBB)
     : null;
 
-  // Build cells
+  // Build cells with R/C/F action classification
   const cells: PreflopGridCell[] = [];
   for (let row = 0; row < 13; row++) {
     for (let col = 0; col < 13; col++) {
@@ -328,15 +374,25 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
       const hc = row === col ? RL[row] + RL[col]
         : row < col ? RL[row] + RL[col] + "s"
         : RL[col] + RL[row] + "o";
+      const cellEquity = equityMap.get(hc) ?? getPreflopEquity(hc, numOpponents);
+      const inRange = heroContinueRange.has(hc);
+
+      // Classify each cell's action via range class
+      const classification = classifyPreflopHand(hc, ctx.id, heroPosition, openerPosition ?? undefined);
+      const cellAction = classifyAction(cellEquity, inRange, classification.rangeClass, callCost, potSizeBB, ctx.id);
+      const cellConfidence = actionConfidence(classification.boundaryDistance);
+
       cells.push({
         handClass: hc,
         row,
         col,
         type,
         isHero: hc === heroHandClass,
-        equity: equityMap.get(hc) ?? getPreflopEquity(hc, numOpponents),
-        facing: facingGrid?.get(hc) ?? null,
-        inHeroRange: heroContinueRange.has(hc),
+        equity: cellEquity,
+        action: cellAction,
+        actionConfidence: cellConfidence,
+        facing: facingGrid?.get(hc) ?? null, // deprecated — kept for backward compat
+        inHeroRange: inRange,
         inOpponentRange: opponentRange?.has(hc) ?? false,
       });
     }
