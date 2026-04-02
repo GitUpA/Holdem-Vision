@@ -19,7 +19,6 @@
 import type { CardIndex } from "../types/cards";
 import type { Position } from "../types/cards";
 import { evaluateHand, compareHandRanks } from "../primitives/handEvaluator";
-import { playersBehind } from "../primitives/position";
 import { getPreflopEquity } from "../gto/preflopEquityTable";
 import {
   GTO_RFI_RANGES,
@@ -34,6 +33,14 @@ import { HAND_STRENGTH_ORDER } from "../gto/preflopClassification";
 // Re-export from canonical location for backward compatibility
 export { normalize6Max, compressRangeByStack } from "../preflop/rangeUtils";
 import { normalize6Max, compressRangeByStack } from "../preflop/rangeUtils";
+import {
+  classifySituation,
+  PREFLOP_SITUATIONS,
+  resolveOpponentCount,
+  type PreflopSituationContext,
+  type PreflopSituationId,
+} from "../preflop/situationRegistry";
+import { resolveOpponentRange, resolveHeroRange } from "../preflop/situationRanges";
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -48,9 +55,12 @@ export interface PreflopGridParams {
   openerPosition?: Position | null;
   openerSizingBB?: number;          // default 0 (no open yet)
   numCallers?: number;              // default 0
+  numLimpers?: number;              // default 0
   facing3Bet?: boolean;             // default false
+  facing4Bet?: boolean;             // default false
   threeBetSizeBB?: number | null;
   threeBettorPosition?: Position | null;
+  isSBComplete?: boolean;           // default false
   blindsBB?: { sb: number; bb: number };
 }
 
@@ -81,7 +91,7 @@ export interface PreflopGridResult {
   cells: PreflopGridCell[];
   heroHandClass: string;
   heroEquity: number;
-  situation: PreflopSituation;
+  situation: PreflopSituationContext;
   opponentRange: Set<string> | null;
   heroContinueRange: Set<string>;
   potSizeBB: number;
@@ -433,13 +443,15 @@ export function getHeroHandClass(heroCards: CardIndex[]): string {
   return RL[12 - hi] + (hi === lo ? RL[12 - lo] : RL[12 - lo] + (suited ? "s" : "o"));
 }
 
-function emptyResult(heroPosition: Position, blindsBB: { sb: number; bb: number } = { sb: 0.5, bb: 1 }, numOpponents: number = 1): PreflopGridResult {
+function emptyResult(heroPosition: Position, tableSize: number = 6, blindsBB: { sb: number; bb: number } = { sb: 0.5, bb: 1 }): PreflopGridResult {
+  const defaultOpp = Math.max(1, Math.min(9, tableSize - 1));
   const cells: PreflopGridCell[] = [];
   for (let row = 0; row < 13; row++) for (let col = 0; col < 13; col++) {
     const hc = row === col ? RL[row] + RL[col] : row < col ? RL[row] + RL[col] + "s" : RL[col] + RL[row] + "o";
-    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc, numOpponents), facing: null, inHeroRange: false, inOpponentRange: false });
+    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc, defaultOpp), facing: null, inHeroRange: false, inOpponentRange: false });
   }
-  return { cells, heroHandClass: "", heroEquity: 0, situation: { type: "rfi" }, opponentRange: null, heroContinueRange: new Set(), potSizeBB: blindsBB.sb + blindsBB.bb };
+  const emptySituation = classifySituation({ heroPosition, tableSize, openerPosition: null, numCallers: 0, numLimpers: 0, facing3Bet: false });
+  return { cells, heroHandClass: "", heroEquity: 0, situation: emptySituation, opponentRange: null, heroContinueRange: new Set(), potSizeBB: blindsBB.sb + blindsBB.bb };
 }
 
 export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: number = 300): PreflopGridResult {
@@ -451,50 +463,39 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
     openerPosition = null,
     openerSizingBB = 0,
     numCallers = 0,
+    numLimpers = 0,
     facing3Bet = false,
+    facing4Bet = false,
     threeBetSizeBB = null,
+    isSBComplete = false,
     blindsBB = { sb: 0.5, bb: 1 },
   } = params;
 
-  const behind = playersBehind(heroPosition, tableSize);
-
   if (!heroCards || heroCards.length < 2) {
-    // Not enough cards — return empty grid with table-size-based opponents
-    const defaultOpp = Math.max(1, Math.min(9, tableSize - 1));
-    return emptyResult(heroPosition, { sb: blindsBB.sb, bb: blindsBB.bb }, defaultOpp);
+    return emptyResult(heroPosition, tableSize, { sb: blindsBB.sb, bb: blindsBB.bb });
   }
 
   const heroHandClass = getHeroHandClass(heroCards);
   const threeBettorPos = params.threeBettorPosition ?? null;
-  const situation = classifyPreflopSituation(heroPosition, openerPosition, numCallers, facing3Bet, threeBettorPos);
 
-  // Derive active opponents from the situation:
-  // RFI: only players behind hero are live (everyone before folded)
-  // Facing open: opener + callers + players behind hero
-  // Facing 3-bet: 3-bettor + callers (usually heads up)
-  // BvB: 1
-  let numOpponents = behind; // default: players behind
-  switch (situation.type) {
-    case "rfi":
-      numOpponents = behind;
-      break;
-    case "facing_open":
-    case "facing_open_multiway":
-      // opener(1) + callers + players behind hero still to act
-      numOpponents = 1 + numCallers + behind;
-      break;
-    case "facing_3bet":
-      // 3-bettor + any callers
-      numOpponents = 1 + numCallers;
-      break;
-    case "blind_vs_blind":
-      numOpponents = 1;
-      break;
-  }
-  numOpponents = Math.max(1, Math.min(9, numOpponents));
+  // ── Classify via registry ──
+  const ctx = classifySituation({
+    heroPosition,
+    tableSize,
+    openerPosition,
+    numCallers,
+    numLimpers,
+    facing3Bet,
+    threeBettorPosition: threeBettorPos,
+    facing4Bet,
+    isSBComplete,
+  });
 
-  const opponentRange = getOpponentRange(situation, stackDepthBB, openerSizingBB);
-  const heroContinueRange = getHeroContinueRange(situation, heroPosition, stackDepthBB);
+  // ── Resolve ranges via registry ──
+  const entry = PREFLOP_SITUATIONS[ctx.id];
+  const numOpponents = resolveOpponentCount(entry, ctx);
+  const opponentRange = resolveOpponentRange(ctx, stackDepthBB, openerSizingBB);
+  const heroContinueRange = resolveHeroRange(ctx, stackDepthBB);
   const equityMap = computeEquityGrid(heroCards, opponentRange, mcTrials, numOpponents);
   const potSizeBB = computePotAtAction(blindsBB, openerSizingBB, numCallers, facing3Bet, threeBetSizeBB);
 
@@ -533,7 +534,7 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
     cells,
     heroHandClass,
     heroEquity: equityMap.get(heroHandClass) ?? getPreflopEquity(heroHandClass, numOpponents),
-    situation,
+    situation: ctx,
     opponentRange,
     heroContinueRange,
     potSizeBB,
