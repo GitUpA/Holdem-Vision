@@ -19,6 +19,10 @@ import {
   GTO_BB_DEFENSE,
   GTO_BVB,
   GTO_4BET,
+  GTO_ISO_RAISE_RANGES,
+  GTO_BB_RAISE_VS_LIMPERS,
+  GTO_SB_COMPLETE_RANGE,
+  GTO_BB_RAISE_VS_SB_COMPLETE,
 } from "../gto/tables/preflopRanges";
 import { HAND_STRENGTH_ORDER } from "../gto/preflopClassification";
 
@@ -121,13 +125,40 @@ function resolveRange(
       return combined;
     }
 
-    // New range sources for Phase 4 — return null until range data is added
     case "limper_by_profile":
-    case "iso_raise_by_position":
-    case "bb_raise_vs_limpers":
+      // What the limper is likely holding — wide capped range
+      // For now, use a generic fish-like limp range (~35% of hands)
+      // Future: derive from opponent profile
+      return new Set([
+        "22", "33", "44", "55", "66", "77", "88", "99",
+        "A2s", "A3s", "A4s", "A5s", "A6s", "A7s", "A8s", "A9s", "ATs",
+        "K2s", "K3s", "K4s", "K5s", "K6s", "K7s", "K8s", "K9s", "KTs",
+        "Q2s", "Q3s", "Q4s", "Q5s", "Q6s", "Q7s", "Q8s", "Q9s", "QTs",
+        "J7s", "J8s", "J9s", "JTs",
+        "T8s", "T9s",
+        "54s", "65s", "76s", "87s", "98s",
+        "53s", "64s", "75s", "86s", "97s",
+        "ATo", "AJo",
+        "KTo", "KJo", "KQo",
+        "QTo", "QJo",
+        "JTo",
+      ]);
+
+    case "iso_raise_by_position": {
+      const pos = normalize6Max(ctx.heroPosition);
+      return GTO_ISO_RAISE_RANGES[pos] ?? GTO_ISO_RAISE_RANGES["co"] ?? null;
+    }
+
+    case "bb_raise_vs_limpers": {
+      const key = ctx.numLimpers >= 3 ? "3+" : String(Math.max(1, ctx.numLimpers));
+      return GTO_BB_RAISE_VS_LIMPERS[key] ?? GTO_BB_RAISE_VS_LIMPERS["1"] ?? null;
+    }
+
     case "sb_complete_range":
+      return GTO_SB_COMPLETE_RANGE;
+
     case "bb_raise_vs_sb_complete":
-      return null;
+      return GTO_BB_RAISE_VS_SB_COMPLETE;
   }
 }
 

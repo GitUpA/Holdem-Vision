@@ -411,3 +411,159 @@ export const GTO_4BET = {
   bluffs: new Set(["A5s", "A4s", "A3s", "A2s"]),
 };
 
+// ═══════════════════════════════════════════════════════
+// ISO-RAISE vs LIMPERS (by position)
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Hands to iso-raise when facing limper(s), by position.
+ * Iso-raise ≈ RFI range adjusted for limper dynamics.
+ * Sizing: 3.5-4x BB in position, 4-5x BB OOP.
+ *
+ * Source: Upswing Poker, GTO Wizard limper analysis, solver consensus.
+ */
+export const GTO_ISO_RAISE_RANGES: Record<string, Set<string>> = {
+  // HJ: ~15% — tighter, players behind can 3-bet
+  hj: new Set([
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77",
+    "AKs", "AQs", "AJs", "ATs",
+    "AKo", "AQo", "AJo",
+    "KQs", "KJs",
+  ]),
+  // CO: ~20% — wider, fewer players behind
+  co: new Set([
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", "66", "55",
+    "AKs", "AQs", "AJs", "ATs", "A9s", "A8s", "A5s",
+    "AKo", "AQo", "AJo", "ATo",
+    "KQs", "KJs", "KTs", "K9s",
+    "QJs", "QTs",
+    "JTs", "T9s",
+  ]),
+  // BTN: ~35% — widest, guaranteed position postflop
+  btn: new Set([
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", "66", "55", "44", "33", "22",
+    "AKs", "AQs", "AJs", "ATs", "A9s", "A8s", "A7s", "A6s", "A5s", "A4s", "A3s", "A2s",
+    "AKo", "AQo", "AJo", "ATo", "A9o",
+    "KQs", "KJs", "KTs", "K9s", "K8s",
+    "KQo", "KJo",
+    "QJs", "QTs", "Q9s",
+    "QJo",
+    "JTs", "J9s",
+    "T9s", "T8s",
+    "98s", "87s", "76s",
+  ]),
+  // SB: ~18% — OOP disadvantage, tighter
+  sb: new Set([
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77",
+    "AKs", "AQs", "AJs", "ATs", "A9s", "A5s",
+    "AKo", "AQo", "AJo",
+    "KQs", "KJs", "KTs",
+    "QJs", "QTs",
+    "JTs",
+  ]),
+  // UTG: rare spot (limper behind you), but ~12% if needed
+  utg: new Set([
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88",
+    "AKs", "AQs", "AJs", "ATs",
+    "AKo", "AQo",
+    "KQs", "KJs",
+  ]),
+};
+
+// ═══════════════════════════════════════════════════════
+// BB RAISE vs LIMPERS
+// ═══════════════════════════════════════════════════════
+
+/**
+ * BB raise range when facing limpers (no raise). BB is OOP the entire hand.
+ * Raise for value, not isolation. Free flop is fine with speculative hands.
+ *
+ * Keyed by limper count: "1", "2", "3+" (3 or more).
+ * Source: GTO Wizard BB limped pot analysis, Upswing Poker, SplitSuit.
+ */
+export const GTO_BB_RAISE_VS_LIMPERS: Record<string, Set<string>> = {
+  // vs 1 limper: ~25% raise range
+  "1": new Set([
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77",
+    "AKs", "AQs", "AJs", "ATs", "A9s", "A8s",
+    "AKo", "AQo", "AJo", "ATo",
+    "KQs", "KJs", "KTs",
+    "KQo", "KJo",
+    "QJs", "QTs",
+    "JTs",
+    // Bluff raises: suited aces with blockers
+    "A5s", "A4s", "A3s", "A2s",
+  ]),
+  // vs 2 limpers: ~18% — tighter, harder to isolate
+  "2": new Set([
+    "AA", "KK", "QQ", "JJ", "TT", "99", "88",
+    "AKs", "AQs", "AJs", "ATs",
+    "AKo", "AQo", "AJo",
+    "KQs", "KJs",
+    "KQo",
+    "QJs",
+    // Fewer bluff raises
+    "A5s", "A4s",
+  ]),
+  // vs 3+ limpers: ~12% — mostly value
+  "3+": new Set([
+    "AA", "KK", "QQ", "JJ", "TT",
+    "AKs", "AQs",
+    "AKo", "AQo",
+    "KQs",
+  ]),
+};
+
+// ═══════════════════════════════════════════════════════
+// SB COMPLETE RANGE (what SB is likely holding when they limp)
+// ═══════════════════════════════════════════════════════
+
+/**
+ * When SB completes (limps) instead of raising, their range is wide and capped.
+ * No premiums (they would have raised). Mostly speculative hands.
+ *
+ * Source: GTO Wizard SB completing analysis, solver solutions.
+ */
+export const GTO_SB_COMPLETE_RANGE = new Set([
+  // Small/medium pairs (set-mining)
+  "22", "33", "44", "55", "66", "77",
+  // Suited connectors and gappers
+  "54s", "65s", "76s", "87s", "98s", "T9s",
+  "53s", "64s", "75s", "86s", "97s", "T8s",
+  // Suited aces (nut flush potential)
+  "A2s", "A3s", "A4s", "A5s", "A6s", "A7s", "A8s", "A9s",
+  // Weak suited kings/queens
+  "K2s", "K3s", "K4s", "K5s", "K6s", "K7s", "K8s", "K9s",
+  "Q2s", "Q3s", "Q4s", "Q5s", "Q6s", "Q7s", "Q8s", "Q9s",
+  // Suited jacks
+  "J7s", "J8s", "J9s",
+  // Offsuit broadways too weak to raise
+  "KTo", "QTo", "JTo", "QJo",
+]);
+
+// ═══════════════════════════════════════════════════════
+// BB RAISE vs SB COMPLETE
+// ═══════════════════════════════════════════════════════
+
+/**
+ * BB raise range when SB just completes (limps).
+ * SB's range is wide and capped — BB has range advantage and should raise aggressively.
+ * Sizing: 3-4BB total.
+ *
+ * Source: GTO Wizard BvB solver solutions, Upswing Poker.
+ */
+export const GTO_BB_RAISE_VS_SB_COMPLETE = new Set([
+  // Value raises
+  "AA", "KK", "QQ", "JJ", "TT", "99", "88", "77",
+  "AKs", "AQs", "AJs", "ATs", "A9s", "A8s",
+  "AKo", "AQo", "AJo", "ATo",
+  "KQs", "KJs", "KTs",
+  "KQo", "KJo",
+  "QJs", "QTs",
+  "JTs",
+  // Bluff/semi-bluff raises: suited connectors + suited aces
+  "A7s", "A6s", "A5s", "A4s", "A3s", "A2s",
+  "T9s", "98s", "87s", "76s",
+  "K9s", "Q9s", "J9s",
+]);
+

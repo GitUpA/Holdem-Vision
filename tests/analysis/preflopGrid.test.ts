@@ -191,6 +191,43 @@ describe("resolveHeroRange", () => {
     expect(range.has("AA")).toBe(true);
     expect(range.size).toBeGreaterThan(30);
   });
+
+  // ── New situation ranges ──
+
+  it("facing_limpers: iso-raise range for BTN", () => {
+    const ctx = classify({ heroPosition: "btn", numLimpers: 1 });
+    expect(ctx.id).toBe("facing_limpers");
+    const heroRange = resolveHeroRange(ctx);
+    expect(heroRange.has("AA")).toBe(true);
+    expect(heroRange.has("KQs")).toBe(true);
+    expect(heroRange.size).toBeGreaterThan(20); // BTN iso-raises wide
+    const oppRange = resolveOpponentRange(ctx)!;
+    expect(oppRange).not.toBeNull();
+    expect(oppRange.size).toBeGreaterThan(30); // limper range is wide
+  });
+
+  it("bb_vs_limpers: raise range narrows with more limpers", () => {
+    const ctx1 = classify({ heroPosition: "bb", numLimpers: 1 });
+    const ctx3 = classify({ heroPosition: "bb", numLimpers: 3 });
+    const range1 = resolveHeroRange(ctx1);
+    const range3 = resolveHeroRange(ctx3);
+    expect(range1.has("AA")).toBe(true);
+    expect(range3.has("AA")).toBe(true);
+    expect(range3.size).toBeLessThan(range1.size); // tighter vs more limpers
+  });
+
+  it("bb_vs_sb_complete: BB raises wide, SB range is capped", () => {
+    const ctx = classify({ heroPosition: "bb", numLimpers: 1, isSBComplete: true });
+    expect(ctx.id).toBe("bb_vs_sb_complete");
+    const heroRange = resolveHeroRange(ctx);
+    expect(heroRange.has("AA")).toBe(true);
+    expect(heroRange.has("T9s")).toBe(true); // bluff raises
+    expect(heroRange.size).toBeGreaterThan(25);
+    const oppRange = resolveOpponentRange(ctx)!;
+    expect(oppRange).not.toBeNull();
+    expect(oppRange.has("AA")).toBe(false); // SB range is capped — no premiums
+    expect(oppRange.has("76s")).toBe(true); // speculative hands
+  });
 });
 
 // ═══════════════════════════════════════════════════════
