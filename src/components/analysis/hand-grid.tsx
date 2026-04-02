@@ -8,6 +8,7 @@
  * Postflop: colors each cell by whether it beats hero on the current board.
  */
 import { useMemo, useState, useEffect } from "react";
+import { useAsyncEquityGrid } from "../../hooks/use-async-equity";
 import { evaluateHand, compareHandRanks } from "../../../convex/lib/primitives/handEvaluator";
 import { getPreflopEquity } from "../../../convex/lib/gto/preflopEquityTable";
 import { GTO_RFI_RANGES } from "../../../convex/lib/gto/tables/preflopRanges";
@@ -17,7 +18,7 @@ import {
   type PreflopGridCell,
   type SizingRole,
 } from "../../../convex/lib/analysis/preflopGrid";
-import { RANK_LABELS, GRID_TO_RANK, getHeroHandClass, normalize6Max } from "../../../convex/lib/preflop/rangeUtils";
+import { getHeroHandClass, normalize6Max } from "../../../convex/lib/preflop/rangeUtils";
 import { positionsForTableSize, positionDisplayName } from "../../../convex/lib/primitives/position";
 import { computeHandGrid, type HandClassGridCell } from "../../../convex/lib/analysis/handGrid";
 import type { CardIndex, Position } from "../../../convex/lib/types/cards";
@@ -26,7 +27,6 @@ import type { CardIndex, Position } from "../../../convex/lib/types/cards";
 // CONSTANTS
 // ═══════════════════════════════════════════════════════
 
-const RL = RANK_LABELS; // local alias for brevity
 const RANGE_PCT: Record<string, number> = { utg: 15, hj: 19, co: 27, btn: 44, sb: 40, mp: 19, utg1: 15, utg2: 15, mp1: 19 };
 
 const FACING_COLOR: Record<SizingRole, string> = {
@@ -131,72 +131,9 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
 
   const opponentRangeEntry = useMemo(() => ranges.find(r => r.pos !== heroPos) ?? null, [ranges, heroPos]);
 
-  // ── ASYNC EQUITY VS RANGE (MC in chunks) ──
-  const [equityCache] = useState(() => new Map<string, Map<string, number>>());
-  const [equityVsRange, setEquityVsRange] = useState<Map<string, number> | null>(null);
-  const [equityComputing, setEquityComputing] = useState(false);
-  const [equityProgress, setEquityProgress] = useState(0);
-
-  useEffect(() => {
-    const oppPos = opponentRangeEntry?.pos;
-    const oppRange = opponentRangeEntry?.range;
-    if (!oppRange || !oppPos || oppRange.size === 0) {
-      setEquityVsRange(null); setEquityComputing(false); setEquityProgress(0); return;
-    }
-    const cached = equityCache.get(oppPos);
-    if (cached) { setEquityVsRange(cached); setEquityComputing(false); setEquityProgress(169); return; }
-
-    setEquityComputing(true); setEquityProgress(0);
-    // Use pipeline's computeEquityGrid but in chunks via requestAnimationFrame
-    const oppCombos: [number, number][] = [];
-    for (const hc of oppRange) {
-      const isP = hc.length === 2; const isS = hc.endsWith("s");
-      const r1 = 12 - RL.indexOf(hc[0]); const r2 = 12 - RL.indexOf(hc[1]);
-      if (isP) { for (let s1 = 0; s1 < 4; s1++) for (let s2 = s1 + 1; s2 < 4; s2++) oppCombos.push([r1*4+s1, r1*4+s2]); }
-      else { for (let s1 = 0; s1 < 4; s1++) for (let s2 = 0; s2 < 4; s2++) { if (isS && s1!==s2) continue; if (!isS && s1===s2) continue; oppCombos.push([r1*4+s1, r2*4+s2]); } }
-    }
-    if (oppCombos.length === 0) return;
-
-    const work: { hc: string; rank1: number; rank2: number; type: string }[] = [];
-    for (let row = 0; row < 13; row++) for (let col = 0; col < 13; col++) {
-      const type = row === col ? "pair" : row < col ? "suited" : "offsuit";
-      const hc = row === col ? RL[row]+RL[col] : row < col ? RL[row]+RL[col]+"s" : RL[col]+RL[row]+"o";
-      work.push({ hc, rank1: GRID_TO_RANK[row], rank2: GRID_TO_RANK[col], type });
-    }
-    const result = new Map<string, number>(); let idx = 0; let cancelled = false;
-    function processChunk() {
-      if (cancelled) return;
-      const end = Math.min(idx + 13, work.length);
-      for (; idx < end; idx++) {
-        const { hc, rank1, rank2, type } = work[idx];
-        let c1: number, c2: number;
-        if (type === "pair") { c1 = rank1*4; c2 = rank1*4+1; }
-        else if (type === "suited") { c1 = rank1*4; c2 = rank2*4; }
-        else { c1 = rank1*4; c2 = rank2*4+1; }
-        const dead = new Set([c1, c2]);
-        const valid = oppCombos.filter(([a,b]) => !dead.has(a) && !dead.has(b));
-        if (valid.length === 0) { result.set(hc, 0.5); continue; }
-        const deck: number[] = []; for (let i = 0; i < 52; i++) if (!dead.has(i)) deck.push(i);
-        let wins = 0, total = 0;
-        for (let t = 0; t < 300; t++) {
-          const opp = valid[Math.floor(Math.random() * valid.length)];
-          const avail = deck.filter(c => c !== opp[0] && c !== opp[1]);
-          if (avail.length < 5) continue;
-          for (let i = avail.length-1; i > avail.length-6; i--) { const j = Math.floor(Math.random()*(i+1)); [avail[i],avail[j]]=[avail[j],avail[i]]; }
-          const board = avail.slice(avail.length-5);
-          const hEval = evaluateHand([c1,c2,...board] as CardIndex[]); const oEval = evaluateHand([opp[0],opp[1],...board] as CardIndex[]);
-          const cmp = compareHandRanks(hEval.rank, oEval.rank);
-          if (cmp > 0) wins++; else if (cmp === 0) wins += 0.5; total++;
-        }
-        result.set(hc, total > 0 ? wins/total : 0.5);
-      }
-      setEquityProgress(idx);
-      if (idx < work.length) requestAnimationFrame(processChunk);
-      else { const final = new Map(result); equityCache.set(oppPos!, final); setEquityVsRange(final); setEquityComputing(false); }
-    }
-    requestAnimationFrame(processChunk);
-    return () => { cancelled = true; };
-  }, [ranges]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── ASYNC EQUITY VS RANGE (MC in chunks via hook) ──
+  const { equityMap: equityVsRange, isComputing: equityComputing, progress: equityProgress } =
+    useAsyncEquityGrid(opponentRangeEntry?.range ?? null, opponentRangeEntry?.pos ?? null);
 
   // ── POSITION LABELS ──
   const positionLabels = useMemo(() => {

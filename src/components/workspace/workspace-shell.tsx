@@ -287,6 +287,21 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
     return hero?.stack ?? 0;
   }, [ws.gameState, ws.seats]);
 
+  // Derive preflop grid props from game state (no IIFEs in JSX)
+  const gridPreflopProps = useMemo(() => {
+    if (!ws.gameState) return { facingPosition: undefined, preflopActions: undefined, numCallers: 0, numLimpers: 0 };
+    const pf = ws.gameState.actionHistory.filter(a => a.street === "preflop");
+    const firstRaiseIdx = pf.findIndex(a => a.actionType === "raise" || a.actionType === "bet");
+    const preflopRaises = pf.filter(a => a.actionType === "raise" || a.actionType === "bet");
+    return {
+      facingPosition: preflopRaises.length > 0 ? preflopRaises[preflopRaises.length - 1].position : undefined,
+      preflopActions: pf.map(a => ({ position: a.position, actionType: a.actionType, amount: a.amount })),
+      numCallers: firstRaiseIdx === -1 ? 0
+        : pf.filter((a, i) => a.actionType === "call" && i > firstRaiseIdx && a.seatIndex !== ws.heroSeatIndex).length,
+      numLimpers: pf.filter((a, i) => a.actionType === "call" && (firstRaiseIdx === -1 || i < firstRaiseIdx) && a.seatIndex !== ws.heroSeatIndex).length,
+    };
+  }, [ws.gameState, ws.heroSeatIndex]);
+
   const selectedSeatAnalysis = useMemo(() => {
     if (ws.selectedSeat === null) return undefined;
     const oppReadResult = ws.analysisResults.get("opponent-read");
@@ -636,31 +651,10 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                   heroPosition={ws.gameState?.players[ws.heroSeatIndex]?.position}
                   stackDepthBB={ws.gameState ? ws.gameState.players[ws.heroSeatIndex]?.currentStack / (ws.blinds?.big ?? 1) : 100}
                   facingBetBB={ws.legalActions?.callAmount ? ws.legalActions.callAmount / (ws.blinds?.big ?? 1) : 0}
-                  facingPosition={(() => {
-                    if (!ws.gameState) return undefined;
-                    const preflopRaises = ws.gameState.actionHistory.filter(
-                      a => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet")
-                    );
-                    if (preflopRaises.length === 0) return undefined;
-                    return preflopRaises[preflopRaises.length - 1].position;
-                  })()}
-                  preflopActions={ws.gameState?.actionHistory
-                    .filter(a => a.street === "preflop")
-                    .map(a => ({ position: a.position, actionType: a.actionType, amount: a.amount }))
-                  }
-                  numCallers={(() => {
-                    if (!ws.gameState) return 0;
-                    const pf = ws.gameState.actionHistory.filter(a => a.street === "preflop");
-                    const firstRaiseIdx = pf.findIndex(a => a.actionType === "raise");
-                    if (firstRaiseIdx === -1) return 0; // no raise = no callers (only limpers)
-                    return pf.filter((a, i) => a.actionType === "call" && i > firstRaiseIdx && a.seatIndex !== ws.heroSeatIndex).length;
-                  })()}
-                  numLimpers={(() => {
-                    if (!ws.gameState) return 0;
-                    const pf = ws.gameState.actionHistory.filter(a => a.street === "preflop");
-                    const firstRaiseIdx = pf.findIndex(a => a.actionType === "raise");
-                    return pf.filter((a, i) => a.actionType === "call" && (firstRaiseIdx === -1 || i < firstRaiseIdx) && a.seatIndex !== ws.heroSeatIndex).length;
-                  })()}
+                  facingPosition={gridPreflopProps.facingPosition}
+                  preflopActions={gridPreflopProps.preflopActions}
+                  numCallers={gridPreflopProps.numCallers}
+                  numLimpers={gridPreflopProps.numLimpers}
                   numPlayers={ws.numPlayers}
                 />
               )}
