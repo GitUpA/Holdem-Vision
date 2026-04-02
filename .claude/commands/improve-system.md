@@ -70,6 +70,9 @@ After identifying issues, fix them in priority order:
 
 | File | What It Controls |
 |---|---|
+| `convex/lib/preflop/situationRegistry.ts` | Preflop situation classification (single source of truth) |
+| `convex/lib/preflop/situationRanges.ts` | Range resolution for all preflop situations |
+| `convex/lib/gto/tables/preflopRanges.ts` | GTO range data (RFI, defense, iso-raise, BB vs limpers) |
 | `convex/lib/gto/handCategorizer.ts` | Hand strength classification |
 | `convex/lib/opponents/rangeEstimator.ts` | Opponent range narrowing |
 | `convex/lib/opponents/behaviorInference.ts` | Action-based player profiling |
@@ -79,7 +82,7 @@ After identifying issues, fix them in priority order:
 | `convex/lib/gto/frequencyLookup.ts` | GTO frequency data routing |
 | `convex/lib/pipeline/counterStrategyMap.ts` | Exploit advice |
 | `convex/lib/gto/actionNarratives.ts` | Per-action story text |
-| `convex/lib/gto/archetypeClassifier.ts` | Spot classification |
+| `convex/lib/gto/archetypeClassifier.ts` | Postflop spot classification |
 
 ## Verification After Fixes
 
@@ -97,7 +100,7 @@ npx vitest run tests/pipeline/coachingAudit.test.ts
 npx vitest run
 ```
 
-Targets: 0 errors, 0 warnings on all audits. 1291+ tests pass.
+Targets: 0 errors, 0 warnings on all audits. 1434+ tests pass.
 
 ## Example Analysis
 

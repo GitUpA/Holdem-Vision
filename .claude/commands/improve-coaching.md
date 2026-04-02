@@ -16,10 +16,13 @@ Play hands through the system, read coaching output, identify issues, fix them, 
    - Narrative that doesn't match the recommended action
 3. **Run audits** — Run `npx vitest run tests/pipeline/semanticAudit.test.ts tests/pipeline/coachingAudit.test.ts` (1000+ hands, automated checks)
 4. **Fix issues found** — Edit the relevant files:
+   - `convex/lib/preflop/situationRegistry.ts` — preflop situation classification + coaching metadata
+   - `convex/lib/preflop/situationRanges.ts` — range resolution for all preflop situations
+   - `convex/lib/gto/tables/preflopRanges.ts` — GTO range data (RFI, defense, iso-raise, BB vs limpers)
    - `convex/lib/gto/handCategorizer.ts` — hand classification
    - `convex/lib/opponents/rangeEstimator.ts` — range narrowing
    - `convex/lib/opponents/behaviorInference.ts` — action-based inference
-   - `convex/lib/analysis/handCommentator.ts` — coaching narratives
+   - `convex/lib/analysis/handCommentator.ts` — coaching narratives (limper-aware)
    - `convex/lib/analysis/opponentStory.ts` — opponent range stories
    - `convex/lib/analysis/snapshot.ts` — coaching snapshot assembly
    - `convex/lib/gto/frequencyLookup.ts` — GTO frequency data
@@ -45,7 +48,7 @@ The audit runs 10 checks across 1000 hands:
 
 - Semantic audit: 0 errors, 0 warnings on 1000 hands
 - Coaching audit: 0 issues on 1000 hands
-- Full test suite: all pass (1 known flaky: constrainedDealer ace_high_dry)
+- Full test suite: 1434+ tests pass
 - TypeScript: 0 errors
 
 ## Adding New Checks
