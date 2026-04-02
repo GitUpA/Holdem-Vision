@@ -117,7 +117,7 @@ export function commentateHand(input: CommentaryInput): HandCommentary {
 
   // ── Part 1: The Scene ──
   if (street === "preflop") {
-    parts.push(buildPreflopScene(gameState, heroSeat, heroCardStr, posLabel, archetype));
+    parts.push(buildPreflopScene(gameState, heroSeat, heroCardStr, posLabel, archetype, preflopGridResult?.situation));
   } else {
     parts.push(buildPostflopScene(communityCards, street, heroCardStr, heroHandDesc, posLabel, archetype));
   }
@@ -185,30 +185,54 @@ function buildPreflopScene(
   heroCardStr: string,
   posLabel: string,
   archetype?: ArchetypeClassification,
+  situationCtx?: import("../preflop/situationRegistry").PreflopSituationContext,
 ): string {
-  // Count raises to understand the action
+  // When situation context is available, use it directly
+  if (situationCtx) {
+    const base = `You're on the ${posLabel} with ${heroCardStr}.`;
+
+    switch (situationCtx.id) {
+      case "rfi":
+        return `${base} No one has entered the pot. You're deciding whether to open.`;
+      case "facing_open":
+      case "facing_open_multiway": {
+        const openerPos = situationCtx.openerPosition ? positionDisplayName(situationCtx.openerPosition) : "a player";
+        const callerText = situationCtx.numCallers > 0 ? ` ${situationCtx.numCallers} caller${situationCtx.numCallers > 1 ? "s" : ""} in.` : "";
+        return `${base} ${openerPos} opened — you're deciding whether to enter this pot.${callerText}`;
+      }
+      case "facing_3bet": {
+        const threeBettor = situationCtx.threeBettorPosition ? positionDisplayName(situationCtx.threeBettorPosition) : "a player";
+        return `${base} You raised, and ${threeBettor} 3-bet. This is a 3-bet pot.`;
+      }
+      case "facing_4bet":
+        return `${base} This is a 4-bet pot. Stacks are on the line.`;
+      case "blind_vs_blind":
+        return `${base} Folded to the blinds.`;
+      case "facing_limpers":
+        return `${base} ${situationCtx.numLimpers} limper${situationCtx.numLimpers > 1 ? "s" : ""} ahead — their range is capped. Iso-raise, over-limp, or fold.`;
+      case "bb_vs_limpers":
+        return `${base} ${situationCtx.numLimpers} limper${situationCtx.numLimpers > 1 ? "s" : ""} to you — you can raise for value or check for a free flop.`;
+      case "bb_vs_sb_complete":
+        return `${base} SB completed — their range is wide and capped. You can raise or check.`;
+      case "bb_uncontested":
+        return `${base} Everyone folded. You win the blinds.`;
+      default:
+        return base;
+    }
+  }
+
+  // Fallback: derive from action history (for non-grid paths like snapshot)
   const raises = state.actionHistory.filter(
     (a) => a.street === "preflop" && (a.actionType === "raise" || a.actionType === "bet"),
   );
   const heroRaises = raises.filter((a) => a.seatIndex === heroSeat);
   const villainRaises = raises.filter((a) => a.seatIndex !== heroSeat);
 
-  const archetypeLabel = archetype ? archetype.archetypeId.replace(/_/g, " ") : "";
-
   if (villainRaises.length === 0) {
-    // Check for limpers
     const preflopActions = state.actionHistory.filter((a) => a.street === "preflop");
     const limpers = preflopActions.filter((a) => a.actionType === "call" && a.seatIndex !== heroSeat);
     if (limpers.length > 0) {
-      const heroPos = state.players[heroSeat].position;
-      if (heroPos === "bb") {
-        const isSBComplete = limpers.length === 1 && state.players[limpers[0].seatIndex].position === "sb";
-        if (isSBComplete) {
-          return `You're on the ${posLabel} with ${heroCardStr}. SB completed — their range is wide and capped. You can raise or check.`;
-        }
-        return `You're on the ${posLabel} with ${heroCardStr}. ${limpers.length} limper${limpers.length > 1 ? "s" : ""} to you — you can raise for value or check for a free flop.`;
-      }
-      return `You're on the ${posLabel} with ${heroCardStr}. ${limpers.length} limper${limpers.length > 1 ? "s" : ""} ahead — their range is capped. Iso-raise, over-limp, or fold.`;
+      return `You're on the ${posLabel} with ${heroCardStr}. ${limpers.length} limper${limpers.length > 1 ? "s" : ""} ahead.`;
     }
     return `You're on the ${posLabel} with ${heroCardStr}. No one has raised yet — you have the initiative.`;
   }
@@ -220,20 +244,10 @@ function buildPreflopScene(
     if (heroRaises.length === 0) {
       return `You're on the ${posLabel} with ${heroCardStr}. ${raiserPos} opened to ${raiseAmount} BB — you're deciding whether to enter this pot.`;
     }
-    return `You're on the ${posLabel} with ${heroCardStr}. You raised, and ${raiserPos} 3-bet to ${raiseAmount} BB. This is a ${archetypeLabel || "3-bet"} spot.`;
+    return `You're on the ${posLabel} with ${heroCardStr}. You raised, and ${raiserPos} 3-bet to ${raiseAmount} BB.`;
   }
 
-  if (villainRaises.length >= 2) {
-    const lastRaise = villainRaises[villainRaises.length - 1];
-    const raiser = state.players.find((p) => p.seatIndex === lastRaise.seatIndex);
-    const raiserPos = raiser ? positionDisplayName(raiser.position) : "a player";
-    const potLabel = archetypeLabel
-      ? (archetypeLabel.endsWith("pots") ? archetypeLabel.slice(0, -1) : `${archetypeLabel} pot`)
-      : "multi-bet pot";
-    return `You're on the ${posLabel} with ${heroCardStr}. There have been ${raises.length} raises — ${raiserPos} has ${lastRaise.amount} BB in. This is a ${potLabel} where stacks are on the line.`;
-  }
-
-  return `You're on the ${posLabel} with ${heroCardStr}.`;
+  return `You're on the ${posLabel} with ${heroCardStr}. There have been ${raises.length} raises. This is a multi-bet pot.`;
 }
 
 function buildPostflopScene(
