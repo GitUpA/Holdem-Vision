@@ -6,6 +6,7 @@ import type { CardIndex, Street, Position } from "./cards";
 import type { OpponentContext } from "./opponents";
 import type { VisualDirective, CardHighlight, RangeHighlight } from "./visuals";
 import type { GameState } from "../state/gameState";
+import type { PreflopSituationContext } from "../preflop/situationRegistry";
 
 // ═══════════════════════════════════════════════════════
 // ANALYSIS CONTEXT — the standardized input to everything
@@ -28,6 +29,9 @@ export interface AnalysisContext {
 
   /** Full game state reference for engine-based lenses (e.g., coaching). Optional. */
   gameState?: GameState;
+
+  /** Pre-computed preflop situation context from the registry. Avoids redundant classification. */
+  situationContext?: PreflopSituationContext;
 }
 
 export interface GameContext {

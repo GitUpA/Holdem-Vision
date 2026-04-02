@@ -57,13 +57,15 @@ interface HandGridProps {
   numCallers?: number;
   numLimpers?: number;
   numPlayers?: number;
+  /** Pre-computed grid result from workspace. If provided, skips local computation. */
+  preflopGridResult?: PreflopGridResult | null;
 }
 
 // ═══════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════
 
-export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100, numCallers = 0, numLimpers = 0, numPlayers = 6 }: HandGridProps) {
+export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100, numCallers = 0, numLimpers = 0, numPlayers = 6, preflopGridResult }: HandGridProps) {
   const [showEquity, setShowEquity] = useState(true);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [facingSizingBB, setFacingSizingBB] = useState(0);
@@ -103,9 +105,10 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
       .map(p => ({ key: p, label: positionDisplayName(p) }));
   }, [numPlayers]);
 
-  // ── PREFLOP: use pure pipeline ──
+  // ── PREFLOP: use pre-computed result from workspace, or compute locally as fallback ──
   const preflopResult = useMemo<PreflopGridResult | null>(() => {
     if (hasBoard || !heroCards || heroCards.length < 2) return null;
+    if (preflopGridResult) return preflopGridResult;
     return computePreflopHandGrid({
       heroCards: heroCards as CardIndex[],
       heroPosition: (heroPosition ?? "btn") as Position,
@@ -115,8 +118,8 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
       numCallers,
       numLimpers,
       tableSize: numPlayers,
-    }, 0); // 0 trials = use static equity (no MC yet)
-  }, [heroCards, heroPosition, hasBoard, facingBetBB, facingPosition, numLimpers]);
+    }, 0);
+  }, [heroCards, heroPosition, hasBoard, facingBetBB, facingPosition, numLimpers, preflopGridResult]);
 
   // ── POSTFLOP: local computation ──
   const postflopData = useMemo(() => {

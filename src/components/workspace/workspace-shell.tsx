@@ -30,6 +30,7 @@ import { VisualRenderer } from "../analysis/visual-renderer";
 import { ExplanationTree } from "../analysis/explanation-tree";
 import { CoachingPanel } from "../analysis/coaching-panel";
 import { HandGrid } from "../analysis/hand-grid";
+import { computePreflopHandGrid } from "../../../convex/lib/analysis/preflopGrid";
 import type { CoachingAdvice } from "../../../convex/lib/analysis/coachingLens";
 import { PlayerList } from "../table/player-list";
 import { TableControls } from "../table/table-controls";
@@ -40,7 +41,7 @@ import type { OpponentReadValue } from "../../../convex/lib/analysis/opponentRea
 import type { SelectionTarget } from "@/hooks/use-workspace";
 import { evaluateHand, compareHandRanks } from "../../../convex/lib/primitives/handEvaluator";
 import type { EvaluatedHand } from "../../../convex/lib/primitives/handEvaluator";
-import type { CardIndex } from "../../../convex/lib/types/cards";
+import type { CardIndex, Position } from "../../../convex/lib/types/cards";
 
 // Drill components
 import { ScoreDisplay } from "../drill/score-display";
@@ -301,6 +302,22 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
       numLimpers: pf.filter((a, i) => a.actionType === "call" && (firstRaiseIdx === -1 || i < firstRaiseIdx) && a.seatIndex !== ws.heroSeatIndex).length,
     };
   }, [ws.gameState, ws.heroSeatIndex]);
+
+  // Compute preflop grid result once at workspace level — shared by HandGrid + coaching
+  const preflopGridResult = useMemo(() => {
+    if (!ws.heroCards || ws.heroCards.length < 2 || ws.communityCards.length >= 3) return null;
+    const heroPosition = ws.gameState?.players[ws.heroSeatIndex]?.position;
+    return computePreflopHandGrid({
+      heroCards: ws.heroCards as CardIndex[],
+      heroPosition: (heroPosition ?? "btn") as Position,
+      openerPosition: (gridPreflopProps.facingPosition ?? undefined) as Position | undefined,
+      openerSizingBB: ws.legalActions?.callAmount ? ws.legalActions.callAmount / (ws.blinds?.big ?? 1) : 0,
+      stackDepthBB: ws.gameState ? ws.gameState.players[ws.heroSeatIndex]?.currentStack / (ws.blinds?.big ?? 1) : 100,
+      numCallers: gridPreflopProps.numCallers,
+      numLimpers: gridPreflopProps.numLimpers,
+      tableSize: ws.numPlayers,
+    }, 0);
+  }, [ws.heroCards, ws.communityCards.length, ws.gameState, ws.heroSeatIndex, ws.legalActions, ws.blinds, ws.numPlayers, gridPreflopProps]);
 
   const selectedSeatAnalysis = useMemo(() => {
     if (ws.selectedSeat === null) return undefined;
@@ -656,6 +673,7 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                   numCallers={gridPreflopProps.numCallers}
                   numLimpers={gridPreflopProps.numLimpers}
                   numPlayers={ws.numPlayers}
+                  preflopGridResult={preflopGridResult}
                 />
               )}
 

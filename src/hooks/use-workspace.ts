@@ -18,6 +18,7 @@ import type { WorkspaceMode } from "@/types/workspace-mode";
 import type { CardIndex, Street, Position } from "../../convex/lib/types/cards";
 import type { BlindStructure } from "../../convex/lib/types/game";
 import type { GameContext, AnalysisContext, AnalysisResult, ExplanationNode } from "../../convex/lib/types/analysis";
+import { classifySituationFromState } from "../../convex/lib/preflop/situationRegistry";
 import type {
   LegalActions,
   PotState,
@@ -374,6 +375,11 @@ export function useWorkspace(mode: WorkspaceMode) {
       };
     });
 
+    // Compute situation context once for all coaching consumers
+    const situationContext = (street === "preflop" && gameState && heroSeatIndex !== undefined)
+      ? classifySituationFromState(gameState, heroSeatIndex)
+      : undefined;
+
     return {
       heroCards,
       communityCards,
@@ -385,6 +391,7 @@ export function useWorkspace(mode: WorkspaceMode) {
       gameContext,
       heroSeatIndex,
       gameState: gameState ?? undefined,
+      situationContext,
     };
   }, [mode.analysis.enabled, heroCards, communityCards, deadCards, street, opponents, heroPosition, numPlayers, gameContext, gameState, heroSeatIndex]);
 

@@ -82,6 +82,8 @@ export interface PreflopGridResult {
   opponentRange: Set<string> | null;
   heroContinueRange: Set<string>;
   potSizeBB: number;
+  spr: number;
+  isPotCommitted: boolean;
 }
 
 // RL and GRID_TO_RANK moved to ../preflop/rangeUtils.ts as RANK_LABELS and GRID_TO_RANK
@@ -274,7 +276,8 @@ function emptyResult(heroPosition: Position, tableSize: number = 6, blindsBB: { 
     cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc, defaultOpp), facing: null, inHeroRange: false, inOpponentRange: false });
   }
   const emptySituation = classifySituation({ heroPosition, tableSize, openerPosition: null, numCallers: 0, numLimpers: 0, facing3Bet: false });
-  return { cells, heroHandClass: "", heroEquity: 0, situation: emptySituation, opponentRange: null, heroContinueRange: new Set(), potSizeBB: blindsBB.sb + blindsBB.bb };
+  const emptyPot = blindsBB.sb + blindsBB.bb;
+  return { cells, heroHandClass: "", heroEquity: 0, situation: emptySituation, opponentRange: null, heroContinueRange: new Set(), potSizeBB: emptyPot, spr: Infinity, isPotCommitted: false };
 }
 
 export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: number = 300): PreflopGridResult {
@@ -361,5 +364,7 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
     opponentRange,
     heroContinueRange,
     potSizeBB,
+    spr: potSizeBB > 0 ? stackDepthBB / potSizeBB : Infinity,
+    isPotCommitted: potSizeBB > 0 && (stackDepthBB / potSizeBB) < 0.5,
   };
 }
