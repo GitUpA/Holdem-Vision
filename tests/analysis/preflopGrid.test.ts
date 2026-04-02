@@ -4,8 +4,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computePotAtAction,
-  classifyFacing,
-  classifyFacingGrid,
+  classifyAction,
   computeEquityGrid,
   computePreflopHandGrid,
   getHeroHandClass,
@@ -360,41 +359,46 @@ describe("resolveHeroRange", () => {
 });
 
 // ═══════════════════════════════════════════════════════
-// STAGE F: classifyFacing
+// Action Classification (R/C/F)
 // ═══════════════════════════════════════════════════════
 
-describe("classifyFacing", () => {
+describe("classifyAction", () => {
   it("F when not in hero range", () => {
-    expect(classifyFacing(0.55, 3, 4.5, false)).toBe("F");
+    expect(classifyAction(0.55, false, "clear_fold", 3, 4.5, "facing_open")).toBe("F");
   });
 
-  it("V for AA (85%) in range facing 3BB into 4.5BB pot", () => {
-    // potOdds = 3 / (4.5 + 3) = 0.40
-    expect(classifyFacing(0.85, 3, 4.5, true)).toBe("V");
+  it("R for clear_raise (AA)", () => {
+    expect(classifyAction(0.85, true, "clear_raise", 3, 4.5, "facing_open")).toBe("R");
   });
 
-  it("V for KQs (63%) in range facing 3BB", () => {
-    expect(classifyFacing(0.63, 3, 4.5, true)).toBe("V");
+  it("R for raise (ATs in range)", () => {
+    expect(classifyAction(0.63, true, "raise", 3, 4.5, "facing_open")).toBe("R");
   });
 
-  it("M for 87s (53%) in range facing 3BB", () => {
-    expect(classifyFacing(0.53, 3, 4.5, true)).toBe("M");
+  it("C for mixed_raise (majority action is call)", () => {
+    expect(classifyAction(0.53, true, "mixed_raise", 3, 4.5, "facing_open")).toBe("C");
   });
 
-  it("M when no bet (check)", () => {
-    expect(classifyFacing(0.50, 0, 1.5, true)).toBe("M");
+  it("C for call (BB defense)", () => {
+    expect(classifyAction(0.45, true, "call", 3, 4.5, "facing_open")).toBe("C");
   });
 
-  it("F for weak hand (35%) in range facing 10BB", () => {
-    expect(classifyFacing(0.35, 10, 11.5, true)).toBe("F");
+  it("F for borderline in RFI (not strong enough to open)", () => {
+    expect(classifyAction(0.50, true, "borderline", 0, 1.5, "rfi")).toBe("F");
   });
 
-  it("B for borderline hand in polarized spot", () => {
-    // 42% equity, facing 6BB into 7.5BB pot
-    // potOdds = 6/13.5 = 0.444, surplus = -0.024
-    // polarization = (6-2)/10 = 0.4, which is > 0.3
-    // surplus > -0.05 && polarization > 0.3 → B
-    expect(classifyFacing(0.42, 6, 7.5, true)).toBe("B");
+  it("C for borderline facing bet with equity > pot odds", () => {
+    // 55% equity, facing 3BB into 4.5BB. potOdds = 3/7.5 = 0.40. equity > 0.45 → C
+    expect(classifyAction(0.55, true, "borderline", 3, 4.5, "facing_open")).toBe("C");
+  });
+
+  it("F for borderline facing bet with equity < pot odds", () => {
+    // 35% equity, facing 10BB into 11.5BB. potOdds = 10/21.5 = 0.465. equity < 0.515 → F
+    expect(classifyAction(0.35, true, "borderline", 10, 11.5, "facing_open")).toBe("F");
+  });
+
+  it("F for clear_fold", () => {
+    expect(classifyAction(0.30, true, "clear_fold", 3, 4.5, "facing_open")).toBe("F");
   });
 });
 
@@ -411,7 +415,7 @@ describe("BB call cost adjustment", () => {
     expect(result.potSizeBB).toBe(4.5);
     // AKo in BB defense range → should NOT be F
     const hero = result.cells.find(c => c.isHero)!;
-    expect(hero.facing).not.toBe("F");
+    expect(hero.action).not.toBe("F");
   });
 
   it("SB facing 3BB open pays 2.5BB (already posted 0.5BB)", () => {
@@ -651,31 +655,32 @@ describe("computePreflopHandGrid", { timeout: 30_000 }, () => {
     expect(heroCell!.handClass).toBe("AKo");
   });
 
-  it("facing an open produces facing classifications", () => {
+  it("facing an open produces R/C/F action classifications", () => {
     const result = computePreflopHandGrid({
       heroCards: [48 as CardIndex, 45 as CardIndex],
       heroPosition: "btn",
       openerPosition: "utg",
       openerSizingBB: 3,
-    }, 150); // enough trials for stable classification
-    // AKo should be V or M facing UTG open (strong hand in range)
+    }, 150);
+    // AKo should be R (raise/3-bet) facing UTG open — strong hand in range
     const heroCell = result.cells.find(c => c.isHero)!;
-    expect(["V", "M"]).toContain(heroCell.facing);
+    expect(heroCell.action).toBe("R");
     expect(heroCell.inHeroRange).toBe(true);
 
     // 72o should be F
     const junk = result.cells.find(c => c.handClass === "72o")!;
-    expect(junk.facing).toBe("F");
+    expect(junk.action).toBe("F");
     expect(junk.inHeroRange).toBe(false);
   });
 
-  it("RFI has no facing classifications", () => {
+  it("RFI produces R/F action classifications (no C in opening)", () => {
     const result = computePreflopHandGrid({
       heroCards: [48 as CardIndex, 45 as CardIndex],
       heroPosition: "btn",
     });
     const heroCell = result.cells.find(c => c.isHero)!;
-    expect(heroCell.facing).toBeNull();
+    // AKo from BTN RFI — should be R (open-raise)
+    expect(heroCell.action).toBe("R");
   });
 
   it("pot size is correct for 3BB open", () => {

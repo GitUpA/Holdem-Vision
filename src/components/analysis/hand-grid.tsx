@@ -16,7 +16,7 @@ import {
   computePreflopHandGrid,
   type PreflopGridResult,
   type PreflopGridCell,
-  type SizingRole,
+  type ActionLetter,
 } from "../../../convex/lib/analysis/preflopGrid";
 import { getHeroHandClass, normalize6Max } from "../../../convex/lib/preflop/rangeUtils";
 import { positionsForTableSize, positionDisplayName } from "../../../convex/lib/primitives/position";
@@ -29,11 +29,8 @@ import type { CardIndex, Position } from "../../../convex/lib/types/cards";
 
 const RANGE_PCT: Record<string, number> = { utg: 15, hj: 19, co: 27, btn: 44, sb: 40, mp: 19, utg1: 15, utg2: 15, mp1: 19 };
 
-const FACING_COLOR: Record<SizingRole, string> = {
-  V: "text-green-400", M: "text-slate-400", B: "text-amber-300", F: "text-red-400/60",
-};
-const ROLE_LABEL: Record<SizingRole, string> = {
-  V: "Value", M: "Mixed", B: "Bluff-catch", F: "Fold",
+const ACTION_COLOR: Record<ActionLetter, string> = {
+  R: "text-green-400", C: "text-blue-300", F: "text-red-400/60",
 };
 
 // ═══════════════════════════════════════════════════════
@@ -68,7 +65,6 @@ interface HandGridProps {
 export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100, numCallers = 0, numLimpers = 0, numPlayers = 6, preflopGridResult }: HandGridProps) {
   const [showEquity, setShowEquity] = useState(true);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
-  const [facingSizingBB, setFacingSizingBB] = useState(0);
   const [showFacing, setShowFacing] = useState(false);
   const [autoDefaultsApplied, setAutoDefaultsApplied] = useState(false);
 
@@ -80,7 +76,6 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
     if (autoDefaultsApplied) return;
     const hPos = heroPosition && !["bb"].includes(heroPosition) ? heroPosition : null;
     if (facingBetBB > 0 && facingPosition) {
-      setFacingSizingBB(facingBetBB);
       setShowFacing(true);
       const positions: string[] = [];
       if (hPos) positions.push(hPos);
@@ -88,7 +83,6 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
       setSelectedPositions(positions);
       setAutoDefaultsApplied(true);
     } else if (facingBetBB > 0) {
-      setFacingSizingBB(facingBetBB);
       setShowFacing(true);
     }
   }, [facingBetBB, facingPosition, heroPosition, autoDefaultsApplied]);
@@ -279,18 +273,13 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
         )}
         <button onClick={() => setShowFacing(!showFacing)}
           className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${showFacing ? "border-green-500/60 bg-green-500/15 text-green-400" : "border-[var(--border)] text-muted-foreground hover:text-green-400 hover:border-green-500/40"}`}>
-          {showFacing ? `${facingSizingBB.toFixed(1)}BB` : "Off"}
+          {showFacing ? "On" : "Off"}
         </button>
         {showFacing && (
-          <>
-            <input type="range" min={0} max={20} step={0.5} value={facingSizingBB}
-              onChange={e => setFacingSizingBB(parseFloat(e.target.value))}
-              className="flex-1 h-1 accent-green-400 cursor-pointer" />
-            <div className="flex gap-1.5 text-[8px]">
-              <span className="text-green-400">V</span><span className="text-slate-400">M</span>
-              <span className="text-amber-300">B</span><span className="text-red-400/60">F</span>
-            </div>
-          </>
+          <div className="flex gap-1.5 text-[8px]">
+            <span className="text-green-400">R</span><span className="text-blue-300">C</span>
+            <span className="text-red-400/60">F</span>
+          </div>
         )}
       </div>
 
@@ -301,15 +290,11 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
             const inPrimary = primary?.range.has(cell.handClass) ?? false;
             const inSecondary = secondary?.range.has(cell.handClass) ?? false;
             const effectiveEquity = hasRangeEquity ? (equityVsRange!.get(cell.handClass) ?? cell.equity) : cell.equity;
-            // Recompute facing with effective equity from MC if available
-            const facing = showFacing && preflopResult
-              ? (cell.inHeroRange ? classifyFacingLocal(effectiveEquity, facingSizingBB, preflopResult.potSizeBB, true) : "F" as SizingRole)
-              : null;
             return (
               <PreflopCellView key={`${cell.row}-${cell.col}`}
                 cell={cell} showEquity={showEquity} effectiveEquity={effectiveEquity}
                 inPrimary={inPrimary} inSecondary={inSecondary} showRange={ranges.length > 0}
-                facing={facing} />
+                showAction={showFacing} />
             );
           })}
         </div>
@@ -318,29 +303,15 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
   );
 }
 
-// Lightweight facing classifier for the slider (uses pipeline's pot size)
-function classifyFacingLocal(equity: number, callCostBB: number, potSizeBB: number, inRange: boolean): SizingRole {
-  if (!inRange) return "F";
-  if (callCostBB <= 0) return "M";
-  const potOdds = callCostBB / (potSizeBB + callCostBB);
-  const surplus = equity - potOdds;
-  const polarization = Math.min(1, Math.max(0, (callCostBB - 2) / 10));
-  if (equity >= 0.70) return "V";
-  if (surplus > 0.15) return "V";
-  if (surplus > 0.05) return "M";
-  if (surplus > -0.05 && polarization > 0.3) return "B";
-  if (surplus > -0.03) return "M";
-  return "F";
-}
-
 // ═══════════════════════════════════════════════════════
 // CELL RENDERERS
 // ═══════════════════════════════════════════════════════
 
-function PreflopCellView({ cell, showEquity, effectiveEquity, inPrimary, inSecondary, showRange, facing }: {
+function PreflopCellView({ cell, showEquity, effectiveEquity, inPrimary, inSecondary, showRange, showAction }: {
   cell: PreflopGridCell; showEquity: boolean; effectiveEquity: number;
-  inPrimary: boolean; inSecondary: boolean; showRange: boolean; facing: SizingRole | null;
+  inPrimary: boolean; inSecondary: boolean; showRange: boolean; showAction: boolean;
 }) {
+  const action = showAction ? cell.action : null;
   let bg: string, txt: string;
   if (cell.isHero) { bg = "bg-blue-600"; txt = "text-white font-bold"; }
   else if (showEquity) {
@@ -361,8 +332,9 @@ function PreflopCellView({ cell, showEquity, effectiveEquity, inPrimary, inSecon
   const primaryRing = showRange && (inPrimary || cell.isHero) ? "ring-2 ring-[var(--gold)] ring-inset" : "";
   const showEqLabel = showEquity && !cell.isHero;
 
+  const actionLabel = action === "R" ? "Raise" : action === "C" ? "Call" : action === "F" ? "Fold" : "";
   const title = cell.isHero ? `Your hand: ${cell.handClass} (${(effectiveEquity*100).toFixed(0)}%)`
-    : `${cell.handClass}: ${(effectiveEquity*100).toFixed(0)}%${facing ? ` | ${ROLE_LABEL[facing]}` : ""}`;
+    : `${cell.handClass}: ${(effectiveEquity*100).toFixed(0)}%${action ? ` | ${actionLabel}` : ""}`;
 
   return (
     <div className={`${bg} ${txt} ${primaryRing} ${dimmed ? "opacity-30" : ""} relative leading-none flex flex-col items-center justify-center rounded-sm aspect-square select-none cursor-default overflow-hidden transition-opacity`} title={title}>
@@ -370,7 +342,7 @@ function PreflopCellView({ cell, showEquity, effectiveEquity, inPrimary, inSecon
         const color = cell.isHero ? "border-t-white border-r-white" : "border-t-cyan-400 border-r-cyan-400";
         return <div className={`absolute top-0 right-0 w-0 h-0 border-t-[8px] border-r-[8px] ${color} border-l-[8px] border-b-[8px] border-l-transparent border-b-transparent`} />;
       })()}
-      {facing && <span className={`absolute bottom-px right-1 text-[9px] font-bold ${cell.isHero ? "text-white/80" : FACING_COLOR[facing]}`}>{facing}</span>}
+      {action && <span className={`absolute bottom-px right-1 text-[9px] font-bold ${cell.isHero ? "text-white/80" : ACTION_COLOR[action]}`}>{action}</span>}
       <span className="text-sm font-semibold">{cell.handClass}</span>
       {showEqLabel && <span className="text-[10px] opacity-75 mt-0.5">{(effectiveEquity*100).toFixed(0)}%</span>}
       {cell.isHero && <span className="text-[10px] opacity-85 mt-0.5">{(effectiveEquity*100).toFixed(0)}%</span>}

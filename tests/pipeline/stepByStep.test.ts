@@ -179,9 +179,9 @@ describe("Step-by-Step Analysis", () => {
             }, 0); // 0 trials = static equity (fast)
 
             const heroCell = gridResult.cells.find(c => c.isHero);
-            const facingLabel = heroCell?.facing ? ` | Facing: ${heroCell.facing}` : "";
+            const actionLabel = heroCell?.action ? ` | Action: ${heroCell.action}` : "";
             const vsLabel = is3Bet ? ` vs ${(lastRaiser?.position ?? "?").toUpperCase()} 3bet` : openerPos ? ` vs ${openerPos.toUpperCase()}` : "";
-            console.log(`  [GRID] Hero: ${gridResult.heroHandClass} (${(gridResult.heroEquity * 100).toFixed(0)}% eq) | Situation: ${gridResult.situation.id}${vsLabel}${facingLabel}`);
+            console.log(`  [GRID] Hero: ${gridResult.heroHandClass} (${(gridResult.heroEquity * 100).toFixed(0)}% eq) | Situation: ${gridResult.situation.id}${vsLabel}${actionLabel}`);
             console.log(`  [GRID] In hero range: ${heroCell?.inHeroRange ? "YES" : "NO"} | In opp range: ${heroCell?.inOpponentRange ? "YES" : "NO"} | Pot: ${gridResult.potSizeBB.toFixed(1)}BB`);
           } else {
             const gridData = computeHandGrid(heroCards, state.communityCards as CardIndex[]);

@@ -9,7 +9,7 @@
  *          → resolveOpponentRange / resolveHeroRange (registry)
  *          → computeEquityGrid (MC)
  *          → computePotAtAction
- *          → classifyFacingGrid
+ *          → classifyAction (R/C/F per cell)
  *          → computePreflopHandGrid (orchestrator)
  *
  * Pure TypeScript, zero Convex/React imports.
@@ -60,9 +60,6 @@ export interface PreflopGridParams {
 // Re-export for any remaining external consumers:
 export type { PreflopSituationContext as PreflopSituation } from "../preflop/situationRegistry";
 
-/** @deprecated Use ActionLetter instead */
-export type SizingRole = "V" | "M" | "B" | "F";
-
 /** The three fundamental poker actions */
 export type ActionLetter = "R" | "C" | "F";
 
@@ -78,8 +75,6 @@ export interface PreflopGridCell {
   equity: number;
   action: ActionLetter | null;
   actionConfidence: ActionConfidence;
-  /** @deprecated Use action instead */
-  facing: SizingRole | null;
   inHeroRange: boolean;
   inOpponentRange: boolean;
 }
@@ -222,44 +217,6 @@ export function computeEquityGrid(
 }
 
 // ═══════════════════════════════════════════════════════
-// STAGE F: Classify facing decision for each hand class
-// ═══════════════════════════════════════════════════════
-
-export function classifyFacing(
-  equity: number,
-  callCostBB: number,
-  potSizeBB: number,
-  inHeroRange: boolean,
-): SizingRole {
-  if (!inHeroRange) return "F";
-  if (callCostBB <= 0) return "M";
-
-  const potOdds = callCostBB / (potSizeBB + callCostBB);
-  const surplus = equity - potOdds;
-  const polarization = Math.min(1, Math.max(0, (callCostBB - 2) / 10));
-
-  if (equity >= 0.70) return "V";
-  if (surplus > 0.15) return "V";
-  if (surplus > 0.05) return "M";
-  if (surplus > -0.05 && polarization > 0.3) return "B";
-  if (surplus > -0.03) return "M";
-  return "F";
-}
-
-export function classifyFacingGrid(
-  equityMap: Map<string, number>,
-  heroContinueRange: Set<string>,
-  callCostBB: number,
-  potSizeBB: number,
-): Map<string, SizingRole> {
-  const result = new Map<string, SizingRole>();
-  for (const [hc, equity] of equityMap) {
-    result.set(hc, classifyFacing(equity, callCostBB, potSizeBB, heroContinueRange.has(hc)));
-  }
-  return result;
-}
-
-// ═══════════════════════════════════════════════════════
 // ACTION CLASSIFICATION (R/C/F)
 // ═══════════════════════════════════════════════════════
 
@@ -305,7 +262,7 @@ function emptyResult(heroPosition: Position, tableSize: number = 6, blindsBB: { 
   const cells: PreflopGridCell[] = [];
   for (let row = 0; row < 13; row++) for (let col = 0; col < 13; col++) {
     const hc = row === col ? RL[row] + RL[col] : row < col ? RL[row] + RL[col] + "s" : RL[col] + RL[row] + "o";
-    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc, defaultOpp), action: null, actionConfidence: "standard" as ActionConfidence, facing: null, inHeroRange: false, inOpponentRange: false });
+    cells.push({ handClass: hc, row, col, type: row === col ? "pair" : row < col ? "suited" : "offsuit", isHero: false, equity: getPreflopEquity(hc, defaultOpp), action: null, actionConfidence: "standard" as ActionConfidence, inHeroRange: false, inOpponentRange: false });
   }
   const emptySituation = classifySituation({ heroPosition, tableSize, openerPosition: null, numCallers: 0, numLimpers: 0, facing3Bet: false });
   const emptyPot = blindsBB.sb + blindsBB.bb;
@@ -362,9 +319,6 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
     : heroPosition === "sb" ? blindsBB.sb : 0;
   const rawCallCost = facing3Bet && threeBetSizeBB ? threeBetSizeBB : openerSizingBB;
   const callCost = Math.max(0, rawCallCost - heroPosted);
-  const facingGrid = callCost > 0
-    ? classifyFacingGrid(equityMap, heroContinueRange, callCost, potSizeBB)
-    : null;
 
   // Build cells with R/C/F action classification
   const cells: PreflopGridCell[] = [];
@@ -391,7 +345,6 @@ export function computePreflopHandGrid(params: PreflopGridParams, mcTrials: numb
         equity: cellEquity,
         action: cellAction,
         actionConfidence: cellConfidence,
-        facing: facingGrid?.get(hc) ?? null, // deprecated — kept for backward compat
         inHeroRange: inRange,
         inOpponentRange: opponentRange?.has(hc) ?? false,
       });
