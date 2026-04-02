@@ -39,9 +39,9 @@ Toggle "Equity" button in the header. Each cell shows its raw preflop equity vs 
 
 Header shows: "X stronger, Y same, Z weaker" relative to hero's hand.
 
-**Data source:** `convex/lib/gto/preflopEquityTable.ts` — static lookup table of all 169 hand classes.
+**Data source:** `convex/lib/gto/preflopEquityTable.ts` — 9 lookup tables (1-9 opponents), computed via 100K MC trials each. The table is selected based on the number of active opponents: UTG at 6-max sees 5-opponent equity (AA = 49%), BTN sees 2-opponent equity (AA = 73%).
 
-**What it teaches:** Relative hand strength. Where your hand sits in the 169-hand hierarchy.
+**What it teaches:** Relative hand strength in context. AA isn't 85% when 5 opponents are behind you — it's 49%. Position matters even for premiums.
 
 ## Layer 3: Position Ranges
 
@@ -60,9 +60,14 @@ Second header bar with position buttons: Hero(BTN), UTG, HJ, CO, BTN, SB.
 
 Header shows: "BTN ~44% vs CO ~27%" when comparing two positions.
 
-**Data source:** `GTO_RFI_RANGES` in `convex/lib/gto/tables/preflopRanges.ts` — static Sets per position.
+**Data source:** Range data in `convex/lib/gto/tables/preflopRanges.ts`, resolved by `convex/lib/preflop/situationRanges.ts`. The range shown depends on the situation (classified by `convex/lib/preflop/situationRegistry.ts`):
+- **RFI:** `GTO_RFI_RANGES` per position
+- **Facing open:** cold-call + 3-bet ranges (or BB defense by opener)
+- **Facing limpers:** `GTO_ISO_RAISE_RANGES` per position
+- **BB vs limpers:** `GTO_BB_RAISE_VS_LIMPERS` keyed by limper count
+- **BB vs SB complete:** `GTO_BB_RAISE_VS_SB_COMPLETE`
 
-**What it teaches:** Position determines range width. UTG opens tight (15%), BTN opens wide (44%). The student sees the gap visually.
+**What it teaches:** Position determines range width. UTG opens tight (15%), BTN opens wide (44%). But range also depends on situation — facing limpers, BB gets a free flop, iso-raising is different from opening.
 
 ## Layer 4: Equity vs Range
 
@@ -117,9 +122,13 @@ When community cards arrive (flop/turn/river), the grid transforms:
 | File | Purpose |
 |------|---------|
 | `src/components/analysis/hand-grid.tsx` | React component — all UI + MC computation |
-| `convex/lib/analysis/handGrid.ts` | Pure TS grid computation (for headless/tests) |
-| `convex/lib/gto/preflopEquityTable.ts` | Static equity vs random for 169 hand classes |
-| `convex/lib/gto/tables/preflopRanges.ts` | GTO opening/calling/3-bet ranges per position |
+| `convex/lib/analysis/preflopGrid.ts` | Preflop grid orchestrator (calls registry + range resolver) |
+| `convex/lib/analysis/handGrid.ts` | Postflop grid computation (for headless/tests) |
+| `convex/lib/preflop/situationRegistry.ts` | Situation classification — single source of truth (10 situations) |
+| `convex/lib/preflop/situationRanges.ts` | Range resolution — maps situation → actual range data |
+| `convex/lib/preflop/rangeUtils.ts` | Shared utils: normalize6Max, compressRangeByStack |
+| `convex/lib/gto/preflopEquityTable.ts` | 9 equity tables (1-9 opponents, 100K MC each) |
+| `convex/lib/gto/tables/preflopRanges.ts` | GTO ranges: RFI, defense, iso-raise, BB vs limpers, SB complete |
 | `src/components/workspace/workspace-shell.tsx` | Hosts the grid, passes game state props |
 
 ## Props Interface
@@ -131,8 +140,21 @@ interface HandGridProps {
   heroPosition?: string;        // Hero's position ("btn", "co", etc.)
   facingBetBB?: number;         // Current bet to call in BB
   facingPosition?: string;      // Position of the bettor ("hj", "utg", etc.)
+  stackDepthBB?: number;        // Stack depth in BB (default 100)
+  numCallers?: number;           // Cold-callers of a raise (excludes limpers)
+  numLimpers?: number;           // Pre-raise calls (limps)
+  numPlayers?: number;           // Table size 2-10 (default 6)
 }
 ```
+
+## Situation Registry
+
+All preflop classification flows through a single registry (`convex/lib/preflop/situationRegistry.ts`). Each situation defines its ID, engine key, range sources, opponent count rule, and coaching metadata. The classifier is a pure function — given game state inputs, returns exactly one `PreflopSituationContext`.
+
+10 situations: `rfi`, `facing_open`, `facing_open_multiway`, `facing_3bet`, `facing_4bet`, `blind_vs_blind`, `facing_limpers`, `bb_vs_limpers`, `bb_vs_sb_complete`, `bb_uncontested`.
+
+Full taxonomy and design: `docs/preflop-situations.md`
+Implementation plan: `docs/plans/situation-registry-plan.md`
 
 ## Precision Analysis — Where the Math Is and Isn't Exact
 
@@ -141,8 +163,8 @@ Each layer builds on the one below. The precision boundary is clear: Layers 1-2 
 ### Layer 1 — The Grid: EXACT
 The 13×13 hand class matrix is a mathematical fact. 169 unique starting hand classes, correctly mapped to rank/suit combinations. No approximation.
 
-### Layer 2 — Equity vs Random: NEAR-EXACT (~1-2% imprecision)
-Static preflop equity values sourced from poker literature consensus. These are well-established numbers computed from exhaustive enumeration by multiple independent tools (ProPokerTools, Equilab, etc.). Individual values may be ~1-2% off from a fresh computation, but the relative ordering across all 169 hands is correct. The imprecision is consistent — no hand is dramatically wrong.
+### Layer 2 — Equity vs N Opponents: COMPUTED (~0.3% precision)
+9 equity tables (1-9 opponents) computed via our own Monte Carlo (100K trials per hand class) using `evaluateHand()`. Validated against 500K trial runs — top hands match within 0.1%, all within 0.5%. The table adjusts dynamically: UTG at 6-max uses 5-opponent equity, BTN uses 2-opponent equity. As players fold, the opponent count updates and equity reflects the narrowed field.
 
 ### Layer 3 — Position Ranges: THE PRECISION BOUNDARY
 This is where approximation enters. Two distinct limitations:
@@ -182,7 +204,7 @@ Two sources of approximation:
 | Layer | Precision | What limits it |
 |-------|-----------|----------------|
 | Grid (13×13) | Exact | Nothing |
-| Equity vs random | ~98% | Literature consensus, not fresh computation |
+| Equity vs N opponents | ~99.7% | 100K MC trials, position-aware (1-9 opponent tables) |
 | Position ranges | **Approximate** | Binary simplification of solver frequencies, third-party sourced |
 | Equity vs range (MC) | Exact computation | Inherits range approximation from Layer 3 |
 | Facing classification | Heuristic | Hand-tuned thresholds, binary continue range |
