@@ -1,5 +1,13 @@
 # First Principles — How Poker Decisions Flow
 
+> **This is the engine architecture document.** It describes how the poker decision system
+> works internally — the game tree, profiles, coaching, computation, and validation.
+>
+> For the learning architecture (how students experience HoldemVision), see
+> `visual-first-principles.md`. For the product vision (why HoldemVision exists),
+> see `product-vision.md`. For mathematical fidelity scores per layer, see
+> `visual-math-fidelity.md`.
+
 ## Layer 1: The Fundamental Unit
 
 A poker hand is a **sequence of decisions under uncertainty**. Each decision point has:
