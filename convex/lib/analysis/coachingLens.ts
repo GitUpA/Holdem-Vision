@@ -123,7 +123,7 @@ export const coachingLens: AnalysisLens = {
     const advices: CoachingAdvice[] = [];
 
     // Pre-compute GTO solver data if available (shared across the GTO profile)
-    const gtoSolverAdvice = tryGtoSolverLookup(gameState, heroSeat, context.heroCards, legal);
+    const gtoSolverAdvice = tryGtoSolverLookup(gameState, heroSeat, context.heroCards, legal, context.situationContext);
 
     // Build opponent story for each active opponent (not hero, not folded)
     let primaryOpponentStory: OpponentStory | undefined;
@@ -397,6 +397,7 @@ function tryGtoSolverLookup(
   heroSeat: number,
   heroCards: CardIndex[],
   legal: LegalActions,
+  situationContext?: import("../preflop/situationRegistry").PreflopSituationContext,
 ): CoachingAdvice | null {
   if (heroCards.length < 2) return null;
 
@@ -425,7 +426,7 @@ function tryGtoSolverLookup(
     gameState,
     heroSeat,
     legal,
-    { opponents: opponents.length > 0 ? opponents : undefined },
+    { opponents: opponents.length > 0 ? opponents : undefined, situationContext },
   );
 
   if (!result) return null;

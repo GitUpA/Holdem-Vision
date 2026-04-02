@@ -26,6 +26,7 @@ import { classifyArchetype, contextFromGameState } from "../gto/archetypeClassif
 import { categorizeHand } from "../gto/handCategorizer";
 import { analyzeBoard, type BoardTexture } from "../opponents/engines/boardTexture";
 import { lookupGtoFrequencies } from "../gto/frequencyLookup";
+import { classifySituationFromState } from "../preflop/situationRegistry";
 import { buildOpponentStory } from "./opponentStory";
 import { buildActionStories } from "../gto/actionNarratives";
 import { commentateHand } from "./handCommentator";
@@ -243,9 +244,14 @@ export function captureFullSnapshot(
           .filter((o) => o.profile)
       : undefined;
 
+    // Derive situation context once for this snapshot
+    const sitCtx = gameState.currentStreet === "preflop"
+      ? classifySituationFromState(gameState, heroSeat) : undefined;
+
     gtoLookup = lookupGtoFrequencies(heroCards, communityCards, gameState, heroSeat, legal, {
       opponents,
       deadCards: opts.deadCards,
+      situationContext: sitCtx,
     });
   }
 

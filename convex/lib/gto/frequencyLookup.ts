@@ -102,6 +102,8 @@ export function lookupGtoFrequencies(
   opts?: {
     opponents?: OpponentInput[];
     deadCards?: CardIndex[];
+    /** Pre-computed situation context — avoids redundant classification */
+    situationContext?: import("../preflop/situationRegistry").PreflopSituationContext;
   },
 ): GtoLookupResult | null {
   if (heroCards.length < 2) return null;
@@ -120,8 +122,8 @@ export function lookupGtoFrequencies(
     const position = gameState.players[heroSeat].position;
     const handCat = categorizeHand(heroCards, communityCards);
 
-    // Use registry situation ID directly (no archetype indirection for preflop)
-    const sitCtx = classifySituationFromState(gameState, heroSeat);
+    // Use pre-computed situation context if available, else derive
+    const sitCtx = opts?.situationContext ?? classifySituationFromState(gameState, heroSeat);
 
     const classification = classifyPreflopHand(handClass, sitCtx.id, position, sitCtx.openerPosition ?? undefined);
     const frequencies = classificationToFrequencies(classification, sitCtx.id);
