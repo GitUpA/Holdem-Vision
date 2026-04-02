@@ -97,6 +97,69 @@ export const HAND_STRENGTH_ORDER: string[] = [
 // Premium hands that never fold from any position
 const PREMIUMS = new Set(["AA", "KK", "QQ", "AKs"]);
 
+/**
+ * Hand-specific teaching insight — why THIS hand works in THIS spot.
+ * Returns a sentence fragment to append to the generic teachingNote.
+ */
+function handInsight(handClass: string, context: "open" | "defend" | "3bet" | "iso" | "limp_raise"): string {
+  const isPair = handClass.length === 2;
+  const isSuited = handClass.endsWith("s");
+  const r1 = handClass[0];
+  const r2 = handClass[isPair ? 1 : 1];
+
+  // Premiums
+  if (PREMIUMS.has(handClass)) return "";
+
+  // Pairs
+  if (isPair) {
+    const rank = "AKQJT98765432".indexOf(r1);
+    if (rank <= 4) return " Big pairs dominate smaller pairs and overcards — raise for value.";
+    if (rank <= 7) return " Medium pairs play for set value. Hit a set ~12% of the time, win big pots.";
+    return " Small pairs are set-mining hands. See a cheap flop, fold if you miss.";
+  }
+
+  // Suited aces
+  if (r1 === "A" && isSuited) {
+    return " Suited aces have nut flush potential. Even with a weak kicker, the flush draws are premium.";
+  }
+
+  // Offsuit aces
+  if (r1 === "A" && !isSuited) {
+    const kicker = "AKQJT98765432".indexOf(r2);
+    if (kicker <= 3) return " Strong ace — your kicker plays. Dominates weaker Ax hands.";
+    return " Weak ace — reverse implied odds if you hit top pair with a bad kicker.";
+  }
+
+  // Suited broadways (KQs, KJs, QJs, JTs)
+  if (isSuited && "KQJT".includes(r1) && "KQJT".includes(r2)) {
+    return " Suited broadway — makes strong top pairs, flushes, and straights. Great playability.";
+  }
+
+  // Suited connectors
+  if (isSuited) {
+    const gap = Math.abs("AKQJT98765432".indexOf(r1) - "AKQJT98765432".indexOf(r2));
+    if (gap === 1) return " Suited connector — strong board coverage on low/mid flops. Plays well multiway.";
+    if (gap === 2) return " Suited one-gapper — decent straight and flush potential. Needs position to realize equity.";
+    if (gap >= 3) return " Suited hand — the suitedness adds ~3% equity via flush draws.";
+  }
+
+  // Offsuit broadways
+  if ("AKQJT".includes(r1) && "AKQJT".includes(r2)) {
+    if (context === "3bet" || context === "defend") return " Broadway cards — top pair potential but beware domination by better Kx/Qx.";
+    return " Broadway hand — makes strong top pairs but plays poorly multiway.";
+  }
+
+  // Offsuit connectors
+  const gap = Math.abs("AKQJT98765432".indexOf(r1) - "AKQJT98765432".indexOf(r2));
+  if (gap === 1 && !isSuited) return " Offsuit connector — playable in position but can't make flushes. Be cautious.";
+
+  return "";
+}
+
+// ═══════════════════════════════════════════════════════
+// CLASSIFICATION
+// ═══════════════════════════════════════════════════════
+
 // ═══════════════════════════════════════════════════════
 // CLASSIFICATION
 // ═══════════════════════════════════════════════════════
@@ -221,13 +284,14 @@ function classifyRfi(handClass: string, position: string): PreflopClassification
   if (range.has(handClass)) {
     const dist = boundaryDistance(handClass, range);
     const isDeep = dist >= 5;
+    const insight = handInsight(handClass, "open");
     return {
       rangeClass: isDeep ? "raise" : "raise",
       matchedRange: "rfi",
       reason: `${handClass} is in the ${position.toUpperCase()} opening range.`,
-      teachingNote: isDeep
-        ? `Standard open from ${position.toUpperCase()}. Raise for value and initiative.`
-        : `Near the edge of the ${position.toUpperCase()} range. Open, but be prepared to fold to a 3-bet.`,
+      teachingNote: (isDeep
+        ? `Standard open from ${position.toUpperCase()}.`
+        : `Near the edge of the ${position.toUpperCase()} range. Open, but be prepared to fold to a 3-bet.`) + insight,
       boundaryDistance: dist,
     };
   }
@@ -258,21 +322,23 @@ function classifyBbDefense(handClass: string, openerPosition: string): PreflopCl
   const opLabel = openerPosition.toUpperCase();
 
   if (defense.threebet.has(handClass)) {
+    const insight = handInsight(handClass, "3bet");
     return {
       rangeClass: PREMIUMS.has(handClass) ? "clear_raise" : "raise",
       matchedRange: "bb_3bet",
       reason: `${handClass} is in the BB 3-bet range vs ${opLabel}.`,
-      teachingNote: `3-bet for value from the BB. You have a strong hand that plays well in a re-raised pot.`,
+      teachingNote: `3-bet for value from the BB. You have a strong hand that plays well in a re-raised pot.` + insight,
       boundaryDistance: 10,
     };
   }
 
   if (defense.call.has(handClass)) {
+    const insight = handInsight(handClass, "defend");
     return {
       rangeClass: "call",
       matchedRange: "bb_call",
       reason: `${handClass} defends in the BB vs ${opLabel} open — call.`,
-      teachingNote: `You're getting a discount from the big blind. This hand has enough playability to see a flop.`,
+      teachingNote: `You're getting a discount from the big blind.` + insight,
       boundaryDistance: 5,
     };
   }
@@ -305,31 +371,34 @@ function classify3Bet(handClass: string, position: string): PreflopClassificatio
   const coldCall = GTO_COLD_CALL_RANGES?.[position];
 
   if (threebet?.has(handClass)) {
+    const insight = handInsight(handClass, "3bet");
     return {
       rangeClass: PREMIUMS.has(handClass) ? "clear_raise" : "raise",
       matchedRange: "3bet",
       reason: `${handClass} is in the ${position.toUpperCase()} 3-bet range.`,
-      teachingNote: `3-bet for value. You have a hand strong enough to build a big pot preflop.`,
+      teachingNote: `3-bet for value. You have a hand strong enough to build a big pot preflop.` + insight,
       boundaryDistance: 10,
     };
   }
 
   if (mixed?.has(handClass)) {
+    const insight = handInsight(handClass, "3bet");
     return {
       rangeClass: "mixed_raise",
       matchedRange: "3bet_mixed",
       reason: `${handClass} is a mixed 3-bet/call hand from ${position.toUpperCase()}.`,
-      teachingNote: `This hand plays well both as a 3-bet (for balance/fold equity) and as a call (for implied odds). Mix it up.`,
+      teachingNote: `Both 3-betting (for fold equity) and calling (for implied odds) are valid.` + insight,
       boundaryDistance: 5,
     };
   }
 
   if (coldCall?.has(handClass)) {
+    const insight = handInsight(handClass, "defend");
     return {
       rangeClass: "call",
       matchedRange: "cold_call",
       reason: `${handClass} cold-calls from ${position.toUpperCase()} — too strong to fold, not strong enough to 3-bet.`,
-      teachingNote: `Call in position. This hand has good playability postflop but doesn't want to bloat the pot preflop.`,
+      teachingNote: `Call in position. Good playability postflop but don't bloat the pot.` + insight,
       boundaryDistance: 5,
     };
   }
@@ -472,13 +541,14 @@ function classifyIsoRaise(handClass: string, position: string): PreflopClassific
 
   if (range.has(handClass)) {
     const dist = boundaryDistance(handClass, range);
+    const insight = handInsight(handClass, "iso");
     return {
       rangeClass: dist >= 5 ? "raise" : "raise",
       matchedRange: "iso_raise",
       reason: `${handClass} iso-raises from ${position.toUpperCase()} vs limper(s).`,
-      teachingNote: dist >= 5
-        ? `Limpers have capped ranges — no premiums. Iso-raise to play in position against a weak range.`
-        : `Near the edge of your iso-raise range. Raise vs passive limpers, consider over-limping vs aggressive ones.`,
+      teachingNote: (dist >= 5
+        ? `Limpers have capped ranges — no premiums. Iso-raise to play against a weak range.`
+        : `Near the edge of your iso-raise range. Raise vs passive limpers, consider over-limping vs aggressive ones.`) + insight,
       boundaryDistance: dist,
     };
   }

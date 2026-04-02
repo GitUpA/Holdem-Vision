@@ -172,8 +172,11 @@ export function resolveHeroRange(
   const range = resolveRange(entry.heroRangeSource, ctx);
   if (!range || range.size === 0) return new Set();
 
-  // Multiway adjustment: each additional caller tightens the continue range
-  const numCallers = ctx.numCallers;
-  const effectiveStack = stackDepthBB - (numCallers * 15);
+  // Multiway adjustment: more opponents = tighter continue range.
+  // Each caller of a raise adds 15BB penalty (standard, crosses compression threshold at 2+).
+  // Limpers add less (8BB each — capped range is less threatening, but still tightens).
+  const callerPenalty = ctx.numCallers * 15;
+  const limperPenalty = ctx.numLimpers * 8;
+  const effectiveStack = stackDepthBB - callerPenalty - limperPenalty;
   return compressRangeByStack(range, effectiveStack);
 }
