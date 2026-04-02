@@ -230,19 +230,26 @@ export function classifyAction(
   potSizeBB: number,
   situationId: string,
 ): ActionLetter {
-  if (!inHeroRange) return "F";
+  // First principle: F only applies when continuing costs chips.
+  // When hero has a free option (BB with no raise), the worst action is C (check), never F.
+  // BB-specific: bb_vs_limpers, bb_vs_sb_complete, bb_uncontested have free check.
+  // RFI from non-BB: callCost is 0 but hero can't check — must raise or fold.
+  const FREE_CHECK_SITUATIONS = new Set(["bb_vs_limpers", "bb_vs_sb_complete", "bb_uncontested"]);
+  const isFreeOption = FREE_CHECK_SITUATIONS.has(situationId);
+
+  if (!inHeroRange) return isFreeOption ? "C" : "F";
 
   if (rangeClass === "clear_raise" || rangeClass === "raise") return "R";
   if (rangeClass === "mixed_raise") return "C"; // majority action is call; coaching notes raise is valid
   if (rangeClass === "call") return "C";
 
   if (rangeClass === "borderline") {
-    if (OPENING_SITUATIONS.has(situationId)) return "F"; // not strong enough to open
+    if (OPENING_SITUATIONS.has(situationId)) return isFreeOption ? "C" : "F";
     const potOdds = callCostBB / (potSizeBB + callCostBB);
-    return equity > potOdds + 0.05 ? "C" : "F";
+    return equity > potOdds + 0.05 ? "C" : (isFreeOption ? "C" : "F");
   }
 
-  return "F";
+  return isFreeOption ? "C" : "F";
 }
 
 export function actionConfidence(boundaryDistance: number): ActionConfidence {

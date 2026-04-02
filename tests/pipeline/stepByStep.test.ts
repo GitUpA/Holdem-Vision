@@ -19,6 +19,7 @@ import { comboToHandClass, cardsToCombo } from "../../convex/lib/opponents/combo
 import { cardToString, rankValue } from "../../convex/lib/primitives/card";
 import { computeHandGrid } from "../../convex/lib/analysis/handGrid";
 import { computePreflopHandGrid, type PreflopGridResult } from "../../convex/lib/analysis/preflopGrid";
+import { classifySituationFromState } from "../../convex/lib/preflop/situationRegistry";
 import type { Position } from "../../convex/lib/types/cards";
 import { positionDisplayName } from "../../convex/lib/primitives/position";
 import type { CardIndex } from "../../convex/lib/types/cards";
@@ -159,28 +160,32 @@ describe("Step-by-Step Analysis", () => {
             );
             const heroPosition = state.players[0]?.position as Position;
             // Detect situation: did hero raise and then get re-raised?
-            const heroRaised = preflopRaises.some((a: { seatIndex: number }) => a.seatIndex === 0);
-            const nonHeroRaises = preflopRaises.filter((a: { seatIndex: number }) => a.seatIndex !== 0);
-            const firstOpener = nonHeroRaises.length > 0 ? nonHeroRaises[0] : null;
-            const lastRaiser = preflopRaises.length > 0 ? preflopRaises[preflopRaises.length - 1] : null;
-            const is3Bet = heroRaised && nonHeroRaises.length > 0;
-            const heroOpenAmt = preflopRaises.find((a: { seatIndex: number }) => a.seatIndex === 0)?.amount ?? 0;
-            const openerPos = is3Bet ? undefined : (firstOpener?.position as Position | undefined);
-            const openerAmt = is3Bet ? heroOpenAmt : (firstOpener?.amount ?? 0);
+            // Use the registry classifier to derive ALL grid params from game state
+            const sitCtx = classifySituationFromState(state, 0);
+            const pf = state.actionHistory.filter(a => a.street === "preflop");
+            const firstRaiseIdx = pf.findIndex(a => a.actionType === "raise" || a.actionType === "bet");
+            const preflopRaisesAll = pf.filter(a => a.actionType === "raise" || a.actionType === "bet");
+            const bbSize = state.blinds.big || 1;
 
             const gridResult: PreflopGridResult = computePreflopHandGrid({
               heroCards,
               heroPosition,
-              openerPosition: openerPos,
-              openerSizingBB: openerAmt,
-              facing3Bet: is3Bet,
-              threeBettorPosition: is3Bet ? (lastRaiser?.position as Position) : undefined,
-              threeBetSizeBB: is3Bet ? (lastRaiser?.amount ?? 0) : undefined,
-            }, 0); // 0 trials = static equity (fast)
+              openerPosition: sitCtx.openerPosition ?? undefined,
+              openerSizingBB: preflopRaisesAll.length > 0 ? (preflopRaisesAll[0].amount ?? 0) / bbSize : 0,
+              numCallers: sitCtx.numCallers,
+              numLimpers: sitCtx.numLimpers,
+              facing3Bet: sitCtx.raiseCount >= 2,
+              facing4Bet: sitCtx.raiseCount >= 3,
+              threeBettorPosition: sitCtx.threeBettorPosition ?? undefined,
+              threeBetSizeBB: preflopRaisesAll.length >= 2 ? (preflopRaisesAll[1].amount ?? 0) / bbSize : undefined,
+              isSBComplete: sitCtx.id === "bb_vs_sb_complete",
+              tableSize: state.numPlayers,
+            }, 0);
 
             const heroCell = gridResult.cells.find(c => c.isHero);
             const actionLabel = heroCell?.action ? ` | Action: ${heroCell.action}` : "";
-            const vsLabel = is3Bet ? ` vs ${(lastRaiser?.position ?? "?").toUpperCase()} 3bet` : openerPos ? ` vs ${openerPos.toUpperCase()}` : "";
+            const vsLabel = sitCtx.threeBettorPosition ? ` vs ${sitCtx.threeBettorPosition.toUpperCase()} 3bet`
+              : sitCtx.openerPosition ? ` vs ${sitCtx.openerPosition.toUpperCase()}` : "";
             console.log(`  [GRID] Hero: ${gridResult.heroHandClass} (${(gridResult.heroEquity * 100).toFixed(0)}% eq) | Situation: ${gridResult.situation.id}${vsLabel}${actionLabel}`);
             console.log(`  [GRID] In hero range: ${heroCell?.inHeroRange ? "YES" : "NO"} | In opp range: ${heroCell?.inOpponentRange ? "YES" : "NO"} | Pot: ${gridResult.potSizeBB.toFixed(1)}BB`);
           } else {
