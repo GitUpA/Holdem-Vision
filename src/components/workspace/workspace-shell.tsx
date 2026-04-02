@@ -648,10 +648,19 @@ export function WorkspaceShell({ initialMode, initialSource, drillParams, vision
                     .filter(a => a.street === "preflop")
                     .map(a => ({ position: a.position, actionType: a.actionType, amount: a.amount }))
                   }
-                  numCallers={ws.gameState?.actionHistory
-                    .filter(a => a.street === "preflop" && a.actionType === "call" && a.seatIndex !== ws.heroSeatIndex)
-                    .length ?? 0
-                  }
+                  numCallers={(() => {
+                    if (!ws.gameState) return 0;
+                    const pf = ws.gameState.actionHistory.filter(a => a.street === "preflop");
+                    const firstRaiseIdx = pf.findIndex(a => a.actionType === "raise");
+                    if (firstRaiseIdx === -1) return 0; // no raise = no callers (only limpers)
+                    return pf.filter((a, i) => a.actionType === "call" && i > firstRaiseIdx && a.seatIndex !== ws.heroSeatIndex).length;
+                  })()}
+                  numLimpers={(() => {
+                    if (!ws.gameState) return 0;
+                    const pf = ws.gameState.actionHistory.filter(a => a.street === "preflop");
+                    const firstRaiseIdx = pf.findIndex(a => a.actionType === "raise");
+                    return pf.filter((a, i) => a.actionType === "call" && (firstRaiseIdx === -1 || i < firstRaiseIdx) && a.seatIndex !== ws.heroSeatIndex).length;
+                  })()}
                   numPlayers={ws.numPlayers}
                 />
               )}

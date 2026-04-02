@@ -63,6 +63,7 @@ interface HandGridProps {
   preflopActions?: PreflopAction[];
   stackDepthBB?: number;
   numCallers?: number;
+  numLimpers?: number;
   numPlayers?: number;
 }
 
@@ -70,7 +71,7 @@ interface HandGridProps {
 // COMPONENT
 // ═══════════════════════════════════════════════════════
 
-export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100, numCallers = 0, numPlayers = 6 }: HandGridProps) {
+export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB = 0, facingPosition, preflopActions, stackDepthBB = 100, numCallers = 0, numLimpers = 0, numPlayers = 6 }: HandGridProps) {
   const [showEquity, setShowEquity] = useState(true);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [facingSizingBB, setFacingSizingBB] = useState(0);
@@ -120,8 +121,10 @@ export function HandGrid({ heroCards, communityCards, heroPosition, facingBetBB 
       openerSizingBB: facingBetBB,
       stackDepthBB,
       numCallers,
+      numLimpers,
+      tableSize: numPlayers,
     }, 0); // 0 trials = use static equity (no MC yet)
-  }, [heroCards, heroPosition, hasBoard, facingBetBB, facingPosition]);
+  }, [heroCards, heroPosition, hasBoard, facingBetBB, facingPosition, numLimpers]);
 
   // ── POSTFLOP: local computation ──
   const postflopData = useMemo(() => {

@@ -163,6 +163,20 @@ function buildPreflopScene(
   const archetypeLabel = archetype ? archetype.archetypeId.replace(/_/g, " ") : "";
 
   if (villainRaises.length === 0) {
+    // Check for limpers
+    const preflopActions = state.actionHistory.filter((a) => a.street === "preflop");
+    const limpers = preflopActions.filter((a) => a.actionType === "call" && a.seatIndex !== heroSeat);
+    if (limpers.length > 0) {
+      const heroPos = state.players[heroSeat].position;
+      if (heroPos === "bb") {
+        const isSBComplete = limpers.length === 1 && state.players[limpers[0].seatIndex].position === "sb";
+        if (isSBComplete) {
+          return `You're on the ${posLabel} with ${heroCardStr}. SB completed — their range is wide and capped. You can raise or check.`;
+        }
+        return `You're on the ${posLabel} with ${heroCardStr}. ${limpers.length} limper${limpers.length > 1 ? "s" : ""} to you — you can raise for value or check for a free flop.`;
+      }
+      return `You're on the ${posLabel} with ${heroCardStr}. ${limpers.length} limper${limpers.length > 1 ? "s" : ""} ahead — their range is capped. Iso-raise, over-limp, or fold.`;
+    }
     return `You're on the ${posLabel} with ${heroCardStr}. No one has raised yet — you have the initiative.`;
   }
 
