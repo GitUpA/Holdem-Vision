@@ -61,12 +61,13 @@ pnpm test:watch    # watch mode
 ## Key Patterns
 
 - Domain logic is pure TS in `convex/lib/` — no React, no Convex runtime.
-- Opponent profiles use situation-based model (11 SituationKeys x BehavioralParams).
+- Opponent profiles use situation-based model (14 SituationKeys × BehavioralParams).
 - 1 unified decision engine (`modified-gto`): GTO solver base + profile-specific frequency modifiers (NIT/FISH/TAG/LAG/GTO).
 - **One system**: Free Play and Archetype mode are identical except board generation (random vs constrained).
 - **Every seat is a player**: hero is the seat that pauses for human input. Headless mode auto-plays hero.
 - **Coach is blind**: coaching infers opponent behavior from actions, never reads assigned profile labels.
-- **Pre-compute strategy**: preflop uses complete solver-quality frequency table (3380 cells, `data/solver/complete_preflop_tables.json`), postflop uses solver tables (56 facing-bet tables across 4 scenarios × 8 archetypes × 3 streets), equity uses lookup tables. Zero Monte Carlo in headless/Convex.
+- **Pre-compute strategy**: preflop uses complete solver-quality frequency table (3380 cells, `data/solver/complete_preflop_tables.json`), postflop uses solver tables (56 facing-bet tables across 4 scenarios × 8 archetypes × 3 streets), equity uses 9 preflop lookup tables (1-9 opponents, 100K MC each). Zero Monte Carlo in headless/Convex.
+- **Preflop situation registry**: `convex/lib/preflop/situationRegistry.ts` — single source of truth for all 10 preflop situations. Classifier, range resolver, opponent count, coaching metadata. Full taxonomy: `docs/preflop-situations.md`.
 - **Self-improving coaching**: `/improve-system` plays 50 hands step-by-step with poker reasoning as judge. `/improve-coaching` runs automated 1000-hand audits. 22+ coaching issues found and fixed across 400 hands.
 - `/vision` is public (no auth required). Archetype mode at `/vision?mode=drill`.
 
